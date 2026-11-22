@@ -2,7 +2,7 @@
 type: prototype
 status: open
 blocked-by: []
-assignee:
+assignee: claude+user
 ---
 # Computer prototype of the four-track workflow
 
