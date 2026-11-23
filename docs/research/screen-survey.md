@@ -4,6 +4,11 @@ Source read: `core/interface/*` of v1.0.0 with our Four-Track screen (paths belo
 
 Confidence key: **H** = read directly in code, **M** = read, but I inferred how pieces connect, **L** = guess.
 
+> **Corrections after the owner replied (2026-11-24).**
+> - The survey said only about 2.6 MB of memory is left for samples. That overstated the limit. Stock v1.0.0 streams samples of 256 KB or more from the SD card and keeps only their first 32,768 frames (about 0.74 s, 64 KB mono on the Original) in memory, in One-Shot and Loop modes (`CHANGELOG.md` item 6, `core/AudioEngine/VoiceStreamManager.h`, `core/source/mtStructs.h:775-793`). About 40 long samples fit in the 2.6 MB. The real limits are 48 instrument slots, 8 streaming voices at once, and SD speed.
+> - The owner wants any loaded sample or line input recordable onto a track, not "drum kits" as such, and wants both pad modes (one sample per pad, or one sample across the pads), chosen per sample.
+> - MIDI stays, because the owner connects controllers.
+
 ## 1. Summary table
 
 | # | Stock module (button) | Screen title(s) | Verdict | One-line reason |

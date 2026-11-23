@@ -34,3 +34,9 @@ What is this effort for, which device, and what is the shape of the workflow?
 - Offset in Repeat mode wraps around the loop; in Play once mode anything pushed past either end is cut off.
 - Bar choices: 1, 2, 3, 4, 6 and 8, and 12, 16, 20, 24, 28 and 32 after a very long first take. This supersedes the earlier 1, 2, 4, 8, 16.
 - Manual tempo (confirmed by the owner): before the first take the person can set a starting tempo, with a one-bar count-in. Left on "Free", the first take sets the loop and the tempo is derived from its length, as decided above. Built in the simulator (`prototype/sim`).
+- Sounds that go onto a track: line input (live instruments) and any loaded sample played from the pads. The type of sample does not matter.
+- Pad behaviour, owner's choice: both modes, chosen per sample. "Pad" mode: one pad triggers one sample. "Keys" mode: one sample spread across the pads at different pitches (the stock behaviour). Stock instrument slots 0 to 47 map one to one onto the 48 pads for Pad mode.
+- Loaded samples can stream from the SD card, as in stock v1.0.0: samples of 256 KB or more keep only about 0.74 s in memory (64 KB, mono on the Original) in One-Shot and Loop modes. Slice, Beat Slice, Granular and Wavetable stay fully in memory. Memory is therefore not the limit for a pad bank; the limits are 48 instrument slots, 8 simultaneous streaming voices, and SD speed (not measured).
+- Part Editor is the small set: trim start and end, offset, fades, normalize. Tone comes from the master effects.
+- MIDI stays. The owner connects controllers, so the MIDI settings in Config stay visible and MIDI input must trigger the same sounds as the pads.
+- No old Tracker projects need keeping: it is a new SD card with no projects.
