@@ -79,6 +79,7 @@ void Recorder::record()
 
     isActive = true;
     recordingHeadIdx = 0;
+    DestinationChannelConfig::length = 0; // a new recording starts empty, not at the last length
 }
 
 void Recorder::update()

@@ -11,6 +11,7 @@
 
 #include "fileBrowser/GlobalFileBrowser.h"
 #include "fileManager/FileManagerModule.h"
+#include "fourTrack/fourTrack.h"
 #include "infoViewer/infoViewer.h"
 #include "instrumentEditor/instrumentEditor.h"
 #include "masterParams/masterParams.h"
@@ -55,7 +56,7 @@ extern uint8_t isAudioOutMuted();
 //=======================================================================
 //=======================================================================
 
-const uint8_t Interface::modulesCount = 14;
+const uint8_t Interface::modulesCount = 15;
 const hModule Interface::modules[modulesCount] = {
     &projectEditor,    // 0
     &sampleImporter,   // 1
@@ -71,6 +72,7 @@ const hModule Interface::modules[modulesCount] = {
     &globalFileBrowser, // 11
     &masterParams,      // 12
     &fileManagerModule, // 13
+    &fourTrack,         // 14 (test build: opened with the Song button)
 };
 
 const uint8_t Interface::modulesButtonsCount = 11;
@@ -84,7 +86,7 @@ const uint32_t Interface::modulesButtons[modulesButtonsCount][3] = {
     { interfaceButtonSampleEdit, 6, 0 },
     { interfaceButtonSampleRec, 8, 0 },
     { interfaceButtonSampleLoad, 1, 0 },
-    { interfaceButtonSong, 4, 0 },
+    { interfaceButtonSong, 14, 0 }, // test build: Song opens the Four-Track screen
     { interfaceButtonConfig, 7, 0 },
 };
 
