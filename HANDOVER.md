@@ -12,7 +12,7 @@ The owner is building a four-track recorder firmware for the Original Polyend Tr
 - They like plain answers to their actual question. Give a recommendation, not a survey. If they say "go with your recommendations", record the decision and move on.
 - Screen visuals (colors, fonts, style) are decided by a separate design AI (Claude Design) and the owner. Do not dictate those. Describe screens by what they are for and what the person does on them. Hardware limits are the exception and are in `docs/design/ui-constraints.md`.
 - Say plainly what you verified and what you guessed. Nothing has been measured on the device. Every CPU number so far is an estimate.
-- They asked for one branch. Everything is on `main`, which is the official v1.0.0 plus our changes. An older history on Polyend's unreleased main is kept in the tag `archive/main-on-unreleased`.
+- They asked for one branch. Everything is on `main`, which is the official v1.0.0 plus our changes. An older history on Polyend's unreleased main is kept in the branch `archive/main-on-unreleased` (a backup; safe to delete on GitHub once you no longer need it).
 - Always build from the release tag, never from Polyend's `main`. Unreleased code crashed the Config screen on the owner's Original.
 - The owner flashes and tests every build. Test builds go to them as files; keep filenames starting `PolyendTrac`, 15 to 31 characters, ending `.ptf`.
 
