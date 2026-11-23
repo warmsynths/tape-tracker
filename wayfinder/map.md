@@ -14,7 +14,7 @@ A written v1 spec for a four-track recording firmware on the Original Polyend Tr
 - Consult the grilling and domain-modeling skills for HITL decisions, and the research skill for research tickets.
 
 ## Decisions so far
-- [Core workflow, device and limits](tickets/01-core-workflow-and-device.md): Original Tracker, full UI replacement, 4 mono tracks, first Part sets the Loop, later Parts record one aligned loop, stock engine kept and trimmed.
+- [Core workflow, device and limits](tickets/01-core-workflow-and-device.md): Original Tracker, full UI replacement, 4 mono tracks, first Part sets the Loop, later Parts record one aligned loop, stock engine kept and trimmed, 4/4 only.
 - [First-note detection](tickets/04-research-onset-detection.md): envelope detector with adaptive noise floor and zero-crossing snap, no FFT, about 15 ms per loop (estimated); default Alignment Window about 60 ms (a starting guess).
 - [Which lo-fi effects exist in stock on MK66](tickets/05-research-master-fx-availability.md): only a gate-style compressor, crude saturation curves and bit-crush exist; wow/flutter, a proper glue compressor, sample-rate reduction and CPU load-shedding must be written (CPU costs unmeasured).
 - [Recording path and latency](tickets/03-research-record-path-and-latency.md): about 7-11 ms input-to-output delay (planning figure, unmeasured); recording start is block-rounded today and needs arming in the audio interrupt for sample accuracy; compensation is one measured constant; the monitor cannot feed back digitally.

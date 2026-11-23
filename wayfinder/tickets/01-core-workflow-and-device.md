@@ -21,3 +21,6 @@ What is this effort for, which device, and what is the shape of the workflow?
 - Lo-fi: master glue compressor plus saturation, wow/flutter, bit-crush; per-track effects only if the CPU allows.
 - Safety: never touch the bootloader or flash start address; keep a stock .ptf on the card; the user flashes and tests.
 - Prototype on a computer first (no firmware emulator exists).
+- Time signature: 4/4 only for v1, with position shown as bar.beat.sixteenth. Beats per bar stays a parameter in the logic (the prototype already treats it as one) so other signatures can be a later setting. Decided later, after Claude Design asked.
+- Loop behaviour confirmed with Claude Design: a Part stops at the Loop end, and Offset wraps around the Loop (the wrap is Claude's default, not yet tested against "play once" mode, which belongs to the alignment-rules ticket).
+- Small text readouts (position, countdown) may update during playback at about ten times a second at most; waveforms never redraw while playing. Not yet measured on the Original.
