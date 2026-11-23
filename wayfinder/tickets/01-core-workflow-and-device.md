@@ -24,3 +24,8 @@ What is this effort for, which device, and what is the shape of the workflow?
 - Time signature: 4/4 only for v1, with position shown as bar.beat.sixteenth. Beats per bar stays a parameter in the logic (the prototype already treats it as one) so other signatures can be a later setting. Decided later, after Claude Design asked.
 - Loop behaviour confirmed with Claude Design: a Part stops at the Loop end, and Offset wraps around the Loop (the wrap is Claude's default, not yet tested against "play once" mode, which belongs to the alignment-rules ticket).
 - Small text readouts (position, countdown) may update during playback at about ten times a second at most; waveforms never redraw while playing. Not yet measured on the Original.
+- Feedback protection: on whenever monitoring is on, acts only on the monitored signal (never on what is recorded), has no off switch. Mic monitoring starts off; line monitoring starts on.
+- Memory full: applies to the first take only. It stops by itself, keeps everything recorded so far, and goes to "How many bars?" with a notice. Later Parts reserve one Loop of room when armed; if there is not enough, the Part is not armed and a memory-full notice shows. (The reservation is intended design, not yet built.)
+- Settings: per project are Loop Mode and click; whole device are alignment window, pre-roll, tempo rounding, input source, gain and monitoring.
+- Input sources: Line, Mic low gain, Mic high gain. Gain ranges from the audio chip code: line about 0 to +22 dB in 16 steps (the +22 is Claude's arithmetic from measured voltages in the code), mic low 0 to +25 dB, mic high 0 to +44 dB.
+- Export: the person chooses how many times the Loop repeats, 1 to 16, default 1.
