@@ -14,6 +14,7 @@ A written v1 spec for a four-track recording firmware on the Original Polyend Tr
 - Consult the grilling and domain-modeling skills for HITL decisions, and the research skill for research tickets.
 
 ## Decisions so far
+- Keep or drop and button map (owner): see `docs/keep-or-drop.md`. Pattern button opens the Four-Track main screen, Song stays free for the later chord screen, Performance is reworked for glitch. Synth plan: stock voices first, Plaits virtual-analogue and chords models later (MIT, CPU unmeasured).
 - Per-track glitch playback (owner, after listening to demos): playhead jumps (back, stutter, reverse) in time, plus musical pitch steps (fifth, octave, etc.) applied per half-beat slice. Owner liked both the tape-style and the granular-style pitch, so both are offered as a per-track choice. Granular costs more CPU (unmeasured). Demo files were made on a PC, not the Tracker. Pattern and Song screens leave the controls; Wavetable dropped.
 - Chord feature (owner, later): small only. Pleasing chord sets that play with a chosen sample, plus a "suggest next chord" helper. No vibe prompts, band modes, melody, song arranger or cloud features from chroma-chords. Estimated 15 to 40 KB of flash and 3 to 4 of the 8 voices (estimates). Pattern and Song screens are hidden, not deleted, until the keep/drop list is settled.
 - [Core workflow, device and limits](tickets/01-core-workflow-and-device.md): Original Tracker, full UI replacement, 4 mono tracks, first Part sets the Loop, later Parts record one aligned loop, stock engine kept and trimmed, 4/4 only.
