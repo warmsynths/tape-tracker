@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { init, reduce, onsetPos } from './logic';
+import { init, reduce, onsetPos, renderTrack, LONG_BAR_CHOICES } from './logic';
 
 const SR = 44100;
 
@@ -70,6 +70,29 @@ describe('FourTrack logic', () => {
     expect(s.tracks[1].part?.offset).toBeGreaterThan(0);
     s = reduce(s, { type: 'UNDO', track: 1 });
     expect(s.tracks[1].part?.offset).toBe(0);
+  });
+  it('uses the agreed bar choices for a very long first take', () => {
+    expect(Array.from(LONG_BAR_CHOICES).join(',')).toBe('12,16,20,24,28,32');
+  });
+
+  it('wraps a shifted part in repeat mode but cuts it off in play once mode', () => {
+    let s = init(SR);
+    // A take with a tone at the start and another near the end.
+    const take = makeTone(SR * 8, 500);
+    const endTone = makeTone(SR * 8, SR * 8 - 1800);
+    for (let i = 0; i < take.length; i++) take[i] += endTone[i];
+    s = reduce(s, { type: 'FIRST_TAKE', samples: take });
+    s = reduce(s, { type: 'SET_BARS', bars: 4 });
+    s = reduce(s, { type: 'CONFIRM_BARS' });
+    // Shift later by 2000 samples: the end tone is pushed past the loop end.
+    s = reduce(s, { type: 'SET_OFFSET', track: 0, offset: 2000 });
+    const energy = (b: Float32Array, from: number, to: number) => { let e = 0; for (let i = from; i < to; i++) e += Math.abs(b[i]); return e; };
+    const repeat = renderTrack(s, 0);
+    s = reduce(s, { type: 'SET_SETTING', key: 'loopMode', value: 'once' });
+    const once = renderTrack(s, 0);
+    // Repeat: the pushed-out tail wraps round to the start. Play once: that start stays silent.
+    expect(energy(repeat, 0, 1999) > 0).toBe(true);
+    expect(energy(once, 0, 1999)).toBe(0);
   });
 });
 

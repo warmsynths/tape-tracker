@@ -29,4 +29,8 @@ What is this effort for, which device, and what is the shape of the workflow?
 - Settings: per project are Loop Mode and click; whole device are alignment window, pre-roll, tempo rounding, input source, gain and monitoring.
 - Input sources: Line, Mic low gain, Mic high gain. Gain ranges from the audio chip code: line about 0 to +22 dB in 16 steps (the +22 is Claude's arithmetic from measured voltages in the code), mic low 0 to +25 dB, mic high 0 to +44 dB.
 - Export: the person chooses how many times the Loop repeats, 1 to 16, default 1.
+- Undo keeps the previous take on the SD card (rename into the project's `undo/` folder), because memory cannot hold it.
+- Ask "Save your changes?" before New or Open. Quick monitoring toggle and a feedback-protection indicator on the main screen. Deleting a project is out of v1.
+- Offset in Repeat mode wraps around the loop; in Play once mode anything pushed past either end is cut off.
+- Bar choices: 1, 2, 3, 4, 6 and 8, and 12, 16, 20, 24, 28 and 32 after a very long first take. This supersedes the earlier 1, 2, 4, 8, 16.
 - Manual tempo (confirmed by the owner): before the first take the person can set a starting tempo, with a one-bar count-in. Left on "Free", the first take sets the loop and the tempo is derived from its length, as decided above. Built in the simulator (`prototype/sim`).

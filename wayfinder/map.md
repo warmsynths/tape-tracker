@@ -39,3 +39,4 @@ A written v1 spec for a four-track recording firmware on the Original Polyend Tr
 - Tracker+ and Tracker Mini support.
 - Internal synths, the chord suite, more than four tracks, explicit pitch or varispeed, and bounce/mixdown: wanted later, each a fresh effort.
 - Rewriting the audio engine, and upstreaming to polyend/tracker-ce.
+- Deleting a project from the recorder (files can be deleted on a computer).

@@ -29,8 +29,8 @@ What I have and have not verified:
 | 3 | Optional starting tempo with a one-bar count-in | Yes | Yes, tested | Partly | Open | Unknown | No | Needs a click sound source |
 | 4 | Later Parts: arm, wait for loop start, keep pre-roll, record one loop, stop | Yes | Yes, not tested | Partly | Open | Partly | No | Highest risk, see finding 1 |
 | 5 | First note snaps to the loop start inside the window | Partly | Yes, tested | Partly | n/a | Yes | No | Window size is a guess |
-| 6 | Offset in ms, bars or sixteenths, wrapping around the loop | Partly | Yes, tested | Yes | Open | Unknown | No | Play-once case undecided |
-| 7 | Undo the last take per track | Yes | Yes, tested | Partly | Open | Partly | No | Viable only if the previous take is kept on the SD card (finding 2); owner's choice |
+| 6 | Offset in ms, bars or sixteenths. Repeat mode wraps around the loop; Play once cuts at the ends | Yes | Yes, tested | Yes | Open | Unknown | No | Decided |
+| 7 | Undo the last take per track, previous take kept on the SD card | Yes | Yes, tested | Partly | Open | Partly | No | Decided; the simulator keeps it in memory, the firmware will not |
 | 8 | Loop Mode: repeat or play once | Yes | Yes, not tested | Yes | Open | Yes | No | Stock loop modes exist |
 | 9 | Mute per track | Partly | Yes | Yes | Open | Yes | No | Only implied in the design |
 | 10 | Four mono tracks playing in sync from RAM | Yes | Yes | Partly | n/a | Partly | No | CPU unmeasured |
@@ -46,6 +46,9 @@ What I have and have not verified:
 | 20 | First take stops at the memory limit and is kept | Yes | Yes | Yes | n/a | Yes | No | |
 | 21 | Click during playback and before a Part | Yes | Yes | Partly | Open | Unknown | No | Same click source as feature 3 |
 | 22 | 4/4 only | Yes | Yes | Yes | n/a | Yes | No | |
+| 23 | Ask "Save your changes?" before New or Open | Yes | No | Yes | Open | Yes | No | Not yet designed or in the simulator |
+| 24 | Quick monitor on/off from the main screen | Yes | No | Yes | Open | Yes | No | Not yet designed or in the simulator |
+| 25 | Main screen shows when feedback protection is acting | Yes | No | Partly | Open | Unknown | No | Needs the limiter's gain reduction (feature 11) |
 
 ## Evidence notes
 1. Stock recording is rounded to a 128-sample block and triggered from the screen loop, and the recorder writes to the start of the whole sample pool. It must be pointed at each Part's own memory and must stop freezing other voices. `docs/research/record-path-and-latency.md`, `docs/research/cpu-ram-budget.md`.
@@ -57,8 +60,8 @@ What I have and have not verified:
 
 ## Findings this table surfaced
 1. **Arming a take inside the audio interrupt is the riskiest change.** Sample-accurate recording needs new code in the part of the firmware where a mistake means glitches or a hang. It should be the first slice built and tested on the device.
-2. **Undo does not fit in memory, but it can live on the SD card.** The simulator keeps the previous take for each track. Four 30 s Parts already use about 10.1 of 11.25 MiB, so an undo copy at that length does not fit in RAM. The project-storage research recommends keeping the previous take on the SD card (rename `partN.wav` to `undo/partN.wav`), costing about one Part read, estimated at 0.2 to 0.9 s, which has not been measured. The alternatives are undo only for shorter loops, or no undo in v1. This is the owner's decision. `docs/research/project-storage.md`.
-3. **Bar choices now follow the design.** The design offers 1, 2, 3, 4, 6 and 8 bars, and 12 to 32 bars after a long first take that ran out of memory. The original decision (1, 2, 4, 8, 16) is superseded. One small mismatch remains: the simulator's long list is 8, 12, 16, 20, 24, 32, while the design's frame 8i shows 12, 16, 20, 24, 28, 32.
+2. **Undo does not fit in memory, but it can live on the SD card.** The simulator keeps the previous take for each track. Four 30 s Parts already use about 10.1 of 11.25 MiB, so an undo copy at that length does not fit in RAM. The project-storage research recommends keeping the previous take on the SD card (rename `partN.wav` to `undo/partN.wav`), costing about one Part read, estimated at 0.2 to 0.9 s, which has not been measured. The alternatives are undo only for shorter loops, or no undo in v1. Decided: the previous take is kept on the SD card. `docs/research/project-storage.md`.
+3. **Bar choices now follow the design.** The design offers 1, 2, 3, 4, 6 and 8 bars, and 12 to 32 bars after a long first take that ran out of memory. The original decision (1, 2, 4, 8, 16) is superseded.  The simulator now uses the design's long list, 12, 16, 20, 24, 28, 32.
 4. **Recording pad hits as audio has a route, and it is small.** The recorder has no internal source today, but the audio graph already has record queues on every voice and the master, built for the exporter. The best option is a pad-bus source on reserved voices recorded dry into the Part buffer. It needs the same two changes as later-Part recording: stop the recorder freezing voice updates, and arm the start inside the audio interrupt. CPU and RAM costs are estimates. `docs/research/pad-recording-path.md`.
 5. **Several simulator features are mock-ups.** The project list, the export progress, the level meters and the feedback protection are drawn but do nothing real. They count as screens, not as proven features.
 6. **No feature has a device test yet.** Until the recovery drill (ticket 07) and the stock build (ticket 06) are done, nothing should be flashed.
@@ -80,5 +83,5 @@ Each slice is flashed by the owner and checked on the device before the next sta
 - Ticket 16 (project storage) is done and awaits the owner's undo decision. Ticket 17 (display pipeline and motion) is done: the design's motion looks feasible (an estimate), and ticket 18 would confirm it on the device.
 
 ## Added from the design (`docs/design/four-track-recorder-design.zip`)
-7. **The design lists things it wanted but left out.** The ones that need an owner decision: an "Unsaved changes" question before New or Open; a quick monitoring toggle on the main screen; a protection indicator on the main screen; deleting a project. None is in the matrix yet.
-8. **Play once mode and Offset wrap is still open.** The design flags that a wrapped piece would sound before the Part itself, and that frame 7d would need to draw differently if the alignment-rules ticket chooses cut or delay instead of wrapping.
+7. **Decided on the design's extras.** Yes to an "Unsaved changes" question before New or Open, a quick monitoring toggle on the main screen, and a protection indicator on the main screen. Deleting a project is left out of v1. The first three still need a design round and are not in the simulator (features 23 to 25).
+8. **Play once and Offset is decided.** Repeat mode wraps a shifted Part around the loop. Play once cuts anything pushed past either end. The simulator does this and has a test for it. The design's frame 7d needs a caption that follows Loop Mode.

@@ -2,7 +2,7 @@ export const NT = 4;
 export const BPB = 4;
 export const MAX_TRACK_SEC = 30.0;
 export const BAR_CHOICES = [1, 2, 3, 4, 6, 8] as const;
-export const LONG_BAR_CHOICES = [8, 12, 16, 20, 24, 32] as const;
+export const LONG_BAR_CHOICES = [12, 16, 20, 24, 28, 32] as const;
 
 export type LoopMode = 'repeat' | 'once';
 export type TempoRounding = 'off' | '0.1' | '1';
@@ -163,8 +163,12 @@ export function renderTrack(s: State, t: number): Float32Array {
   const out = new Float32Array(L || 0);
   if (!p || !L) return out;
   const shift = p.alignShift + p.offset;
+  const once = s.settings.loopMode === 'once';
   for (let i = 0; i < p.raw.length; i++) {
-    out[mod(i - p.preRoll + shift, L)] += p.raw[i];
+    const pos = i - p.preRoll + shift;
+    // Play once: anything pushed past either end is cut off. Repeat: it wraps like a tape loop.
+    if (once && (pos < 0 || pos >= L)) continue;
+    out[mod(pos, L)] += p.raw[i];
   }
   return out;
 }
