@@ -77,7 +77,7 @@ Each slice is flashed by the owner and checked on the device before the next sta
 - Ticket 09 settles features 5 and 6.
 - Ticket 10 settles feature 17 and the memory plan.
 - Ticket 11 fills the "Real control" column.
-- Ticket 17 (display pipeline and motion) is in progress; ticket 16 (project storage) is done and awaits the owner's undo decision.
+- Ticket 16 (project storage) is done and awaits the owner's undo decision. Ticket 17 (display pipeline and motion) is done: the design's motion looks feasible (an estimate), and ticket 18 would confirm it on the device.
 
 ## Added from the design (`docs/design/four-track-recorder-design.zip`)
 7. **The design lists things it wanted but left out.** The ones that need an owner decision: an "Unsaved changes" question before New or Open; a quick monitoring toggle on the main screen; a protection indicator on the main screen; deleting a project. None is in the matrix yet.

@@ -33,11 +33,12 @@ The firmware builds screens from a fixed set of controls (`core/libs/NewDisplay`
 - Keep the element count per screen low; the display list is built by the CPU.
 
 ## 5. Speed and memory
-- The Original has the slowest CPU in the family (180 MHz). Stock redraws of a busy screen are noted at roughly **20 to 35 ms per step** (`docs/developer_guide.md`).
+- The Original has the slowest CPU in the family (180 MHz) and sends data to the screen chip byte by byte. The developer guide's figure of 20 to 35 ms per busy redraw is a stock note, and the display research found it does not describe this code. Research estimate for the motion in the design: about 20 updates a second is roughly 3 to 10% of main-loop time. These are estimates, not measurements (`docs/research/display-pipeline-and-motion.md`).
 - Animate only the playhead line, the level meters and a few small text readouts (position, countdown) that change in steps of about 100 ms or on the beat, never every frame. The stock firmware already updates a timer widget during playback, but this has not been measured on the Original. Waveforms are drawn once when they change.
 - Motion tiers (nothing here has been measured on the Original):
   - Likely fine: playhead, level meters, a pulsing record or armed indicator, a highlight that moves between tracks or fields, changing numbers.
   - Needs a test on the device: fades, a waveform growing while recording, a short slide when a panel opens.
+  - Keep the number of drawn elements stable. A blink should change an element's color, not make it disappear, and a readout should keep a fixed width, because a change in the length of the drawn list forces everything after it to be re-sent.
   - Unlikely on the Original: whole-screen transitions, smooth scrolling or zooming, blur, large image animation, anything moving across many parts of the screen at once.
 - Free RAM is very tight (about 1 MB of SDRAM free, shared with recording buffers). Any screen state that needs extra memory must be justified.
 
