@@ -13,7 +13,7 @@ Design the screens for a four-track recorder that runs as firmware on an Origina
 - Icons: only Pause, Stop, Play, Rec, Folder, Up-dir, Loop and Arrow exist as glyphs. Anything else must be plain text or simple rectangles and lines.
 - Color: flat opaque colors, no alpha, gradients, shadows, blur or rounded corners. Name each color by role, not by hex, so it can be re-themed: background, top bar, label active, label inactive, button, red (record), list, bar active, bar inactive, waveform, waveform progress, marker, and accents (white, red, orange, yellow, green, cyan, grey). It must still read in a one-color Monochrome theme.
 - Drawing vocabulary: text, filled and outlined rectangles, level meters, a thin playhead line, point markers, and a waveform shown as a min/max envelope no wider than 600 columns. No images or bitmaps.
-- Motion: only the playhead line and level meters move. No scrolling or zooming, no fades, no animated transitions.
+- Motion: only the playhead line, level meters and a few small text readouts (position, countdown, updating about ten times a second at most) change during playback. No scrolling or zooming, no fades, no animated transitions.
 - Four tracks are always visible on the main screen. No vertical scrolling.
 
 ## Vocabulary (use these words on screen)

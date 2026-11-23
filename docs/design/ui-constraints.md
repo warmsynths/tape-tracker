@@ -34,7 +34,7 @@ The firmware builds screens from a fixed set of controls (`core/libs/NewDisplay`
 
 ## 5. Speed and memory
 - The Original has the slowest CPU in the family (180 MHz). Stock redraws of a busy screen are noted at roughly **20 to 35 ms per step** (`docs/developer_guide.md`).
-- Animate only the playhead line and level meters. No scrolling or zooming waveforms, no fades, no animated transitions. Waveforms are drawn once when they change.
+- Animate only the playhead line, the level meters and a few small text readouts (position, countdown) that change in steps of about 100 ms or on the beat, never every frame. The stock firmware already updates a timer widget during playback, but this has not been measured on the Original. No scrolling or zooming waveforms, no fades, no animated transitions. Waveforms are drawn once when they change.
 - Free RAM is very tight (about 1 MB of SDRAM free, shared with recording buffers). Any screen state that needs extra memory must be justified.
 
 ## 6. This product
