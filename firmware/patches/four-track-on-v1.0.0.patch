@@ -112,10 +112,10 @@ index fbebd91..2dd99e6 100644
  
 diff --git a/core/interface/fourTrack/fFourTrack.cpp b/core/interface/fourTrack/fFourTrack.cpp
 new file mode 100644
-index 0000000..87eee5e
+index 0000000..90ad5a8
 --- /dev/null
 +++ b/core/interface/fourTrack/fFourTrack.cpp
-@@ -0,0 +1,477 @@
+@@ -0,0 +1,517 @@
 +#include "fourTrack.h"
 +
 +#include "Platform.h"
@@ -318,6 +318,10 @@ index 0000000..87eee5e
 +        }
 +        onFirstTakeFinished();
 +    }
++    else if (session.mode() == FourTrackSession::Mode::RecordingPart)
++    {
++        finishPartEarly(); // keep what was played up to now, the rest of the loop stays silent
++    }
 +    else if (session.mode() != FourTrackSession::Mode::Idle)
 +    {
 +        cancelRecording();
@@ -445,6 +449,42 @@ index 0000000..87eee5e
 +        recorder.record();
 +        session.armWindowReached();
 +    }
++}
++
++void cFourTrack::finishPartEarly()
++{
++    const int track = session.recordingTrack();
++    if (!recordStartKnown)
++    {
++        recorder.stop();
++        session.pressStop(); // nothing was captured yet
++        return;
++    }
++
++    const uint32_t length = session.loopFrames();
++    const uint32_t firstSample = (length - (recordStartPosition % length)) % length;
++    recorder.stop();
++    const uint32_t recorded = recorder.getLength();
++    if (recorded <= firstSample)
++    {
++        session.pressStop(); // stopped before the loop had started
++        return;
++    }
++
++    uint32_t needed = firstSample + length + kPostFrames;
++    if (needed > kRegionFrames)
++    {
++        needed = kRegionFrames;
++    }
++    if (recorded < needed)
++    {
++        // Everything after the stop point stays silent, not left over from an older take.
++        std::memset(regionStart(track) + recorded, 0, (needed - recorded) * sizeof(int16_t));
++    }
++
++    partData[track] = regionStart(track) + firstSample;
++    engine.getLoopPlayer()->setTrack(track, partData[track]);
++    session.partRecorded();
 +}
 +
 +void cFourTrack::servicePartRecording()
@@ -595,10 +635,10 @@ index 0000000..87eee5e
 +}
 diff --git a/core/interface/fourTrack/fourTrack.h b/core/interface/fourTrack/fourTrack.h
 new file mode 100644
-index 0000000..fbba917
+index 0000000..5371b3e
 --- /dev/null
 +++ b/core/interface/fourTrack/fourTrack.h
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,69 @@
 +#ifndef INTERFACE_FOURTRACK_H_
 +#define INTERFACE_FOURTRACK_H_
 +
@@ -644,6 +684,7 @@ index 0000000..fbba917
 +    void serviceFirstTake();
 +    void serviceArmed();
 +    void servicePartRecording();
++    void finishPartEarly();
 +    void cancelRecording();
 +
 +    FourTrackSession session;
