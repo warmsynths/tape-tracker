@@ -26,3 +26,7 @@ __pycache__/
 .vscode/
 .idea/
 .DS_Store
+
+# Node / Simulator build outputs
+node_modules/
+prototype/sim/dist/

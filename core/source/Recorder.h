@@ -29,6 +29,8 @@ class Recorder
     void update();
     void setConfig(Config config);
     void setFullMemoryCallback(std::function<void(void)> fullMemoryCallback);
+    // Called from the audio interrupt just before the first block of a recording is copied.
+    void setFirstBlockCallback(std::function<void(void)> firstBlockCallback);
 
     void record();
     void stop();
@@ -61,6 +63,7 @@ class Recorder
     bool isActive = false;
     uint32_t recordingHeadIdx;
     std::function<void(void)> fullMemoryCallback = nullptr;
+    std::function<void(void)> firstBlockCallback = nullptr;
 };
 
 extern Recorder recorder;

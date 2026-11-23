@@ -10,6 +10,7 @@
 #include "core/titleBar.h"
 
 #include "imageViewer/imageViewer.h"
+#include "fourTrack/fourTrack.h"
 #include "instrumentEditor/instrumentEditor.h"
 #include "masterParams/masterParams.h"
 #include "patternEditor/patternEditor.h"
@@ -51,7 +52,7 @@ extern uint8_t isAudioOutMuted();
 //=======================================================================
 //=======================================================================
 
-const uint8_t Interface::modulesCount = 13;
+const uint8_t Interface::modulesCount = 14;
 const hModule Interface::modules[modulesCount] = {
     &projectEditor,    // 0
     &sampleImporter,   // 1
@@ -66,6 +67,7 @@ const hModule Interface::modules[modulesCount] = {
     &imageViewer,      // 10
     nullptr,           // 11
     &masterParams,     // 12
+    &fourTrack,        // 13 (test build: opened with the Song button)
 };
 
 const uint8_t Interface::modulesButtonsCount = 11;
@@ -79,7 +81,7 @@ const uint32_t Interface::modulesButtons[modulesButtonsCount][3] = {
     { interfaceButtonSampleEdit, 6, 0 },
     { interfaceButtonSampleRec, 8, 0 },
     { interfaceButtonSampleLoad, 1, 0 },
-    { interfaceButtonSong, 4, 0 },
+    { interfaceButtonSong, 13, 0 }, // test build: Song opens the Four-Track screen
     { interfaceButtonConfig, 7, 0 },
 };
 

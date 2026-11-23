@@ -128,6 +128,11 @@ AudioPlaySdWav* audioEngine::getSdPlayer()
     return &playerWavFromSD;
 }
 
+AudioPlayLoops* audioEngine::getLoopPlayer()
+{
+    return &loopPlayer;
+}
+
 audioEngine::audioEngine()
 {
     for (int voiceIdx = 0; voiceIdx < kVoices; voiceIdx++)
@@ -145,6 +150,14 @@ audioEngine::audioEngine()
 
     connectInputToOutput(&input, &output);
     connectInputToMixer(&input, &mixerAndFxs);
+    for (int channel = 0; channel < (int)MixerAndFxChannelType::kChannelCount; channel++)
+    {
+        connections.push_back(new AudioConnection(
+          &loopPlayer,
+          0,
+          mixerAndFxs.getTracksAndSendsMixer((MixerAndFxChannelType)channel),
+          MixerAndFxs<kVoices>::TrackAndFxsChannels::kLoopChannel));
+    }
     connectMixerToOutput(&mixerAndFxs, &output);
     connectMixerToExportQueue(&mixerAndFxs, &exportQueues);
     connectSpecialInputsToOutput(&output);

@@ -192,6 +192,7 @@ class audioEngine
     ExportQueues* getExportQueues();
     MixerAndFxs<kVoices>* getMixerAndFx();
     AudioPlaySdWav* getSdPlayer();
+    AudioPlayLoops* getLoopPlayer();
 
     friend class playerEngine;
 
@@ -232,6 +233,7 @@ class audioEngine
     SdStream sdStream;
     std::vector<AudioConnection*> connections;
     AudioInput input;
+    AudioPlayLoops loopPlayer; // declared before mixerAndFxs so it updates before the mixer
     AudioPlaySdWav playerWavFromSD;
     AudioSynthWaveform testWaveform;
     AudioPlayMemory metronomeTick;

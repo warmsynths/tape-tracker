@@ -31,6 +31,11 @@ void Recorder::setConfig(Config config)
     }
 }
 
+void Recorder::setFirstBlockCallback(std::function<void(void)> firstBlockCallback)
+{
+    Recorder::firstBlockCallback = firstBlockCallback;
+}
+
 // todo: SR->fullMemoryDuringRecordFlag this flag should be set
 void Recorder::setFullMemoryCallback(std::function<void(void)> fullMemoryCallback)
 {
@@ -78,6 +83,7 @@ void Recorder::record()
 
     isActive = true;
     recordingHeadIdx = 0;
+    DestinationChannelConfig::length = 0; // a new recording starts empty, not at the last length
 }
 
 void Recorder::update()
@@ -151,6 +157,10 @@ void Recorder::update()
             {
                 if (recordingQueue[0]->available() > 0)
                 {
+                    if (recordingHeadIdx == 0 && firstBlockCallback != nullptr)
+                    {
+                        firstBlockCallback();
+                    }
                     memcpy(&channelConfig[0].initialAddress[recordingHeadIdx],
                            recordingQueue[0]->readBuffer(),
                            sizeof(int16_t) * AUDIO_BLOCK_SAMPLES);
