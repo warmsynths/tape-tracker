@@ -21,6 +21,7 @@ A written v1 spec for a four-track recording firmware on the Original Polyend Tr
 - [CPU and RAM budget for four tracks](tickets/02-research-cpu-ram-budget.md): RAM fits (about 10.1 of 11.25 MiB) only if the Sample Editor buffers go; CPU is an unmeasured guess of 35-60%; recorder and per-voice update behaviour must change.
 - [Feasibility of a desktop build of the firmware](tickets/14-research-desktop-build-feasibility.md): defer; core can likely build on a PC, but the screen is the big obstacle (no usable FT81x emulator), and a PC build cannot show CPU load or timing. If wanted later, start with a headless harness (about 2-4 weeks, estimated).
 - [How pads played live can be captured as audio](tickets/15-research-pad-recording-path.md): a pad-bus source on reserved voices, recorded dry into the Part buffer; a small change that shares two required changes with later-Part recording (CPU and RAM estimated, not measured).
+- [How a four-track project could be stored](tickets/16-research-project-storage.md): a new folder per project with a small settings file, four mono WAV Parts and an `undo/` folder; the stock project format has no room for our fields; undo on the SD card is viable (timings estimated, not measured).
 
 ## Open tickets
 (Open tickets are the files in `tickets/` with `status: open`; the frontier is those with no open `blocked-by`.)

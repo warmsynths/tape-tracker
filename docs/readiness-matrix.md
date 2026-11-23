@@ -30,14 +30,14 @@ What I have and have not verified:
 | 4 | Later Parts: arm, wait for loop start, keep pre-roll, record one loop, stop | Yes | Yes, not tested | Partly | Open | Partly | No | Highest risk, see finding 1 |
 | 5 | First note snaps to the loop start inside the window | Partly | Yes, tested | Partly | n/a | Yes | No | Window size is a guess |
 | 6 | Offset in ms, bars or sixteenths, wrapping around the loop | Partly | Yes, tested | Yes | Open | Unknown | No | Play-once case undecided |
-| 7 | Undo the last take per track | Yes | Yes, tested | No | Open | Unknown | No | Memory problem, see finding 2 |
+| 7 | Undo the last take per track | Yes | Yes, tested | Partly | Open | Partly | No | Viable only if the previous take is kept on the SD card (finding 2); owner's choice |
 | 8 | Loop Mode: repeat or play once | Yes | Yes, not tested | Yes | Open | Yes | No | Stock loop modes exist |
 | 9 | Mute per track | Partly | Yes | Yes | Open | Yes | No | Only implied in the design |
 | 10 | Four mono tracks playing in sync from RAM | Yes | Yes | Partly | n/a | Partly | No | CPU unmeasured |
 | 11 | Live input monitor with feedback protection | Yes | Partly | Partly | Open | Unknown | No | Protection is text only in the simulator; the design also shows how far the monitor is turned down, which needs a gain-reduction readout from the limiter |
 | 12 | Input setup: line, mic low, mic high, gain, level meter | Yes | Yes | Yes | Open | Yes | No | Gain functions found in code |
-| 13 | Settings, project-wide versus device-wide | Yes | Yes | Unknown | Open | Unknown | No | Needs the project file decision |
-| 14 | Project: new, open, save, save as, rename | Partly | Mock only | Unknown | Open | Unknown | No | File format not decided |
+| 13 | Settings, project-wide versus device-wide | Yes | Yes | Partly | Open | Partly | No | Project settings go in the project file; device settings in a new section of the device config |
+| 14 | Project: new, open, save, save as, rename | Partly | Mock only | Partly | Open | Partly | No | A folder per project is recommended; save times are guesses |
 | 15 | Export WAV with 1 to 16 repeats | Yes | Fake progress only | Partly | Open | Partly | No | Stock WAV export exists |
 | 16 | Pads played live and captured as audio on a track | Partly | Partly | Partly | Open | Partly | No | Small change, and it needs the same two changes as feature 4 (see finding 4) |
 | 17 | Lo-fi master chain: glue compressor, saturation, wow and flutter, bit-crush | Partly | No | Unknown | Open | No | No | Mostly to be written, after the CPU is measured |
@@ -57,7 +57,7 @@ What I have and have not verified:
 
 ## Findings this table surfaced
 1. **Arming a take inside the audio interrupt is the riskiest change.** Sample-accurate recording needs new code in the part of the firmware where a mistake means glitches or a hang. It should be the first slice built and tested on the device.
-2. **Undo probably does not fit in memory.** The simulator keeps the previous take for each track. Four 30 s Parts already use about 10.1 of 11.25 MiB, so a single undo copy at that length (about 2.5 MiB) does not fit. Options: undo only for shorter loops, store the previous take on the SD card, or drop undo from v1. This is a decision for the owner.
+2. **Undo does not fit in memory, but it can live on the SD card.** The simulator keeps the previous take for each track. Four 30 s Parts already use about 10.1 of 11.25 MiB, so an undo copy at that length does not fit in RAM. The project-storage research recommends keeping the previous take on the SD card (rename `partN.wav` to `undo/partN.wav`), costing about one Part read, estimated at 0.2 to 0.9 s, which has not been measured. The alternatives are undo only for shorter loops, or no undo in v1. This is the owner's decision. `docs/research/project-storage.md`.
 3. **Bar choices now follow the design.** The design offers 1, 2, 3, 4, 6 and 8 bars, and 12 to 32 bars after a long first take that ran out of memory. The original decision (1, 2, 4, 8, 16) is superseded. One small mismatch remains: the simulator's long list is 8, 12, 16, 20, 24, 32, while the design's frame 8i shows 12, 16, 20, 24, 28, 32.
 4. **Recording pad hits as audio has a route, and it is small.** The recorder has no internal source today, but the audio graph already has record queues on every voice and the master, built for the exporter. The best option is a pad-bus source on reserved voices recorded dry into the Part buffer. It needs the same two changes as later-Part recording: stop the recorder freezing voice updates, and arm the start inside the audio interrupt. CPU and RAM costs are estimates. `docs/research/pad-recording-path.md`.
 5. **Several simulator features are mock-ups.** The project list, the export progress, the level meters and the feedback protection are drawn but do nothing real. They count as screens, not as proven features.
@@ -77,7 +77,7 @@ Each slice is flashed by the owner and checked on the device before the next sta
 - Ticket 09 settles features 5 and 6.
 - Ticket 10 settles feature 17 and the memory plan.
 - Ticket 11 fills the "Real control" column.
-- Ticket 16 (project storage) and ticket 17 (display pipeline and motion) are in progress.
+- Ticket 17 (display pipeline and motion) is in progress; ticket 16 (project storage) is done and awaits the owner's undo decision.
 
 ## Added from the design (`docs/design/four-track-recorder-design.zip`)
 7. **The design lists things it wanted but left out.** The ones that need an owner decision: an "Unsaved changes" question before New or Open; a quick monitoring toggle on the main screen; a protection indicator on the main screen; deleting a project. None is in the matrix yet.
