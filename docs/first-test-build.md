@@ -9,13 +9,13 @@
 **What it replaces.** In this build the **Song** button opens the new screen instead of Song mode. Everything else on the Tracker is unchanged.
 
 ## Before you start
-1. Do the recovery drill first. You need the official firmware file on your computer, and to have tried the paperclip reset once.
+1. The recovery drill is done (see ticket 07). You need the official firmware file on your computer, and to have tried the paperclip reset once.
 2. Know how to put the official file back: delete this test file from the card's `Firmware` folder, copy the official `.ptf` in, then press the paperclip into the reset hole.
 
 ## Put it on the Tracker
 1. Copy the test `.ptf` file into the `Firmware` folder on the SD card. Keep the official file off the card while testing.
 2. On the Tracker go to **Config**, then **Firmware**, then **Firmware update**, choose the test file, and confirm.
-3. Wait for it to restart.
+3. Wait for it to restart. If the screen sits at 100 and does not restart, restart the Tracker by hand. This happened during the recovery drill and a manual restart worked.
 
 ## Try it
 1. **Set the input level first.** Press **Sample Rec**, choose the line input, and set the gain with the jog wheel while you play. Aim for a strong level without hitting the top. This build uses that same gain setting.
