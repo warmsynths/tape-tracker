@@ -33,6 +33,8 @@ The firmware draws with a separate screen chip and swaps in a finished frame abo
 ## How the plan is run
 The map is a local-markdown task board: one file per question in `wayfinder/tickets/`, an index in `wayfinder/map.md`. Take an open ticket with nothing blocking it, resolve it, write the answer under `## Resolution`, set `status: closed`, and add one line to "Decisions so far" in the map. Do one ticket at a time. Research tickets can run in parallel. If an answer makes new questions specific, add tickets; if it is still vague, put it under "Not yet specified".
 
+- Only the Original Tracker matters to the owner. Do not build or test Plus or Mini; skip them unless asked.
+
 ## Practical traps
 - The clone is shallow. Merging branches fails with "unrelated histories". Copy files between branches instead.
 - Pushing works with `git push -u origin <branch>`. Deleting a remote branch from the original session failed repeatedly through its proxy. Two stale branches, `wayfinder-map` and `prototype/four-track`, may still exist on GitHub with nothing in them that is not on `main`. The owner can delete them on GitHub.
