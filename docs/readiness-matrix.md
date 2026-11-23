@@ -17,7 +17,7 @@ A feature is ready to build only when every check below says Yes. Looking right 
 Cell values: **Yes**, **Partly**, **No**, **Unknown**, **Open** (waiting on a named ticket), **n/a**.
 
 What I have and have not verified:
-- Simulator column: read from the source. The four logic tests (first take, alignment, starting tempo, nudge and undo) **pass** when run directly with Node using a small stand-in for the test framework. The simulator's own build, type check and screens have **not** been run: its packages would not install in the environment used for this work.
+- Simulator column: read from the source. The four logic tests (first take, alignment, starting tempo, nudge and undo) **pass** under the simulator's own test runner, and its type check and production build pass. I also loaded the built page in a browser and recorded a first take with no errors. I have not listened to it or judged how it feels.
 - Hardware columns: taken from the research files, which contain no measurements from a real device. Every CPU figure is a guess.
 
 ## The matrix
