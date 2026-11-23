@@ -53,6 +53,7 @@ What I have and have not verified:
 3. Four 30 s mono Parts take about 10.1 of the 11.25 MiB sample pool. `docs/research/cpu-ram-budget.md`.
 4. Stock effects: only a gate-style compressor, crude saturation curves and bit-crush exist. Wow and flutter, a proper glue compressor and sample-rate reduction would be new code. `docs/research/master-fx-availability.md`.
 5. Gain ranges: line about 0 to +22 dB, mic low 0 to +25 dB, mic high 0 to +44 dB, from the audio chip code.
+6. Measured on the stock Original build (not on the device): flash 89.21% used, about 113 KB free; RAM 69.08%; SDRAM 93.50%. `docs/build-notes.md`. Flash headroom is tighter than the repo's own figure of about 144 KB, so new code has less room than the research assumed until the official build is compared.
 
 ## Findings this table surfaced
 1. **Arming a take inside the audio interrupt is the riskiest change.** Sample-accurate recording needs new code in the part of the firmware where a mistake means glitches or a hang. It should be the first slice built and tested on the device.
