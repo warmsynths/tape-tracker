@@ -1,579 +1,1940 @@
-<title>Four-Track Prototype</title>
-<meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap">
-<style>
-/* Layout: a hardware-screen stage (loop info, four lanes, bars prompt) over free play, settings, walkthroughs and a plain-language log.
-   Single dark look by choice: it imitates a small device screen. One accent (tape amber) plus record red. */
-:root{
-  color-scheme:dark;
-  --bg:#12110e; --panel:#1b1914; --panel2:#24211a; --line:#3a352a;
-  --text:#e9e2cf; --dim:#9a9279; --accent:#e9a43a; --rec:#ff5b4a; --ok:#86c47c;
-  --ui:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
-  --head:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
-}
-*{box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:var(--ui);font-size:13px;line-height:1.45;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 40px}
-.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
-h1{font:600 26px/1.1 var(--head);margin:0;letter-spacing:.01em}
-h2{font:600 12px/1 var(--head);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:0 0 10px}
-p{margin:0}
-.q{background:var(--panel);border:1px solid var(--line);padding:12px 14px;color:var(--dim);max-width:78ch}
-.q b{color:var(--text);font-weight:500}
-.note{color:var(--dim)}
-.stage{background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;outline:none}
-.stage:focus-visible{border-color:var(--accent)}
-.top{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel2)}
-.mode{font:600 15px var(--head);letter-spacing:.08em;text-transform:uppercase;min-width:11ch}
-.mode.rec{color:var(--rec)} .mode.arm{color:var(--accent)}
-.top .kv{color:var(--dim)} .top .kv b{color:var(--text);font-weight:500}
-.lanes{position:relative;display:grid;grid-template-columns:minmax(128px,190px) 1fr}
-.lane-info,.lane-wave{border-bottom:1px solid var(--line);padding:8px 10px;min-width:0}
-.lane-info{border-right:1px solid var(--line);display:flex;flex-direction:column;gap:3px;cursor:pointer}
-.lane-info.sel{background:#2b261b;box-shadow:inset 3px 0 var(--accent)}
-.tn{font:600 20px/1 var(--head)} .tstate{font-size:11px;letter-spacing:.08em;color:var(--dim)}
-.tstate.rec{color:var(--rec)} .tstate.arm{color:var(--accent)} .tstate.mute{color:var(--dim);text-decoration:line-through}
-.off{font-size:11px;color:var(--dim)} .off b{color:var(--text);font-weight:500}
-.off .f{padding:0 3px;border:1px solid transparent} .off .f.on{border-color:var(--accent);color:var(--accent)}
-.lane-wave canvas{display:block;width:100%;height:64px;background:var(--bg)}
-.decision{font-size:11px;color:var(--dim);margin-top:4px;min-height:2.9em}
-.decision.ok{color:var(--ok)} .decision.warn{color:var(--accent)}
-.playhead{position:absolute;top:0;bottom:0;left:190px;right:0;pointer-events:none}
-.playhead i{position:absolute;top:0;bottom:0;left:0;width:2px;background:#fff;opacity:.85;transform:translateX(0)}
-@media (max-width:560px){.lanes{grid-template-columns:104px 1fr}.playhead{left:104px}.tn{font-size:16px}}
-.bars{display:none;padding:12px 14px;border-top:1px solid var(--line);background:#241f14}
-.bars.on{display:block}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.chip{border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;padding:6px 10px;cursor:pointer}
-.chip.on{border-color:var(--accent);color:var(--accent)}
-.fnrow{display:grid;grid-template-columns:repeat(8,1fr);border-top:1px solid var(--line)}
-.fnrow span{padding:7px 4px;text-align:center;font-size:11px;color:var(--dim);border-right:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fnrow span:last-child{border-right:0}
-.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
-.card{background:var(--panel);border:1px solid var(--line);padding:14px;min-width:0}
-.btnrow{display:flex;flex-wrap:wrap;gap:8px}
-button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);padding:7px 11px;cursor:pointer}
-button:hover{border-color:var(--accent)} button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-button.primary{border-color:var(--accent);color:var(--accent)} button.recbtn{border-color:var(--rec);color:var(--rec)}
-.set{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center}
-select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);padding:5px 6px;min-width:0}
-.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 12px} .keys dt{color:var(--accent)} .keys dd{margin:0;color:var(--dim)}
-.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-.tab{padding:6px 10px} .tab.on{border-color:var(--accent);color:var(--accent)}
-.steps{display:flex;flex-direction:column;gap:8px;margin-top:10px;align-items:flex-start}
-.steps button.done{opacity:.5} .steps button.next{border-color:var(--accent);color:var(--accent)}
-.log{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto;margin:0;padding:0;list-style:none}
-.log li{padding-left:10px;border-left:2px solid var(--line)} .log li:first-child{border-color:var(--accent);color:var(--text)} .log li{color:var(--dim)}
-</style>
+<!DOCTYPE html>
+<html lang="en">
 
-<div class="wrap">
-  <header>
-    <h1>Four-Track Prototype</h1>
-    <p class="note">Throwaway sketch of how recording, aligning and offsetting should feel. Not the final screen design.</p>
-  </header>
+<head>
+  <meta charset="utf-8">
+  <title>Four-Track Prototype</title>
+  <title>Tape Tracker — Original Tracker Simulator</title>
+  <meta name="claude:viewport-fit-sides" content="cover">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      color-scheme: dark;
+      --ui: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+      --scr: "Arimo", Helvetica, Arial, sans-serif;
+      --page-bg: #12110e;
+      --card: #1b1914;
+      --card2: #24211a;
+      --line: #3a352a;
+      --text: #e9e2cf;
+      --dim: #9a9279;
+      --accent: #e9a43a;
+      --rec: #ff5b4a;
+      --bg: #0e0d0b;
+      --chassis: #181715;
+      --chassis-hi: #262420;
+      --chassis-lo: #0c0b0a;
+      --key: #21201d;
+      --key-border: #38352f;
+      --text: #e5decb;
+      --dim: #8f8875;
+      --accent: #d8873a;
+      --rec: #c4452e;
+      --ok: #93a66a;
+    }
 
-  <div class="q"><b>The question this answers.</b> Does this model feel right? The first part you record sets the loop. Each later part records one loop, and its first note is moved onto the loop start if it lands close enough. You can then shift any part in milliseconds or bars. Play it with the keyboard, or use the walkthroughs below to see the awkward cases without needing good timing.</div>
+    * {
+      box-sizing: border-box
+    }
 
-  <section class="stage" id="stage" tabindex="0" aria-label="Four-track screen. Click it, then use the keyboard.">
-    <div class="top">
-      <span class="mode" id="mode">Empty</span>
-      <span class="kv">loop <b id="kvLoop">not set</b></span>
-      <span class="kv">position <b id="kvPos">-</b></span>
-      <span class="kv">mode <b id="kvMode">repeat</b></span>
-      <span class="kv">window <b id="kvWin">off</b></span>
-    </div>
-    <div class="lanes" id="lanes"></div>
-    <div class="bars" id="barsPrompt">
-      <div><b>How many bars was that?</b> <span class="note" id="barsInfo"></span></div>
-      <div class="chips" id="barChips"></div>
-      <div class="note" style="margin-top:8px">Left/Right to choose, Enter to confirm. No audio is stretched; the tempo comes from the length you played.</div>
-    </div>
-    <div class="fnrow" aria-hidden="true"><span>Enter Rec</span><span>Space Play</span><span>1-4 Track</span><span>&larr; &rarr; Field</span><span>&uarr; &darr; Offset</span><span>Shift Coarse</span><span>Bksp Undo</span><span>Esc Cancel</span></div>
-  </section>
+    body {
+      margin: 0;
+      background: var(--page-bg);
+      color: var(--text);
+      font-family: var(--ui);
+      font-size: 13px;
+      line-height: 1.45;
+      padding: 18px max(16px, env(safe-area-inset-left, 0px)) 40px max(16px, env(safe-area-inset-right, 0px))
+    }
 
-  <div class="cols">
-    <section class="card">
-      <h2>Free play</h2>
-      <div class="btnrow" style="margin-bottom:12px">
-        <button class="recbtn" id="bRec">Rec (Enter)</button>
-        <button id="bPlay">Play / Stop (Space)</button>
-        <button id="bUndo">Undo (Backspace)</button>
-        <button id="bMute">Mute track</button>
-        <button id="bReset">Reset everything</button>
-      </div>
-      <h2>Settings</h2>
-      <div class="set">
-        <label for="sLoop">Loop mode</label>
-        <select id="sLoop"><option value="repeat">repeat</option><option value="once">play once</option></select>
-        <label for="sWin">Alignment window</label>
-        <select id="sWin"><option value="0">off</option><option value="30">&plusmn;30 ms</option><option value="60" selected>&plusmn;60 ms</option><option value="100">&plusmn;100 ms</option><option value="150">&plusmn;150 ms</option></select>
-        <label for="sPre">Pre-roll</label>
-        <select id="sPre"><option value="0">none</option><option value="60">60 ms</option><option value="120" selected>120 ms</option><option value="250">250 ms</option><option value="500">500 ms</option></select>
-        <label for="sRound">Tempo rounding</label>
-        <select id="sRound"><option value="off" selected>off (exact length)</option><option value="0.1">nearest 0.1 BPM</option><option value="1">nearest 1 BPM</option></select>
-        <label for="sClick">Click while playing</label>
-        <select id="sClick"><option value="0" selected>off (count-in only)</option><option value="1">on</option></select>
-      </div>
-      <p class="note" style="margin-top:10px">Window and pre-roll apply to the next take you record. The count-in before a part always clicks.</p>
-    </section>
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px
+    }
 
-    <section class="card">
-      <h2>Keyboard</h2>
-      <dl class="keys">
-        <dt>Enter</dt><dd>Record. First take: press again to stop. Later: arms the selected track.</dd>
-        <dt>Space</dt><dd>Play / stop</dd>
-        <dt>1 2 3 4</dt><dd>Select track</dd>
-        <dt>Left / Right</dt><dd>Offset field (ms or bars). Chooses bars in the prompt.</dd>
-        <dt>Up / Down</dt><dd>Change offset. Ms: 1 ms, Shift 10 ms. Bars: 1 bar, Shift 1 beat.</dd>
-        <dt>Backspace</dt><dd>Undo the last take on the track</dd>
-        <dt>Esc</dt><dd>Cancel an armed take</dd>
-        <dt>A S D F G H J K L ;</dt><dd>Guitar plucks (A minor pentatonic)</dd>
-        <dt>Q W E R T Y U I O P</dt><dd>Bass plucks</dd>
-        <dt>Z X C V B N M , . /</dt><dd>Drums: kick, snare, hat, open hat, clap, tom, tom, rim, shaker, cowbell</dd>
-      </dl>
-      <p class="note" style="margin-top:10px">Click the screen once so it has keyboard focus. Browser keyboard timing is a few milliseconds loose, which is a fair stand-in for a human.</p>
+    h1 {
+      font: 700 22px/1.15 var(--scr);
+      margin: 0
+    }
+
+    h2 {
+      font: 700 11px/1 var(--scr);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin: 0 0 8px
+    }
+
+    p {
+      margin: 0
+    }
+
+    .hdr {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px
+    }
+
+    .note {
+      color: var(--dim)
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: auto minmax(280px, 1fr);
+      gap: 14px;
+      align-items: start
+    }
+
+    @media (max-width:1120px) {
+      .main-grid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--ui);
+      font-size: 12px;
+      line-height: 1.4;
+      padding: 16px max(12px, env(safe-area-inset-left, 0px)) 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px
+    }
+
+    /* 800x480 hardware screen */
+    .bezel {
+      background: #0b0a08;
+      border: 2px solid #2e2a22;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      outline: none
+    }
+
+    .bezel:focus-visible {
+      border-color: var(--accent)
+    }
+
+    .screen-scroll {
+      max-width: 100%;
+      overflow-x: auto
+    }
+
+    .topbar-meta {
+      width: 100%;
+      max-width: 1060px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      color: var(--dim)
+    }
+
+    .topbar-meta b {
+      color: var(--text)
+    }
+
+    .meta-btns {
+      display: flex;
+      gap: 8px;
+      align-items: center
+    }
+
+    .meta-btns button {
+      font: inherit;
+      color: var(--text);
+      background: var(--key);
+      border: 1px solid var(--key-border);
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 3px
+    }
+
+    .meta-btns button:hover {
+      border-color: var(--accent)
+    }
+
+    /* Hardware Chassis */
+    .tracker {
+      background: linear-gradient(180deg, #1f1d1a 0%, #151412 100%);
+      border: 1px solid #35322c;
+      border-radius: 10px;
+      padding: 18px 20px 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, .65), inset 0 1px 0 rgba(255, 255, 255, .06);
+      display: grid;
+      grid-template-columns: 800px 200px;
+      gap: 18px;
+      max-width: 100%;
+      outline: none;
+    }
+
+    .tracker:focus-visible {
+      border-color: var(--accent)
+    }
+
+    @media (max-width:1070px) {
+      .tracker {
+        grid-template-columns: 1fr;
+        width: 100%;
+        max-width: 840px
+      }
+    }
+
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0
+    }
+
+    .screen-frame {
+      background: #050504;
+      border: 3px solid #0b0a09;
+      border-radius: 3px;
+      overflow-x: auto;
+      box-shadow: inset 0 0 0 1px #2a2722
+    }
+
+    .screen {
+      position: relative;
+      width: 800px;
+      height: 480px;
+      overflow: hidden;
+      font-family: var(--scr);
+      user-select: none;
+      flex: none
+    }
+
+    .scr-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 800px;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--dim)
+    }
+
+    .scr-bar .btnrow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 12px;
+      min-width: 0
+    }
+
+    button {
+      font: inherit;
+      color: var(--text);
+      background: var(--card2);
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      cursor: pointer
+    }
+
+    button:hover {
+      border-color: var(--accent)
+    }
+
+    button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      color: var(--accent)
+    }
+
+    button.recbtn {
+      border-color: var(--rec);
+      color: var(--rec)
+    }
+
+    .keys {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 12px
+    }
+
+    .keys dt {
+      color: var(--accent)
+    }
+
+    .keys dd {
+      margin: 0;
+      color: var(--dim)
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px
+    }
+
+    .tab {
+      padding: 6px 10px
+    }
+
+    .tab.on {
+      border-color: var(--accent);
+      color: var(--accent)
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+      align-items: flex-start
+    }
+
+    .steps button.done {
+      opacity: .5
+    }
+
+    .steps button.next {
+      border-color: var(--accent);
+      color: var(--accent)
+    }
+
+    .log {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 260px;
+      overflow: auto;
+      margin: 0;
+      padding: 0;
+      list-style: none
+    }
+
+    .log li {
+      padding-left: 10px;
+      border-left: 2px solid var(--line);
+      color: var(--dim)
+    }
+
+    .log li:first-child {
+      border-color: var(--accent);
+      color: var(--text)
+    }
+
+    /* 8 physical screen buttons directly under 800px screen */
+    .hw-fn-row {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+      width: 800px;
+      max-width: 100%
+    }
+
+    .hw-btn {
+      background: var(--key);
+      border: 1px solid var(--key-border);
+      border-bottom: 3px solid #0e0d0b;
+      color: var(--text);
+      font: 600 11px/1 var(--ui);
+      padding: 9px 4px;
+      border-radius: 3px;
+      cursor: pointer;
+      text-align: center;
+      transition: transform .04s;
+      user-select: none;
+    }
+
+    .hw-btn:hover {
+      border-color: #575248
+    }
+
+    .hw-btn:active,
+    .hw-btn.active {
+      transform: translateY(1px);
+      border-bottom-width: 2px;
+      background: #2d2b26
+    }
+
+    .hw-btn.rec-led {
+      border-top: 2px solid var(--rec);
+      color: #f0b8ae
+    }
+
+    .hw-btn.on {
+      border-top: 2px solid var(--accent);
+      color: var(--accent)
+    }
+
+    /* Pad Grid (3 rows x 10 pads: Guitar, Bass, Drums) */
+    .pads-wrap {
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      width: 800px;
+      max-width: 100%
+    }
+
+    .pad-row {
+      display: grid;
+      grid-template-columns: 56px repeat(10, 1fr);
+      gap: 5px;
+      align-items: center
+    }
+
+    .pad-lbl {
+      font-size: 10px;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: .06em
+    }
+
+    .pad {
+      height: 28px;
+      background: #262420;
+      border: 1px solid #3c3831;
+      border-bottom: 2px solid #12110f;
+      border-radius: 3px;
+      color: var(--dim);
+      font: 500 10px/1 var(--ui);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .pad:hover {
+      border-color: var(--accent);
+      color: var(--text)
+    }
+
+    .pad:active,
+    .pad.hit {
+      background: #3a352c;
+      color: #fff;
+      border-color: var(--accent)
+    }
+
+    /* Right-hand Hardware Controls: Jog, D-Pad, Transport */
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 6px 0
+    }
+
+    .brand {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      letter-spacing: .12em;
+      color: var(--dim);
+      text-transform: uppercase
+    }
+
+    .limit-pill {
+      background: #12110f;
+      border: 1px solid #2c2922;
+      padding: 2px 6px;
+      border-radius: 2px;
+      color: var(--dim);
+      font-size: 10px
+    }
+
+    .jog-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px
+    }
+
+    .jog {
+      width: 136px;
+      height: 136px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 32%, #34312b 0%, #1d1b18 65%, #12110f 100%);
+      border: 2px solid #3c3830;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, .55), inset 0 1px 1px rgba(255, 255, 255, .08);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: ew-resize;
+    }
+
+    .jog-notch {
+      position: absolute;
+      width: 6px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 2px;
+      top: 12px;
+      left: 50%;
+      margin-left: -3px;
+      transform-origin: 3px 56px
+    }
+
+    .jog-center {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #181613;
+      border: 1px solid #35312a;
+      color: var(--dim);
+      font: 600 10px var(--ui);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer
+    }
+
+    .jog-center:hover {
+      color: var(--text);
+      border-color: var(--accent)
+    }
+
+    .jog-btns {
+      display: flex;
+      gap: 8px;
+      width: 100%
+    }
+
+    .jog-btns button {
+      flex: 1
+    }
+
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      width: 156px;
+      margin: 0 auto
+    }
+
+    .dpad .empty {
+      visibility: hidden
+    }
+
+    .transport {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px
+    }
+
+    .transport .wide {
+      grid-column: span 2
+    }
+
+    /* Compact status/log strip below hardware */
+    .footer-strip {
+      width: 100%;
+      max-width: 1060px;
+      background: #141310;
+      border: 1px solid #2b2822;
+      border-radius: 4px;
+      padding: 8px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .last-event {
+      color: var(--text);
+      font-size: 12px
+    }
+
+    .last-event span {
+      color: var(--dim);
+      margin-right: 6px
+    }
+
+    .hint {
+      color: var(--dim);
+      font-size: 11px
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header class="hdr">
+      <div>
+        <h1>Four-Track Prototype</h1>
+        <p class="note">Interactive 800×480 prototype using the Round 2 screen designs and the four-track alignment
+          engine.</p>
+
+        <div class="topbar-meta">
+          <div><b>ORIGINAL TRACKER · FOUR-TRACK RECORDER</b> <span style="margin-left:8px">MK66 Limits: 30s/track ·
+              600-col waveforms · 10 Hz readouts</span></div>
+          <div class="meta-btns">
+            <button id="bTheme">Theme: Original</button>
+            <button id="bReset">Power / Reset</button>
+          </div>
+        </div>
+
+        <main class="tracker" id="stage" tabindex="0" aria-label="Original Polyend Tracker Hardware Simulator">
+          <div class="left-col">
+            <div class="screen-frame">
+              <div class="screen" id="screen"></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="bTheme">Theme: Original</button>
+              <button id="bReset">Reset project</button>
+              <div class="hw-fn-row" id="hwFnRow">
+                <button class="hw-btn" data-fn="0">1</button>
+                <button class="hw-btn" data-fn="1">2</button>
+                <button class="hw-btn" data-fn="2">3</button>
+                <button class="hw-btn" data-fn="3">4</button>
+                <button class="hw-btn" data-fn="4">5</button>
+                <button class="hw-btn" data-fn="5">6</button>
+                <button class="hw-btn" data-fn="6">7</button>
+                <button class="hw-btn" data-fn="7">8</button>
+              </div>
+    </header>
+    <div class="pads-wrap" id="pads"></div>
+  </div>
+
+  <div class="main-grid">
+    <section class="bezel" id="stage" tabindex="0" aria-label="Original Tracker 800 by 480 screen">
+      <div class="screen-scroll">
+        <div class="screen" id="screen"></div>
+        <div class="right-col">
+          <div class="brand">
+            <span>Polyend Tracker</span>
+            <span class="limit-pill" id="ramPill">RAM 0.0 / 30s</span>
+          </div>
+
+          <div class="jog-box">
+            <div class="jog" id="jog" title="Scroll wheel or drag to turn Jog">
+              <div class="jog-notch" id="jogNotch"></div>
+              <button class="jog-center" id="bOk" title="Enter / Confirm">OK</button>
+            </div>
+            <div class="scr-bar">
+              <div class="btnrow">
+                <button class="recbtn" id="bRec">Rec / Arm (Enter)</button>
+                <button id="bPlay">Play / Stop (Space)</button>
+                <button id="bUndo">Undo (Backspace)</button>
+                <button id="bEsc">Cancel / Close (Esc)</button>
+              </div>
+              <span>Click the 8 bottom screen buttons, or use Arrows + Enter + 1–4</span>
+              <div class="jog-btns">
+                <button class="hw-btn" id="bJogL">↺ Jog −</button>
+                <button class="hw-btn" id="bJogR">Jog + ↻</button>
+              </div>
     </section>
   </div>
 
-  <section class="card">
-    <h2>Walkthroughs</h2>
-    <p class="note" style="margin-bottom:10px">Each tab resets to a known start and plays a scripted performance, so you can watch the rule at work. Press the steps in order.</p>
-    <div class="tabs" id="tabs"></div>
-    <p id="tabDesc"></p>
-    <div class="steps" id="steps"></div>
-  </section>
+  <div class="side">
+    <section class="card">
+      <h2>Walkthroughs (watch the screen)</h2>
+      <div class="tabs" id="tabs"></div>
+      <p id="tabDesc" class="note"></p>
+      <div class="steps" id="steps"></div>
+    </section>
+    <div class="dpad">
+      <div class="empty"></div><button class="hw-btn" id="bUp">▲</button>
+      <div class="empty"></div>
+      <button class="hw-btn" id="bLeft">◀</button><button class="hw-btn" id="bShift">Shift</button><button
+        class="hw-btn" id="bRight">▶</button>
+      <div class="empty"></div><button class="hw-btn" id="bDown">▼</button>
+      <div class="empty"></div>
+    </div>
+
+    <section class="card">
+      <h2>What just happened</h2>
+      <ul class="log" id="log"></ul>
+    </section>
+    <div class="transport">
+      <button class="hw-btn rec-led" id="bRec">● Rec</button>
+      <button class="hw-btn" id="bPlay">▶ Play</button>
+      <button class="hw-btn" id="bUndo">Undo</button>
+      <button class="hw-btn" id="bEsc">Back / Esc</button>
+      <button class="hw-btn wide" id="bMon">Shift+Input: Mon</button>
+    </div>
+  </div>
+  </main>
 
   <section class="card">
-    <h2>What just happened</h2>
-    <ul class="log" id="log"></ul>
+    <h2>Keyboard &amp; Hardware Map</h2>
+    <dl class="keys">
+      <dt>Enter</dt>
+      <dd>Arm / Record / Confirm bars / Confirm popup</dd>
+      <dt>Space</dt>
+      <dd>Play / Stop</dd>
+      <dt>1 2 3 4</dt>
+      <dd>Select Track 1–4 (or bar choice 1–6 in prompt)</dd>
+      <dt>Up / Down</dt>
+      <dd>Select Track, Settings/Input row, or adjust Offset</dd>
+      <dt>Left / Right</dt>
+      <dd>Switch Offset field, change setting, or pick bars</dd>
+      <dt>Shift</dt>
+      <dd>Coarse step (10 ms / 1 beat)</dd>
+      <dt>Backspace</dt>
+      <dd>Undo last take on selected track</dd>
+      <dt>Esc</dt>
+      <dd>Cancel armed take / close sub-screen or popup</dd>
+      <dt>A S D F G H J K L ;</dt>
+      <dd>Guitar plucks (A minor pentatonic)</dd>
+      <dt>Q W E R T Y U I O P</dt>
+      <dd>Bass plucks</dd>
+      <dt>Z X C V B N M , . /</dt>
+      <dd>Drums: kick, snare, hat, open hat, clap, toms, rim, shaker, cowbell</dd>
+    </dl>
   </section>
-</div>
+  <div class="footer-strip">
+    <div class="last-event" id="lastEvent"><span>Status:</span>Ready. Click Rec (or Enter), play pads/keys, then press
+      Rec again to set the Loop.</div>
+    <div class="hint">Keys: Enter=Rec/OK · Space=Play · 1–4=Track · Arrows=Nav/Edit · MouseWheel=Jog · Backspace=Undo ·
+      Esc=Back</div>
+  </div>
 
-<script id="logic">
-/* ---------- LOGIC: pure, no DOM, no audio. This is the part worth keeping. ---------- */
-const FourTrack = (function () {
-  const NT = 4, BPB = 4, BAR_CHOICES = [1, 2, 4, 8, 16];
-  const mod = (a, n) => ((a % n) + n) % n;
-  const amp = db => Math.pow(10, db / 20);
-  const resize = (buf, len) => { const o = new Float32Array(len); o.set(buf.subarray(0, Math.min(len, buf.length))); return o; };
+  <script id="logic">
+    /* ---------- LOGIC: pure, no DOM, no audio. This is the part worth keeping. ---------- */
+    /* ---------- LOGIC: pure, no DOM, no audio. ---------- */
+    const FourTrack = (function () {
+      const NT = 4, BPB = 4, BAR_CHOICES = [1, 2, 3, 4, 6, 8];
+      const NT = 4, BPB = 4, BAR_CHOICES = [1, 2, 3, 4, 6, 8], LONG_BAR_CHOICES = [8, 12, 16, 20, 24, 32];
+      const MAX_TRACK_SEC = 30.0; // MK66 RAM budget (~30 s mono per track)
+      const mod = (a, n) => ((a % n) + n) % n;
+      const amp = db => Math.pow(10, db / 20);
+      const resize = (buf, len) => { const o = new Float32Array(len); o.set(buf.subarray(0, Math.min(len, buf.length))); return o; };
 
-  // First-note detector: 32-sample peak envelope, adaptive noise floor, 5 ms confirmation,
-  // back-search to the true start, then a zero-crossing snap. Returns a sample index or -1.
-  function detectFirstOnset(x, sr) {
-    const cell = 32, n = Math.floor(x.length / cell);
-    if (n < 8) return -1;
-    const env = new Float32Array(n);
-    for (let i = 0; i < n; i++) { let m = 0; for (let j = i * cell; j < (i + 1) * cell; j++) { const a = Math.abs(x[j]); if (a > m) m = a; } env[i] = m; }
-    const sorted = Array.from(env).sort((a, b) => a - b);
-    const floor = sorted[Math.floor(n * 0.1)];
-    const thr = Math.max(amp(-50), floor * 4);
-    const conf = Math.max(1, Math.round(0.005 * sr / cell));
-    for (let i = 0; i < n - conf; i++) {
-      if (env[i] < thr) continue;
-      let above = 0; for (let k = 0; k <= conf; k++) if (env[i + k] >= thr) above++;
-      if (above < Math.ceil((conf + 1) / 2)) continue;
-      const s = i * cell, lim = Math.max(0, s - Math.round(0.015 * sr));
-      let p = s; while (p > lim && Math.abs(x[p]) >= thr * 0.25) p--;
-      let q = p; while (q < s + cell && Math.abs(x[q]) < thr * 0.25) q++;
-      const zc = Math.round(0.001 * sr); let z = q;
-      for (let k = q; k > Math.max(1, q - zc); k--) { if ((x[k - 1] <= 0 && x[k] > 0) || (x[k - 1] >= 0 && x[k] < 0)) { z = k; break; } }
-      return z;
-    }
-    return -1;
-  }
-  const bpmFor = (len, bars, sr) => bars * BPB * 60 / (len / sr);
-  function pickBars(len, sr) {
-    let best = 4, bd = 1e9;
-    for (const b of BAR_CHOICES) { const bpm = bpmFor(len, b, sr); if (bpm < 60 || bpm > 160) continue; const d = Math.abs(bpm - 100); if (d < bd) { bd = d; best = b; } }
-    return best;
-  }
-  function roundedLen(len, bars, sr, rounding) {
-    if (rounding === 'off') return len;
-    const step = rounding === '1' ? 1 : 0.1;
-    const bpm = Math.round(bpmFor(len, bars, sr) / step) * step;
-    return Math.round(bars * BPB * 60 / bpm * sr);
-  }
-  const windowSamples = s => !s.bpm ? 0 : Math.min(s.settings.windowMs / 1000 * s.sr, (60 / s.bpm / 4 / 2) * s.sr);
-  const barSamples = s => s.loopLen / s.bars;
-  const onsetPos = (s, t) => { const p = s.tracks[t].part; return p ? mod(p.onsetRel + p.alignShift + p.offset, s.loopLen) : 0; };
+      function detectFirstOnset(x, sr) {
+        const cell = 32, n = Math.floor(x.length / cell);
+        if (n < 8) return -1;
+        const env = new Float32Array(n);
+        for (let i = 0; i < n; i++) { let m = 0; for (let j = i * cell; j < (i + 1) * cell; j++) { const a = Math.abs(x[j]); if (a > m) m = a; } env[i] = m; }
+        const sorted = Array.from(env).sort((a, b) => a - b);
+        const floor = sorted[Math.floor(n * 0.1)];
+        const thr = Math.max(amp(-50), floor * 4);
+        const conf = Math.max(1, Math.round(0.005 * sr / cell));
+        for (let i = 0; i < n - conf; i++) {
+          if (env[i] < thr) continue;
+          let above = 0; for (let k = 0; k <= conf; k++) if (env[i + k] >= thr) above++;
+          if (above < Math.ceil((conf + 1) / 2)) continue;
+          const s = i * cell, lim = Math.max(0, s - Math.round(0.015 * sr));
+          let p = s; while (p > lim && Math.abs(x[p]) >= thr * 0.25) p--;
+          let q = p; while (q < s + cell && Math.abs(x[q]) < thr * 0.25) q++;
+          const zc = Math.round(0.001 * sr); let z = q;
+          for (let k = q; k > Math.max(1, q - zc); k--) { if ((x[k - 1] <= 0 && x[k] > 0) || (x[k - 1] >= 0 && x[k] < 0)) { z = k; break; } }
+          return z;
+        }
+        return -1;
+      }
+      const bpmFor = (len, bars, sr) => bars * BPB * 60 / (len / sr);
+      function choicesFor(len, sr) {
+        return (len / sr) > 18 ? LONG_BAR_CHOICES : BAR_CHOICES;
+      }
+      function pickBars(len, sr) {
+        let best = 4, bd = 1e9;
+        for (const b of BAR_CHOICES) { const bpm = bpmFor(len, b, sr); if (bpm < 60 || bpm > 160) continue; const d = Math.abs(bpm - 100); if (d < bd) { bd = d; best = b; } }
+        const list = choicesFor(len, sr);
+        let best = list[Math.floor(list.length / 2)], bd = 1e9;
+        for (const b of list) { const bpm = bpmFor(len, b, sr); if (bpm < 60 || bpm > 180) continue; const d = Math.abs(bpm - 105); if (d < bd) { bd = d; best = b; } }
+        return best;
+      }
+      function roundedLen(len, bars, sr, rounding) {
+        if (rounding === 'off') return len;
+        const step = rounding === '1' ? 1 : 0.1;
+        const bpm = Math.round(bpmFor(len, bars, sr) / step) * step;
+        return Math.round(bars * BPB * 60 / bpm * sr);
+      }
+      const windowSamples = s => !s.bpm ? 0 : Math.min(s.settings.windowMs / 1000 * s.sr, (60 / s.bpm / 4 / 2) * s.sr);
+      const barSamples = s => s.loopLen / s.bars;
+      const onsetPos = (s, t) => { const p = s.tracks[t].part; return p ? mod(p.onsetRel + p.alignShift + p.offset, s.loopLen) : 0; };
 
-  // Where each sample of a part sits inside the loop, wrapping around the loop ends.
-  function render(s, t) {
-    const p = s.tracks[t].part, L = s.loopLen, out = new Float32Array(L || 0);
-    if (!p || !L) return out;
-    const shift = p.alignShift + p.offset;
-    for (let i = 0; i < p.raw.length; i++) out[mod(i - p.preRoll + shift, L)] += p.raw[i];
-    return out;
-  }
+      function render(s, t) {
+        const p = s.tracks[t].part, L = s.loopLen, out = new Float32Array(L || 0);
+        if (!p || !L) return out;
+        const shift = p.alignShift + p.offset;
+        for (let i = 0; i < p.raw.length; i++) out[mod(i - p.preRoll + shift, L)] += p.raw[i];
+        return out;
+      }
 
-  function init(sr) {
-    return { sr, status: 'empty', loopLen: 0, bars: 0, bpm: 0, pending: null, selected: 0,
-      tracks: Array.from({ length: NT }, () => ({ part: null, prev: null, mute: false })),
-      settings: { loopMode: 'repeat', windowMs: 60, preRollMs: 120, rounding: 'off', click: false }, log: [] };
-  }
-  const fmtMs = (s, n) => { const ms = n / s.sr * 1000, a = Math.abs(ms); return (ms < 0 ? '-' : '+') + (a >= 1000 ? (a / 1000).toFixed(2) + ' s' : a.toFixed(0) + ' ms'); };
-  const say = (s, m) => { s.log = [m, ...s.log].slice(0, 40); };
-  const wrapHalf = (x, L) => Math.round(mod(x + L / 2, L) - L / 2);
+      function init(sr) {
+        return {
+          sr, status: 'empty', loopLen: 0, bars: 0, bpm: 0, pending: null, selected: 0,
+          tracks: Array.from({ length: NT }, (_, i) => ({ name: 'Track ' + (i + 1), part: null, prev: null, mute: false })),
+          settings: { loopMode: 'repeat', windowMs: 60, preRollMs: 120, rounding: '0.1', click: false }, log: []
+        };
+      }
+      const fmtMs = (s, n) => { const ms = n / s.sr * 1000, a = Math.abs(ms); return (ms < 0 ? '−' : '+') + (a >= 1000 ? (a / 1000).toFixed(2) + ' s' : a.toFixed(0) + ' ms'); };
+      const say = (s, m) => { s.log = [m, ...s.log].slice(0, 40); };
+      const say = (s, m) => { s.log = [m, ...s.log].slice(0, 20); };
+      const wrapHalf = (x, L) => Math.round(mod(x + L / 2, L) - L / 2);
 
-  function reduce(state, a) {
-    const s = { ...state, tracks: state.tracks.map(t => ({ ...t })), settings: { ...state.settings }, log: state.log };
-    switch (a.type) {
-      case 'RESET': return init(state.sr);
-      case 'SELECT': s.selected = a.track; return s;
-      case 'SET_SETTING': s.settings[a.key] = a.value; return s;
-      case 'MUTE': s.tracks[a.track].mute = !s.tracks[a.track].mute; return s;
-      case 'FIRST_TAKE': {
-        const onset = detectFirstOnset(a.samples, s.sr);
-        if (onset < 0) { say(s, 'No note was heard in that take, so nothing was kept.'); return s; }
-        const trimmed = a.samples.subarray(onset);
-        s.pending = { trimmed, bars: pickBars(trimmed.length, s.sr) };
-        s.status = 'confirmBars';
-        say(s, `First take: your first note came ${(onset / s.sr * 1000).toFixed(0)} ms after you pressed record, so that silence was cut. The loop is ${(trimmed.length / s.sr).toFixed(2)} s long. Choose how many bars it was.`);
+      function reduce(state, a) {
+        const s = { ...state, tracks: state.tracks.map(t => ({ ...t })), settings: { ...state.settings }, log: state.log };
+        switch (a.type) {
+          case 'RESET': return init(state.sr);
+          case 'SELECT': s.selected = a.track; return s;
+          case 'SET_SETTING': s.settings[a.key] = a.value; return s;
+          case 'MUTE': s.tracks[a.track].mute = !s.tracks[a.track].mute; return s;
+          case 'FIRST_TAKE': {
+            const onset = detectFirstOnset(a.samples, s.sr);
+            if (onset < 0) { say(s, 'No sound in this take. Nothing was kept.'); return s; }
+            const trimmed = a.samples.subarray(onset);
+            s.pending = { trimmed, bars: pickBars(trimmed.length, s.sr) };
+            s.pending = { trimmed, bars: pickBars(trimmed.length, s.sr), memFull: !!a.memFull };
+            s.status = 'confirmBars';
+            say(s, `First take: first note at ${(onset / s.sr * 1000).toFixed(0)} ms was trimmed. Loop length ${(trimmed.length / s.sr).toFixed(2)} s. Choose bars.`);
+            say(s, `First take: ${(trimmed.length / s.sr).toFixed(2)} s kept (trimmed ${(onset / s.sr * 1000).toFixed(0)} ms). Choose bar count.`);
+            return s;
+          }
+          case 'SET_BARS': if (s.pending) s.pending = { ...s.pending, bars: a.bars }; return s;
+          case 'CANCEL_BARS': s.pending = null; s.status = 'empty'; say(s, 'First take discarded.'); return s;
+          case 'CONFIRM_BARS': {
+            if (!s.pending) return s;
+            const bars = s.pending.bars, raw0 = s.pending.trimmed;
+            const len = roundedLen(raw0.length, bars, s.sr, s.settings.rounding);
+            const raw = len === raw0.length ? raw0 : resize(raw0, len);
+            s.loopLen = len; s.bars = bars; s.bpm = bpmFor(len, bars, s.sr); s.pending = null; s.status = 'ready';
+            s.tracks[0].part = { raw, preRoll: 0, onsetRel: 0, aligned: true, alignShift: 0, offset: 0, reason: 'First Part · sets the Loop' };
+            s.tracks[0].part = { raw, preRoll: 0, onsetRel: 0, aligned: true, alignShift: 0, offset: 0, reason: 'First Part · sets Loop' };
+            s.selected = 0;
+            say(s, `Loop set: ${bars} bar${bars > 1 ? 's' : ''} (${(len / s.sr).toFixed(3)} s, ${s.bpm.toFixed(1)} BPM).`);
+            say(s, `Loop set: ${bars} bar${bars > 1 ? 's' : ''} (${(len / s.sr).toFixed(2)} s, ${s.bpm.toFixed(1)} BPM).`);
+            return s;
+          }
+          case 'PART_TAKE': {
+            if (s.status !== 'ready') return s;
+            const t = a.track, onset = detectFirstOnset(a.raw, s.sr);
+            if (onset < 0) { say(s, `Track ${t + 1}: no sound in this take. Nothing was kept.`); return s; }
+            const win = windowSamples(s), onsetRel = onset - a.preRoll;
+            let aligned = false, shift = 0, reason;
+            if (win <= 0) reason = 'Snap off · kept as played';
+            else if (Math.abs(onsetRel) <= win) { aligned = true; shift = -onsetRel; reason = `Snapped ${fmtMs(s, onsetRel).replace('+', '').replace('−', '')} ${onsetRel < 0 ? 'early' : 'late'}`; }
+            else reason = `Left in place (${fmtMs(s, onsetRel)})`;
+            s.tracks[t].prev = s.tracks[t].part;
+            s.tracks[t].part = { raw: a.raw, preRoll: a.preRoll, onsetRel, aligned, alignShift: shift, offset: 0, reason };
+            if (a.label) s.tracks[t].name = a.label;
+            s.selected = t;
+            say(s, `Track ${t + 1}: ${reason}`);
+            return s;
+          }
+          case 'NUDGE': {
+            const p = s.tracks[a.track].part; if (!p || !s.loopLen) return s;
+            const delta = a.unit === 'ms' ? Math.round((a.coarse ? 10 : 1) / 1000 * s.sr) * a.dir
+              : a.unit === '16th' ? Math.round(barSamples(s) / 16) * a.dir
+                : Math.round(barSamples(s) * (a.coarse ? 0.25 : 1)) * a.dir;
+            s.tracks[a.track].part = { ...p, offset: wrapHalf(p.offset + delta, s.loopLen) };
+            return s;
+          }
+          case 'SET_OFFSET': {
+            const p = s.tracks[a.track].part; if (!p) return s;
+            s.tracks[a.track].part = { ...p, offset: wrapHalf(a.offset, s.loopLen) };
+            say(s, `Track ${a.track + 1}: offset set to ${fmtMs(s, s.tracks[a.track].part.offset)}.`);
+            say(s, `Track ${a.track + 1}: offset ${fmtMs(s, s.tracks[a.track].part.offset)}.`);
+            return s;
+          }
+          case 'UNDO': {
+            const t = s.tracks[a.track];
+            if (!t.prev) { say(s, `Track ${a.track + 1}: nothing to undo.`); return s; }
+            t.part = t.prev; t.prev = null; say(s, `Track ${a.track + 1}: previous Part restored.`); return s;
+          }
+        }
         return s;
       }
-      case 'SET_BARS': if (s.pending) s.pending = { ...s.pending, bars: a.bars }; return s;
-      case 'CONFIRM_BARS': {
-        if (!s.pending) return s;
-        const bars = s.pending.bars, raw0 = s.pending.trimmed;
-        const len = roundedLen(raw0.length, bars, s.sr, s.settings.rounding);
-        const raw = len === raw0.length ? raw0 : resize(raw0, len);
-        s.loopLen = len; s.bars = bars; s.bpm = bpmFor(len, bars, s.sr); s.pending = null; s.status = 'ready';
-        s.tracks[0].part = { raw, preRoll: 0, onsetRel: 0, aligned: true, alignShift: 0, offset: 0, reason: 'First part. It defines the loop, so it starts exactly on the loop start.' };
-        s.selected = 0;
-        say(s, `Loop set: ${bars} bar${bars > 1 ? 's' : ''} in ${(len / s.sr).toFixed(3)} s, which works out to ${s.bpm.toFixed(2)} BPM.` + (len !== raw0.length ? ` The end was ${len > raw0.length ? 'padded' : 'trimmed'} by ${Math.abs(len - raw0.length) / s.sr * 1000 | 0} ms to round the tempo.` : ''));
-        return s;
+      return { NT, BPB, BAR_CHOICES, detectFirstOnset, bpmFor, pickBars, roundedLen, windowSamples, barSamples, onsetPos, render, init, reduce, fmtMs };
+      return { NT, BPB, MAX_TRACK_SEC, BAR_CHOICES, choicesFor, detectFirstOnset, bpmFor, pickBars, roundedLen, windowSamples, barSamples, onsetPos, render, init, reduce, fmtMs };
+    })();
+    if (typeof module !== 'undefined') module.exports = FourTrack;
+  </script>
+
+  <script id="shell">
+    (function () {
+      const FT = FourTrack, SR = 44100, $ = id => document.getElementById(id);
+      const PAL = {
+        Original: { bg: '#15130f', topBarBg: '#221f19', topBarText: '#d3c8ae', topBarFrame: '#3a342a', labelActive: '#e6dcc3', labelInactive: '#91876f', button: '#211e18', red: '#c4452e', list: '#1c1a15', listSel: '#332e25', barActive: '#93a66a', barInactive: '#2c2922', waveform: '#8d826c', waveformBg: '#191712', waveformProgress: '#d2a94f', marker: '#d8873a', orange: '#d8873a', grey: '#575043' },
+        Monochrome: { bg: '#000000', topBarBg: '#000000', topBarText: '#ffffff', topBarFrame: '#7f7f7f', labelActive: '#ffffff', labelInactive: '#8a8a8a', button: '#000000', red: '#ffffff', list: '#000000', listSel: '#262626', barActive: '#ffffff', barInactive: '#3a3a3a', waveform: '#7f7f7f', waveformBg: '#000000', waveformProgress: '#ffffff', marker: '#ffffff', orange: '#ffffff', grey: '#4a4a4a' }
+      };
+
+      let S = FT.init(SR), ctx = null, master = null, rec = null;
+      let theme = 'Original', view = 'main'; // 'main' | 'offset' | 'settings' | 'input' | 'project' | 'name'
+      let popup = null; // null | { kind:'replace'|'nosound'|'export'|'exporting', repeats:1, pct:0 }
+      let offsetField = 'ms', offsetOrig = 0;
+      let setRow = 3, inRow = 1, projRow = 0, nameTitle = 'Save as', nameStr = 'BASEMENT 04', nameCur = 10, projName = 'Basement 04', dirty = false;
+      let theme = 'Original', view = 'main', popup = null, shiftHeld = false, jogAngle = 0;
+      let offsetField = 'ms', offsetOrig = 0, setRow = 3, inRow = 1, projRow = 0;
+      let nameTitle = 'Save as', nameStr = 'BASEMENT 04', nameCur = 10, projName = 'Basement 04', dirty = false;
+      let inp = { src: 0, gain: 18, mon: true, level: -48, peakDb: -48, clip: false, clipUntil: 0 };
+      let tabIdx = 0, stepDone = 0;
+      const T = { playing: false, epoch: 0, nodes: [null, null, null, null], nextClick: 0 };
+      const meterVals = [0, 0, 0, 0];
+      let masterMeter = 0;
+      let masterMeter = 0, last10Hz = 0, bottomHandlers = [];
+      const PROJECTS = [
+        ['Basement 04', 'open', '3 Parts', '4 bars · 115.0 BPM', 'Today'],
+        ['Basement 03', '', '4 Parts', '8 bars · 92.0 BPM', 'Yesterday'],
+        ['Dusk Riff', '', '2 Parts', '2 bars · 76.5 BPM', '12 Nov'],
+        ['Sunday Bass', '', '1 Part', '4 bars · 101.0 BPM', '9 Nov']
+      ];
+      const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_. '.split('');
+
+      /* ---- sounds ---- */
+      const cache = {};
+      function rnd(o) { o.s = (o.s * 1664525 + 1013904223) >>> 0; return o.s / 4294967296 * 2 - 1; }
+      function ks(f, dur, damp, soft) {
+        const n = Math.floor(SR * dur), N = Math.max(2, Math.round(SR / f)), ring = new Float32Array(N), o = new Float32Array(n), r = { s: 12345 + N };
+        for (let i = 0; i < N; i++) ring[i] = rnd(r);
+        for (let p = 0; p < soft; p++) for (let i = 0; i < N; i++) ring[i] = (ring[i] + ring[(i + 1) % N]) / 2;
+        let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(ring[i]));
+        let idx = 0; for (let i = 0; i < n; i++) { const a = ring[idx], b = ring[(idx + 1) % N]; ring[idx] = (a + b) * 0.5 * damp; o[i] = a / pk * 0.5; idx = (idx + 1) % N; }
+        return o;
       }
-      case 'PART_TAKE': {
-        if (s.status !== 'ready') return s;
-        const t = a.track, onset = detectFirstOnset(a.raw, s.sr);
-        if (onset < 0) { say(s, `Track ${t + 1}: no note was heard, so nothing was kept.`); return s; }
-        const win = windowSamples(s), onsetRel = onset - a.preRoll;
-        let aligned = false, shift = 0, reason;
-        if (win <= 0) reason = 'Alignment is off, so the part stays exactly as you played it.';
-        else if (Math.abs(onsetRel) <= win) { aligned = true; shift = -onsetRel; reason = `First note was ${fmtMs(s, onsetRel)} from the loop start, inside the window of ±${(win / s.sr * 1000).toFixed(0)} ms, so it was moved onto the loop start.`; }
-        else reason = `First note is ${fmtMs(s, onsetRel)} from the loop start, outside ±${(win / s.sr * 1000).toFixed(0)} ms, so it counts as a deliberate entry and stays where you played it.`;
-        s.tracks[t].prev = s.tracks[t].part;
-        s.tracks[t].part = { raw: a.raw, preRoll: a.preRoll, onsetRel, aligned, alignShift: shift, offset: 0, reason };
-        s.selected = t;
-        say(s, `Track ${t + 1}: ${reason}`);
-        return s;
+      function synth(kind, f) {
+        const key = kind + f; if (cache[key]) return cache[key];
+        const r = { s: 777 }; let out;
+        const mk = (d, fn) => { const o = new Float32Array(Math.floor(SR * d)); for (let i = 0; i < o.length; i++) o[i] = fn(i / SR, i); return o; };
+        if (kind === 'guitar') out = ks(f, 1.8, 0.9965, 1);
+        else if (kind === 'bass') out = ks(f, 1.3, 0.9985, 4);
+        else if (kind === 'kick') { let ph = 0; out = mk(0.4, t => { ph += 2 * Math.PI * (45 + 105 * Math.exp(-t * 30)) / SR; return Math.sin(ph) * Math.exp(-t * 8) * 0.85; }); }
+        else if (kind === 'snare') out = mk(0.25, t => (rnd(r) * Math.exp(-t * 22) * 0.45 + Math.sin(2 * Math.PI * 185 * t) * Math.exp(-t * 28) * 0.4));
+        else if (kind === 'chat' || kind === 'ohat') { let pv = 0; const dk = kind === 'chat' ? 90 : 14; out = mk(kind === 'chat' ? 0.08 : 0.4, t => { const x = rnd(r); const y = x - pv; pv = x; return y * Math.exp(-t * dk) * 0.3; }); }
+        else if (kind === 'clap') out = mk(0.3, t => rnd(r) * (Math.exp(-t * 60) + Math.exp(-(t - 0.012) * 60) * (t > 0.012 ? 1 : 0) + Math.exp(-(t - 0.024) * 25) * (t > 0.024 ? 1 : 0)) * 0.3);
+        else if (kind === 'tomL' || kind === 'tomH') { const f0 = kind === 'tomL' ? 120 : 190; let ph = 0; out = mk(0.4, t => { ph += 2 * Math.PI * (f0 * 0.65 + f0 * 0.35 * Math.exp(-t * 14)) / SR; return Math.sin(ph) * Math.exp(-t * 9) * 0.7; }); }
+        else if (kind === 'rim') out = mk(0.08, t => Math.sin(2 * Math.PI * 820 * t) * Math.exp(-t * 120) * 0.5 + rnd(r) * Math.exp(-t * 200) * 0.2);
+        else if (kind === 'shaker') { let pv = 0; out = mk(0.14, t => { const x = rnd(r); const y = x - pv; pv = x; return y * Math.min(1, t / 0.015) * Math.exp(-t * 28) * 0.25; }); }
+        else out = mk(0.35, t => ((Math.sin(2 * Math.PI * 540 * t) > 0 ? 1 : -1) + (Math.sin(2 * Math.PI * 800 * t) > 0 ? 1 : -1)) * Math.exp(-t * 12) * 0.12);
+        return (cache[key] = out);
       }
-      case 'NUDGE': {
-        const p = s.tracks[a.track].part; if (!p || !s.loopLen) return s;
-        const delta = a.unit === 'ms' ? Math.round((a.coarse ? 10 : 1) / 1000 * s.sr) * a.dir : Math.round(barSamples(s) * (a.coarse ? 0.25 : 1)) * a.dir;
-        s.tracks[a.track].part = { ...p, offset: wrapHalf(p.offset + delta, s.loopLen) };
-        return s;
+      const KEYMAP = {};
+      'asdfghjkl;'.split('').forEach((k, i) => KEYMAP[k] = { kind: 'guitar', f: [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 783.99][i] });
+      'qwertyuiop'.split('').forEach((k, i) => KEYMAP[k] = { kind: 'bass', f: [55, 65.41, 73.42, 82.41, 98, 110, 130.81, 146.83, 164.81, 196][i] });
+      ['kick', 'snare', 'chat', 'ohat', 'clap', 'tomL', 'tomH', 'rim', 'shaker', 'cowbell'].forEach((k, i) => KEYMAP['zxcvbnm,./'[i]] = { kind: k, f: 0 });
+      const PAD_ROWS = [
+        { label: 'Guitar', keys: 'asdfghjkl;', names: ['A3', 'C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5', 'G5'], kind: 'guitar', freqs: [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 783.99] },
+        { label: 'Bass', keys: 'qwertyuiop', names: ['A1', 'C2', 'D2', 'E2', 'G2', 'A2', 'C3', 'D3', 'E3', 'G3'], kind: 'bass', freqs: [55, 65.41, 73.42, 82.41, 98, 110, 130.81, 146.83, 164.81, 196] },
+        { label: 'Drums', keys: 'zxcvbnm,./', names: ['KICK', 'SNR', 'CH', 'OH', 'CLAP', 'TOML', 'TOMH', 'RIM', 'SHK', 'COW'], kinds: ['kick', 'snare', 'chat', 'ohat', 'clap', 'tomL', 'tomH', 'rim', 'shaker', 'cowbell'] }
+      ];
+      const padsEl = $('pads');
+      PAD_ROWS.forEach(row => {
+        const r = document.createElement('div'); r.className = 'pad-row';
+        const lbl = document.createElement('div'); lbl.className = 'pad-lbl'; lbl.textContent = row.label; r.appendChild(lbl);
+        row.keys.split('').forEach((k, i) => {
+          const note = row.kind ? { kind: row.kind, f: row.freqs[i], label: row.label } : { kind: row.kinds[i], f: 0, label: 'Drums' };
+          KEYMAP[k] = note;
+          const b = document.createElement('button'); b.className = 'pad'; b.textContent = `${row.names[i]}`;
+          b.title = `Key: ${k.toUpperCase()}`;
+          b.onpointerdown = e => { e.preventDefault(); b.classList.add('hit'); hit(note); setTimeout(() => b.classList.remove('hit'), 100); $('stage').focus(); };
+          r.appendChild(b);
+        });
+        padsEl.appendChild(r);
+      });
+
+      /* ---- audio ---- */
+      function ensureAudio() {
+        if (!ctx) {
+          ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+          master = ctx.createGain(); master.gain.value = 0.8;
+          const comp = ctx.createDynamicsCompressor(); master.connect(comp); comp.connect(ctx.destination);
+          setInterval(tick, 25); requestAnimationFrame(frame);
+        }
+        if (ctx.state === 'suspended') ctx.resume();
       }
-      case 'SET_OFFSET': {
-        const p = s.tracks[a.track].part; if (!p) return s;
-        s.tracks[a.track].part = { ...p, offset: wrapHalf(a.offset, s.loopLen) };
-        say(s, `Track ${a.track + 1}: offset set to ${fmtMs(s, s.tracks[a.track].part.offset)}.`);
-        return s;
+      function playBuf(buf, when, gain) {
+        const ab = ctx.createBuffer(1, buf.length, SR); ab.copyToChannel(buf, 0);
+        const n = ctx.createBufferSource(); n.buffer = ab; const g = ctx.createGain(); g.gain.value = gain == null ? 1 : gain;
+        n.connect(g); g.connect(master); n.start(when || 0);
       }
-      case 'UNDO': {
-        const t = s.tracks[a.track];
-        if (!t.prev) { say(s, `Track ${a.track + 1}: nothing to undo.`); return s; }
-        t.part = t.prev; t.prev = null; say(s, `Track ${a.track + 1}: previous take restored.`); return s;
+      const loopSec = () => S.loopLen / SR;
+      function startTrack(i) {
+        stopTrack(i);
+        if (!S.tracks[i].part || !T.playing) return;
+        const now = ctx.currentTime + 0.01; let when, phase;
+        if (now < T.epoch) { when = T.epoch; phase = 0; } else { when = now; phase = (now - T.epoch) % loopSec(); }
+        if (S.settings.loopMode === 'once' && now - T.epoch >= loopSec()) return;
+        const ab = ctx.createBuffer(1, S.loopLen, SR); ab.copyToChannel(FT.render(S, i), 0);
+        const n = ctx.createBufferSource(); n.buffer = ab; n.loop = S.settings.loopMode === 'repeat';
+        const g = ctx.createGain(); g.gain.value = S.tracks[i].mute ? 0 : 1; n.connect(g); g.connect(master);
+        n.start(when, phase); T.nodes[i] = { n, g };
       }
-    }
-    return s;
-  }
-  return { NT, BPB, BAR_CHOICES, detectFirstOnset, bpmFor, pickBars, roundedLen, windowSamples, barSamples, onsetPos, render, init, reduce, fmtMs };
-})();
-if (typeof module !== 'undefined') module.exports = FourTrack;
-</script>
+      function stopTrack(i) { const o = T.nodes[i]; if (o) { try { o.n.stop(); } catch (e) { } o.n.disconnect(); T.nodes[i] = null; } }
+      function refreshAudio() { if (ctx && T.playing) for (let i = 0; i < 4; i++) startTrack(i); }
+      function startPlayback(at) {
+        ensureAudio(); for (let i = 0; i < 4; i++) stopTrack(i);
+        T.playing = true; T.epoch = at; for (let i = 0; i < 4; i++) startTrack(i);
+        T.nextClick = Math.max(0, Math.ceil((ctx.currentTime - at) / (60 / S.bpm)));
+      }
+      function stopPlayback() { T.playing = false; for (let i = 0; i < 4; i++) stopTrack(i); }
+      function clickAt(t, accent) {
+        const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = accent ? 1600 : 1100; o.type = 'square';
+        g.gain.setValueAtTime(0.14, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.03); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.04);
+      }
+      function tick() {
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        if (T.playing && S.bpm && S.settings.click) {
+          const beat = 60 / S.bpm;
+          while (T.epoch + T.nextClick * beat < now + 0.12) { const t = T.epoch + T.nextClick * beat; if (t >= now - 0.01) clickAt(t, T.nextClick % 4 === 0); T.nextClick++; }
+        }
+        if (T.playing && S.settings.loopMode === 'once' && S.loopLen && now - T.epoch > loopSec() + 0.05 && !rec) { stopPlayback(); renderScreen(); }
+        if (rec && rec.kind === 'first' && (now - rec.t0) >= FT.MAX_TRACK_SEC) stopFirstTake(true);
+        if (rec && rec.kind === 'part' && now >= rec.windowEnd + 0.03) finishPart();
+      }
 
-<script id="shell">
-/* ---------- SHELL: audio, keyboard and screen. Throwaway. ---------- */
-(function () {
-  const FT = FourTrack, SR = 44100, $ = id => document.getElementById(id);
-  let S = FT.init(SR), ctx = null, master = null;
-  let rec = null, field = 'ms', tabIdx = 0, stepDone = 0, scenarioKey = '';
-  const T = { playing: false, epoch: 0, nodes: [null, null, null, null], nextClick: 0 };
-  const mod = (a, n) => ((a % n) + n) % n;
+      /* ---- recording ---- */
+      function renderHits(hits, startSec, len) {
+        const buf = new Float32Array(len);
+        for (const h of hits) {
+          const idx = Math.round((h.t - startSec) * SR); if (idx < 0 || idx >= len) continue;
+          const s = synth(h.n.kind, h.n.f), m = Math.min(s.length, len - idx);
+          for (let i = 0; i < m; i++) buf[idx + i] += s[i];
+        }
+        return buf;
+      }
+      const preRollSamples = () => Math.round(S.settings.preRollMs / 1000 * SR);
+      function dispatch(a) {
+        S = FT.reduce(S, a);
+        if (['FIRST_TAKE', 'CONFIRM_BARS', 'PART_TAKE', 'NUDGE', 'SET_OFFSET', 'UNDO'].includes(a.type)) dirty = true;
+        if (a.type === 'RESET') { dirty = false; stopPlayback(); }
+        if (['PART_TAKE', 'NUDGE', 'SET_OFFSET', 'UNDO', 'CONFIRM_BARS', 'MUTE', 'RESET'].includes(a.type) || (a.type === 'SET_SETTING' && a.key === 'loopMode')) refreshAudio();
+        renderScreen();
+      }
+      function stopFirstTake(memFull) {
+        if (!rec || rec.kind !== 'first') return;
+        const now = ctx.currentTime, len = Math.min(Math.round(FT.MAX_TRACK_SEC * SR), Math.round((now - rec.t0) * SR));
+        const samples = renderHits(rec.hits, rec.t0, len);
+        const label = rec.label || 'Track 1';
+        rec = null;
+        const hadNoSound = FT.detectFirstOnset(samples, SR) < 0;
+        S.tracks[0].name = label;
+        dispatch({ type: 'FIRST_TAKE', samples, memFull });
+        if (hadNoSound) { popup = { kind: 'nosound' }; renderScreen(); }
+      }
+      function finishPart() {
+        const r = rec; rec = null;
+        const pre = r.pre, raw = renderHits(r.hits, r.windowStart, S.loopLen + pre);
+        const hadNoSound = FT.detectFirstOnset(raw, SR) < 0;
+        dispatch({ type: 'PART_TAKE', track: r.track, raw, preRoll: pre });
+        dispatch({ type: 'PART_TAKE', track: r.track, raw, preRoll: pre, label: r.label });
+        if (hadNoSound) { popup = { kind: 'nosound' }; renderScreen(); }
+      }
+      function startPartArm(track) {
+        ensureAudio();
+        if (loopSec() > FT.MAX_TRACK_SEC) { popup = { kind: 'memfull', track }; renderScreen(); return; }
+        const now = ctx.currentTime, beat = 60 / S.bpm, pre = preRollSamples();
+        let T0;
+        if (T.playing && S.settings.loopMode === 'repeat') T0 = T.epoch + Math.ceil((now + 0.05 - T.epoch) / loopSec()) * loopSec();
+        else { T0 = now + 4 * beat + 0.1; for (let k = 4; k >= 1; k--) clickAt(T0 - k * beat, k === 4); startPlayback(T0); }
+        rec = { kind: 'part', track, T0, windowStart: T0 - pre / SR, windowEnd: T0 + loopSec(), pre, hits: [], started: false };
+        rec = { kind: 'part', track, T0, windowStart: T0 - pre / SR, windowEnd: T0 + loopSec(), pre, hits: [], started: false, label: null };
+        renderScreen();
+      }
+      function doRecord() {
+        ensureAudio(); const now = ctx.currentTime;
+        if (S.status === 'empty' && !rec) { rec = { kind: 'first', t0: now, hits: [] }; renderScreen(); return; }
+        if (rec && rec.kind === 'first') {
+          const len = Math.round((now - rec.t0) * SR); const samples = renderHits(rec.hits, rec.t0, len); rec = null;
+          const hadNoSound = FT.detectFirstOnset(samples, SR) < 0;
+          dispatch({ type: 'FIRST_TAKE', samples });
+          if (hadNoSound) { popup = { kind: 'nosound' }; renderScreen(); }
+          return;
+        }
+        if (S.status === 'empty' && !rec) { rec = { kind: 'first', t0: now, hits: [], label: null }; renderScreen(); return; }
+        if (rec && rec.kind === 'first') { stopFirstTake(false); return; }
+        if (S.status === 'confirmBars') { dispatch({ type: 'CONFIRM_BARS' }); startPlayback(ctx.currentTime + 0.1); renderScreen(); return; }
+        if (S.status === 'ready' && !rec) {
+          if (S.tracks[S.selected].part) { popup = { kind: 'replace', track: S.selected }; renderScreen(); return; }
+          startPartArm(S.selected);
+        }
+      }
+      function cancelRec() {
+        if (rec && rec.kind === 'part') { rec = null; stopPlayback(); renderScreen(); }
+        else if (rec && rec.kind === 'first') { rec = null; renderScreen(); }
+      }
+      function hit(n, t) {
+        ensureAudio(); const when = t == null ? ctx.currentTime : t;
+        function hit(n) {
+          ensureAudio(); const when = ctx.currentTime;
+          if (inp.mon || view !== 'input') playBuf(synth(n.kind, n.f), 0, 0.9);
+          const boost = Math.min(0, -14 + (inp.gain - 12) * 0.5);
+          inp.level = Math.max(inp.level, boost); inp.peakDb = Math.max(inp.peakDb, boost);
+          if (boost >= 0) { inp.clip = true; inp.clipUntil = performance.now() + 2000; }
+          meterVals[S.selected] = 0.85; masterMeter = Math.max(masterMeter, 0.78);
+          if (rec && (rec.kind === 'first' || (when >= rec.windowStart && when < rec.windowEnd))) rec.hits.push({ t: when, n });
+        }
 
-  /* ---- sounds ---- */
-  const cache = {};
-  function rnd(seedObj) { seedObj.s = (seedObj.s * 1664525 + 1013904223) >>> 0; return seedObj.s / 4294967296 * 2 - 1; }
-  function ks(f, dur, damp, soft) {
-    const n = Math.floor(SR * dur), N = Math.max(2, Math.round(SR / f)), ring = new Float32Array(N), o = new Float32Array(n), r = { s: 12345 + N };
-    for (let i = 0; i < N; i++) ring[i] = rnd(r);
-    for (let p = 0; p < soft; p++) for (let i = 0; i < N; i++) ring[i] = (ring[i] + ring[(i + 1) % N]) / 2;
-    let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(ring[i]));
-    let idx = 0; for (let i = 0; i < n; i++) { const a = ring[idx], b = ring[(idx + 1) % N]; ring[idx] = (a + b) * 0.5 * damp; o[i] = a / pk * 0.5; idx = (idx + 1) % N; }
-    return o;
-  }
-  function synth(kind, f) {
-    const key = kind + f; if (cache[key]) return cache[key];
-    const r = { s: 777 }; let out;
-    const mk = (d, fn) => { const o = new Float32Array(Math.floor(SR * d)); for (let i = 0; i < o.length; i++) o[i] = fn(i / SR, i); return o; };
-    if (kind === 'guitar') out = ks(f, 1.8, 0.9965, 1);
-    else if (kind === 'bass') out = ks(f, 1.3, 0.9985, 4);
-    else if (kind === 'kick') { let ph = 0; out = mk(0.4, t => { ph += 2 * Math.PI * (45 + 105 * Math.exp(-t * 30)) / SR; return Math.sin(ph) * Math.exp(-t * 8) * 0.85; }); }
-    else if (kind === 'snare') out = mk(0.25, t => (rnd(r) * Math.exp(-t * 22) * 0.45 + Math.sin(2 * Math.PI * 185 * t) * Math.exp(-t * 28) * 0.4));
-    else if (kind === 'chat' || kind === 'ohat') { let pv = 0; const dk = kind === 'chat' ? 90 : 14; out = mk(kind === 'chat' ? 0.08 : 0.4, t => { const x = rnd(r); const y = x - pv; pv = x; return y * Math.exp(-t * dk) * 0.3; }); }
-    else if (kind === 'clap') out = mk(0.3, t => rnd(r) * (Math.exp(-t * 60) + Math.exp(-(t - 0.012) * 60) * (t > 0.012 ? 1 : 0) + Math.exp(-(t - 0.024) * 25) * (t > 0.024 ? 1 : 0)) * 0.3);
-    else if (kind === 'tomL' || kind === 'tomH') { const f0 = kind === 'tomL' ? 120 : 190; let ph = 0; out = mk(0.4, t => { ph += 2 * Math.PI * (f0 * 0.65 + f0 * 0.35 * Math.exp(-t * 14)) / SR; return Math.sin(ph) * Math.exp(-t * 9) * 0.7; }); }
-    else if (kind === 'rim') out = mk(0.08, t => Math.sin(2 * Math.PI * 820 * t) * Math.exp(-t * 120) * 0.5 + rnd(r) * Math.exp(-t * 200) * 0.2);
-    else if (kind === 'shaker') { let pv = 0; out = mk(0.14, t => { const x = rnd(r); const y = x - pv; pv = x; return y * Math.min(1, t / 0.015) * Math.exp(-t * 28) * 0.25; }); }
-    else out = mk(0.35, t => ((Math.sin(2 * Math.PI * 540 * t) > 0 ? 1 : -1) + (Math.sin(2 * Math.PI * 800 * t) > 0 ? 1 : -1)) * Math.exp(-t * 12) * 0.12);
-    return (cache[key] = out);
-  }
-  const KEYMAP = {};
-  'asdfghjkl;'.split('').forEach((k, i) => KEYMAP[k] = { kind: 'guitar', f: [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 783.99][i] });
-  'qwertyuiop'.split('').forEach((k, i) => KEYMAP[k] = { kind: 'bass', f: [55, 65.41, 73.42, 82.41, 98, 110, 130.81, 146.83, 164.81, 196][i] });
-  ['kick', 'snare', 'chat', 'ohat', 'clap', 'tomL', 'tomH', 'rim', 'shaker', 'cowbell'].forEach((k, i) => KEYMAP['zxcvbnm,./'[i]] = { kind: k, f: 0 });
+        /* ---- walkthroughs ---- */
+        const PROG = [[220, 261.63, 329.63, 55], [174.61, 220, 261.63, 43.65], [261.63, 329.63, 392, 65.41], [196, 246.94, 293.66, 49]];
+        const jit = i => (((i * 37) % 11) - 5) / 1000;
+        function scriptedFirstTake() {
+          ensureAudio(); const beat = 60 / 92, lead = 0.35, hits = [];
+          for (let i = 0; i < 16; i++) { const c = PROG[Math.floor(i / 4) % 4]; hits.push({ t: lead + i * beat + jit(i), n: { kind: 'guitar', f: c[i % 3] } }); }
+          const len = Math.round((lead + 16 * beat + 0.04) * SR);
+          S.tracks[0].name = 'Guitar';
+          dispatch({ type: 'FIRST_TAKE', samples: renderHits(hits, 0, len) });
+        }
+        function scriptedPart(track, kind, shiftSec, startBar) {
+          const beat = 60 / S.bpm, hits = [], nb = S.bars * 4;
+          for (let i = startBar * 4; i < nb; i++) {
+            const t0 = i * beat + shiftSec + jit(i + track);
+            if (kind === 'drums') {
+              const b = i % 4; hits.push({ t: t0, n: { kind: b % 2 === 0 ? 'kick' : 'snare', f: 0 } });
+              hits.push({ t: t0 + beat / 2 + jit(i * 3), n: { kind: 'chat', f: 0 } });
+            } else hits.push({ t: t0, n: { kind: 'bass', f: PROG[Math.floor(i / 4) % 4][3] } });
+            if (rec && (rec.kind === 'first' || (when >= rec.windowStart && when < rec.windowEnd))) {
+              rec.hits.push({ t: when, n });
+              if (!rec.label && n.label) rec.label = n.label;
+            }
+            const pre = preRollSamples(), start = -pre / SR;
+            dispatch({ type: 'PART_TAKE', track, raw: renderHits(hits, start, S.loopLen + pre), preRoll: pre, label: kind === 'drums' ? 'Drums' : 'Bass' });
+          }
+          const sel = t => dispatch({ type: 'SELECT', track: t });
+          const play = () => { ensureAudio(); startPlayback(ctx.currentTime + 0.1); renderScreen(); };
+          const SCEN = [
+            {
+              name: 'First take sets the loop', desc: 'Record guitar for four bars (0.35 s silence trimmed on start). Pick 4 bars on the prompt to derive the BPM.', setup: null,
+              steps: [['Record guitar (scripted)', scriptedFirstTake], ['Choose 4 bars and confirm', () => { dispatch({ type: 'SET_BARS', bars: 4 }); dispatch({ type: 'CONFIRM_BARS' }); }], ['Play', play]]
+            },
+            {
+              name: 'Drums 28 ms late', desc: 'Kick lands 28 ms after loop start — inside the ±60 ms Alignment Window, so it snaps to 1.1.00.', setup: 'guitar',
+              steps: [['Select Track 2', () => sel(1)], ['Record drums 28 ms late', () => scriptedPart(1, 'drums', 0.028, 0)], ['Play', play]]
+            },
+            {
+              name: 'Bass enters two bars late', desc: 'Bass waits two bars on purpose. Outside the window, so it stays at bar 3.', setup: 'guitar',
+              steps: [['Select Track 3', () => sel(2)], ['Record bass starting at bar 3', () => scriptedPart(2, 'bass', 0, 2)], ['Play', play]]
+            },
+            {
+              name: 'Early drums, fix with Offset', desc: 'Drums are 100 ms early (outside ±60 ms), left in place, then fixed with the Offset band.', setup: 'guitar',
+              steps: [['Select Track 2', () => sel(1)], ['Record drums 100 ms early', () => scriptedPart(1, 'drums', -0.100, 0)], ['Open Offset & shift +100 ms', () => { dispatch({ type: 'SET_OFFSET', track: 1, offset: Math.round(0.1 * SR) }); view = 'offset'; renderScreen(); }], ['Play', play]]
+            },
+            {
+              name: 'Offset by a bar', desc: 'Shift a Part by whole bars or 1/16 steps.', setup: 'drums',
+              steps: [['Select Track 2', () => sel(1)], ['Nudge +1 bar', () => dispatch({ type: 'NUDGE', track: 1, unit: 'bars', dir: 1, coarse: false })], ['Nudge −1 beat', () => dispatch({ type: 'NUDGE', track: 1, unit: 'bars', dir: -1, coarse: true })], ['Play', play]]
+            },
+            {
+              name: 'Play once instead of repeat', desc: 'Set Loop Mode to Play once and hear the loop stop after one pass.', setup: 'drums',
+              steps: [['Set Loop Mode to Play once', () => dispatch({ type: 'SET_SETTING', key: 'loopMode', value: 'once' })], ['Play', play]]
+            }
+          ];
+          function setupScenario(i, autoFirst) {
+            stopPlayback(); rec = null; view = 'main'; popup = null; S = FT.init(SR); tabIdx = i; stepDone = 0;
+            const st = SCEN[i].setup;
+            if (st) { scriptedFirstTake(); dispatch({ type: 'SET_BARS', bars: 4 }); dispatch({ type: 'CONFIRM_BARS' }); if (st === 'drums') scriptedPart(1, 'drums', 0.028, 0); }
+            else if (autoFirst) { SCEN[i].steps[0][1](); stepDone = 1; }
+            renderScreen(); drawScen();
+          }
+          function drawScen() {
+            const tabs = $('tabs'); tabs.innerHTML = '';
+            SCEN.forEach((s, i) => { const b = document.createElement('button'); b.className = 'tab' + (i === tabIdx ? ' on' : ''); b.textContent = s.name; b.onclick = () => setupScenario(i, true); tabs.appendChild(b); });
+            $('tabDesc').textContent = SCEN[tabIdx].desc;
+            const box = $('steps'); box.innerHTML = '';
+            SCEN[tabIdx].steps.forEach((st, i) => {
+              const b = document.createElement('button'); b.textContent = (i + 1) + '. ' + st[0];
+              b.className = i < stepDone ? 'done' : i === stepDone ? 'next' : '';
+              b.onclick = () => { st[1](); stepDone = Math.max(stepDone, i + 1); drawScen(); };
+              box.appendChild(b);
+            });
+          }
 
-  /* ---- audio engine ---- */
-  function ensureAudio() {
-    if (!ctx) {
-      ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
-      master = ctx.createGain(); master.gain.value = 0.8;
-      const comp = ctx.createDynamicsCompressor(); master.connect(comp); comp.connect(ctx.destination);
-      setInterval(tick, 25); requestAnimationFrame(frame);
-    }
-    if (ctx.state === 'suspended') ctx.resume();
-  }
-  function playBuf(buf, when, gain) {
-    const ab = ctx.createBuffer(1, buf.length, SR); ab.copyToChannel(buf, 0);
-    const n = ctx.createBufferSource(); n.buffer = ab; const g = ctx.createGain(); g.gain.value = gain == null ? 1 : gain;
-    n.connect(g); g.connect(master); n.start(when || 0); return { n, g };
-  }
-  const loopSec = () => S.loopLen / SR;
-  function startTrack(i) {
-    stopTrack(i);
-    if (!S.tracks[i].part || !T.playing) return;
-    const now = ctx.currentTime + 0.01; let when, phase;
-    if (now < T.epoch) { when = T.epoch; phase = 0; } else { when = now; phase = (now - T.epoch) % loopSec(); }
-    if (S.settings.loopMode === 'once' && now - T.epoch >= loopSec()) return;
-    const ab = ctx.createBuffer(1, S.loopLen, SR); ab.copyToChannel(FT.render(S, i), 0);
-    const n = ctx.createBufferSource(); n.buffer = ab; n.loop = S.settings.loopMode === 'repeat';
-    const g = ctx.createGain(); g.gain.value = S.tracks[i].mute ? 0 : 1; n.connect(g); g.connect(master);
-    n.start(when, phase); T.nodes[i] = { n, g };
-  }
-  function stopTrack(i) { const o = T.nodes[i]; if (o) { try { o.n.stop(); } catch (e) { } o.n.disconnect(); T.nodes[i] = null; } }
-  function refreshAudio() { if (ctx && T.playing) for (let i = 0; i < 4; i++) startTrack(i); }
-  function startPlayback(at) {
-    ensureAudio(); for (let i = 0; i < 4; i++) stopTrack(i);
-    T.playing = true; T.epoch = at; for (let i = 0; i < 4; i++) startTrack(i);
-    T.nextClick = Math.max(0, Math.ceil((ctx.currentTime - at) / (60 / S.bpm)));
-  }
-  function stopPlayback() { T.playing = false; for (let i = 0; i < 4; i++) stopTrack(i); }
-  function clickAt(t, accent) {
-    const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = accent ? 1600 : 1100; o.type = 'square';
-    g.gain.setValueAtTime(0.14, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.03); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.04);
-  }
-  function tick() {
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    if (T.playing && S.bpm && S.settings.click) {
-      const beat = 60 / S.bpm;
-      while (T.epoch + T.nextClick * beat < now + 0.12) { const t = T.epoch + T.nextClick * beat; if (t >= now - 0.01) clickAt(t, T.nextClick % 4 === 0); T.nextClick++; }
-    }
-    if (T.playing && S.settings.loopMode === 'once' && S.loopLen && now - T.epoch > loopSec() + 0.05 && !rec) { stopPlayback(); draw(); }
-    if (rec && rec.kind === 'part' && now >= rec.windowEnd + 0.03) finishPart();
-  }
+          /* ---- 800x480 screen renderer (Round 1 & Round 2) ---- */
+          const el = (tag, style, text, parent) => {
+            const d = document.createElement(tag);
+            if (style) d.style.cssText = style;
+            if (text != null) d.textContent = text;
+            if (parent) parent.appendChild(d);
+            return d;
+          };
+          function fmtPos(sec) {
+            if (!S.loopLen || !S.bpm) return '1.1.00';
+            const beatSec = 60 / S.bpm, totalBeats = sec / beatSec;
+            const bar = Math.floor(totalBeats / 4) + 1;
+            const beat = Math.floor(totalBeats % 4) + 1;
+            const bar = Math.floor(totalBeats / 4) + 1, beat = Math.floor(totalBeats % 4) + 1;
+            const sx = Math.floor((totalBeats * 4) % 4) * 25;
+            return `${bar}.${beat}.${String(sx).padStart(2, '0')}`;
+          }
+          let playheadEl = null, posValEl = null, masterFillEl = null, trackMeterEls = [], inputFillEl = null, armedMsgEl = null;
 
-  /* ---- recording ---- */
-  function renderHits(hits, startSec, len) {
-    const buf = new Float32Array(len);
-    for (const h of hits) {
-      const idx = Math.round((h.t - startSec) * SR); if (idx < 0 || idx >= len) continue;
-      const s = synth(h.n.kind, h.n.f), m = Math.min(s.length, len - idx);
-      for (let i = 0; i < m; i++) buf[idx + i] += s[i];
-    }
-    return buf;
-  }
-  const preRollSamples = () => Math.round(S.settings.preRollMs / 1000 * SR);
-  function dispatch(a) { S = FT.reduce(S, a); if (['PART_TAKE', 'NUDGE', 'SET_OFFSET', 'UNDO', 'CONFIRM_BARS', 'MUTE', 'RESET'].includes(a.type) || (a.type === 'SET_SETTING' && a.key === 'loopMode')) { if (a.type === 'RESET') stopPlayback(); refreshAudio(); } draw(); }
-  function finishPart() {
-    const r = rec; rec = null;
-    const pre = r.pre, raw = renderHits(r.hits, r.windowStart, S.loopLen + pre);
-    dispatch({ type: 'PART_TAKE', track: r.track, raw, preRoll: pre });
-  }
-  function doRecord() {
-    ensureAudio(); const now = ctx.currentTime;
-    if (S.status === 'empty' && !rec) { rec = { kind: 'first', t0: now, hits: [] }; draw(); return; }
-    if (rec && rec.kind === 'first') {
-      const len = Math.round((now - rec.t0) * SR); const samples = renderHits(rec.hits, rec.t0, len); rec = null;
-      dispatch({ type: 'FIRST_TAKE', samples }); return;
-    }
-    if (S.status === 'confirmBars') { dispatch({ type: 'CONFIRM_BARS' }); startPlayback(ctx.currentTime + 0.1); draw(); return; }
-    if (S.status === 'ready' && !rec) {
-      const beat = 60 / S.bpm, pre = preRollSamples(); let T0;
-      if (T.playing && S.settings.loopMode === 'repeat') T0 = T.epoch + Math.ceil((now + 0.05 - T.epoch) / loopSec()) * loopSec;
-      else { T0 = now + 4 * beat + 0.1; for (let k = 4; k >= 1; k--) clickAt(T0 - k * beat, k === 4); startPlayback(T0); }
-      rec = { kind: 'part', track: S.selected, T0, windowStart: T0 - pre / SR, windowEnd: T0 + loopSec(), pre, hits: [] };
-      draw();
-    }
-  }
-  function cancelRec() { if (rec && rec.kind === 'part' && ctx.currentTime < rec.T0) { rec = null; stopPlayback(); draw(); } else if (rec && rec.kind === 'first') { rec = null; draw(); } }
-  function hit(n, t) { ensureAudio(); const when = t == null ? ctx.currentTime : t; playBuf(synth(n.kind, n.f), 0, 0.9); if (rec && (rec.kind === 'first' || (when >= rec.windowStart && when < rec.windowEnd))) rec.hits.push({ t: when, n }); }
+          function renderBottom(scr, c, items, handlers) {
+            bottomHandlers = handlers || [];
+            el('div', `position:absolute;left:0;top:440px;width:800px;height:40px;background:${c.topBarFrame};`, null, scr);
+            const hwBtns = $('hwFnRow').children;
+            items.forEach((it, i) => {
+              const o = typeof it === 'string' ? { t: it } : it;
+              const w = i === 7 ? 100 : 99, bg = o.on ? c.listSel : c.button, line = o.on ? c.labelActive : c.button;
+              const fg = o.red ? c.red : (o.t ? c.labelActive : c.labelInactive), wt = (o.on || o.red) ? '700' : '400';
+              const b = el('div', `position:absolute;left:${i * 100}px;top:441px;width:${w}px;height:39px;background:${bg};color:${fg};font-size:14px;font-weight:${wt};line-height:39px;text-align:center;white-space:nowrap;cursor:${o.t ? 'pointer' : 'default'};`, o.t || '', scr);
+              el('div', `position:absolute;left:0;top:0;width:${w}px;height:2px;background:${line};`, null, b);
+              if (o.t && handlers && handlers[i]) b.onclick = e => { e.stopPropagation(); $('stage').focus(); handlers[i](); };
+              if (hwBtns[i]) {
+                hwBtns[i].textContent = o.t || String(i + 1);
+                hwBtns[i].className = 'hw-btn' + (o.red ? ' rec-led' : o.on ? ' on' : '');
+              }
+            });
+          }
+          function renderTopBar(scr, c, title, fields, boxes) {
+            el('div', `position:absolute;left:0;top:0;width:800px;height:36px;background:${c.topBarBg};`, null, scr);
+            el('div', `position:absolute;left:0;top:35px;width:800px;height:1px;background:${c.topBarFrame};`, null, scr);
+            el('div', `position:absolute;left:16px;top:8px;font-size:17px;font-weight:700;line-height:20px;color:${c.topBarText};white-space:nowrap;`, title, scr);
+            const fw = el('div', 'position:absolute;left:176px;top:0;height:36px;display:flex;', null, scr);
+            fields.forEach(f => {
+              const d = el('div', `position:relative;width:${f.w}px;display:flex;align-items:baseline;justify-content:center;gap:6px;padding-top:9px;`, null, fw);
+              el('div', `position:absolute;left:0;top:10px;width:1px;height:16px;background:${c.topBarFrame};`, null, d);
+              if (f.label) el('span', `font-size:12px;line-height:14px;color:${c.labelInactive};`, f.label, d);
+              const val = el('span', `font-size:17px;font-weight:700;line-height:20px;color:${c.topBarText};`, f.value, d);
+              if (f.label === 'POS') posValEl = val;
+            });
+            const bw = el('div', 'position:absolute;right:10px;top:6px;height:24px;display:flex;gap:14px;', null, scr);
+            boxes.forEach(b => {
+              const d = el('div', 'height:24px;display:flex;align-items:center;gap:6px;white-space:nowrap;', null, bw);
+              if (b.glyph) el('span', `font-size:17px;font-weight:700;line-height:20px;color:${b.glyphColor || c.topBarText};`, b.glyph, d);
+              el('span', `font-size:14px;font-weight:700;line-height:17px;color:${b.fg || c.topBarText};`, b.text, d);
+            });
+          }
+          function drawLaneWave(canvas, c, i, H, splitPx) {
+            canvas.width = 600; canvas.height = H;
+            const g = canvas.getContext('2d');
+            g.fillStyle = c.waveformBg; g.fillRect(0, 0, 600, H);
+            const t = S.tracks[i], p = t.part; if (!p || !S.loopLen) return;
+            const buf = FT.render(S, i); let pk = 0.0001; for (let k = 0; k < buf.length; k += 7) pk = Math.max(pk, Math.abs(buf[k]));
+            const cy = H / 2, a = (H - 10) / 2;
+            for (let x = 0; x < 600; x++) {
+              const i0 = Math.floor(x / 600 * buf.length), i1 = Math.max(i0 + 1, Math.floor((x + 1) / 600 * buf.length));
+              let mn = 0, mx = 0; for (let k = i0; k < i1; k += 3) { const v = buf[k]; if (v < mn) mn = v; if (v > mx) mx = v; }
+              const y1 = Math.round(cy - mx / pk * a), y2 = Math.round(cy - mn / pk * a) + 1;
+              g.fillStyle = t.mute ? c.grey : (x < splitPx ? c.waveformProgress : c.waveform);
+              g.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+            }
+          }
 
-  /* ---- scripted performances for the walkthroughs ---- */
-  const PROG = [[220, 261.63, 329.63, 55], [174.61, 220, 261.63, 43.65], [261.63, 329.63, 392, 65.41], [196, 246.94, 293.66, 49]];
-  const jit = i => (((i * 37) % 11) - 5) / 1000;
-  function scriptedFirstTake() {
-    ensureAudio(); const beat = 60 / 92, lead = 0.35, hits = [];
-    for (let i = 0; i < 16; i++) { const c = PROG[Math.floor(i / 4) % 4]; hits.push({ t: lead + i * beat + jit(i), n: { kind: 'guitar', f: c[i % 3] } }); }
-    const len = Math.round((lead + 16 * beat + 0.04) * SR);
-    dispatch({ type: 'FIRST_TAKE', samples: renderHits(hits, 0, len) });
-  }
-  function scriptedPart(track, kind, shiftSec, startBar) {
-    const beat = 60 / S.bpm, bar = beat * 4, hits = [], nb = S.bars * 4;
-    for (let i = startBar * 4; i < nb; i++) {
-      const t0 = i * beat + shiftSec + jit(i + track);
-      if (kind === 'drums') {
-        const b = i % 4; hits.push({ t: t0, n: { kind: b % 2 === 0 ? 'kick' : 'snare', f: 0 } });
-        hits.push({ t: t0 + beat / 2 + jit(i * 3), n: { kind: 'chat', f: 0 } });
-      } else hits.push({ t: t0, n: { kind: 'bass', f: PROG[Math.floor(i / 4) % 4][3] } });
-    }
-    const pre = preRollSamples(), start = -pre / SR;
-    dispatch({ type: 'PART_TAKE', track, raw: renderHits(hits, start, S.loopLen + pre), preRoll: pre });
-  }
-  const sel = t => dispatch({ type: 'SELECT', track: t });
-  const confirm4 = () => dispatch({ type: 'SET_BARS', bars: 4 }) || dispatch({ type: 'CONFIRM_BARS' });
-  const play = () => { ensureAudio(); startPlayback(ctx.currentTime + 0.1); draw(); };
-  const SCEN = [
-    { name: 'First take sets the loop', desc: 'You record guitar for four bars. You started playing 0.35 s after pressing record and pressed stop 40 ms late. Watch the silence get cut and the BPM come out of the length you played.', setup: null,
-      steps: [['Record the guitar part (scripted)', () => scriptedFirstTake()], ['Choose 4 bars and confirm', () => { dispatch({ type: 'SET_BARS', bars: 4 }); dispatch({ type: 'CONFIRM_BARS' }); }], ['Play the loop', play]] },
-    { name: 'Drums 28 ms late', desc: 'The drummer hits the first kick 28 ms after the loop start. That is inside the window, so the whole part is moved earlier to sit exactly on the start.', setup: 'guitar',
-      steps: [['Select track 2', () => sel(1)], ['Record drums, first hit 28 ms late', () => scriptedPart(1, 'drums', 0.028, 0)], ['Play', play]] },
-    { name: 'Bass enters two bars late', desc: 'The bass sits out two bars on purpose. Its first note is far outside the window, so it must not be dragged back to bar 1.', setup: 'guitar',
-      steps: [['Select track 3', () => sel(2)], ['Record bass starting at bar 3', () => scriptedPart(2, 'bass', 0, 2)], ['Play', play]] },
-    { name: 'Early drums, fix with offset', desc: 'The drummer is 100 ms early. That is outside the ±60 ms window, so it is left alone, and you correct it by hand with an offset.', setup: 'guitar',
-      steps: [['Select track 2', () => sel(1)], ['Record drums, 100 ms early', () => scriptedPart(1, 'drums', -0.100, 0)], ['Set offset to +100 ms', () => dispatch({ type: 'SET_OFFSET', track: 1, offset: Math.round(0.1 * SR) })], ['Play', play]] },
-    { name: 'Offset by a bar', desc: 'Shift a part by whole bars. Up/Down on the keyboard does this when the bars field is selected; Shift moves by a beat.', setup: 'drums',
-      steps: [['Select track 2', () => sel(1)], ['Nudge +1 bar', () => dispatch({ type: 'NUDGE', track: 1, unit: 'bars', dir: 1, coarse: false })], ['Nudge -1 beat', () => dispatch({ type: 'NUDGE', track: 1, unit: 'bars', dir: -1, coarse: true })], ['Play', play]] },
-    { name: 'Play once instead of repeat', desc: 'With loop mode set to play once, the loop plays through a single time and stops.', setup: 'drums',
-      steps: [['Set loop mode to play once', () => { dispatch({ type: 'SET_SETTING', key: 'loopMode', value: 'once' }); $('sLoop').value = 'once'; }], ['Play', play]] }
-  ];
-  function setupScenario(i) {
-    stopPlayback(); rec = null; S = FT.init(SR); tabIdx = i; stepDone = 0; syncSettings();
-    const st = SCEN[i].setup;
-    if (st) { scriptedFirstTake(); dispatch({ type: 'SET_BARS', bars: 4 }); dispatch({ type: 'CONFIRM_BARS' }); if (st === 'drums') { scriptedPart(1, 'drums', 0.028, 0); } }
-    draw(); drawScen();
-  }
-  function drawScen() {
-    const tabs = $('tabs'); tabs.innerHTML = '';
-    SCEN.forEach((s, i) => { const b = document.createElement('button'); b.className = 'tab' + (i === tabIdx ? ' on' : ''); b.textContent = s.name; b.onclick = () => setupScenario(i); tabs.appendChild(b); });
-    $('tabDesc').textContent = SCEN[tabIdx].desc;
-    const box = $('steps'); box.innerHTML = '';
-    SCEN[tabIdx].steps.forEach((st, i) => {
-      const b = document.createElement('button'); b.textContent = (i + 1) + '. ' + st[0];
-      b.className = i < stepDone ? 'done' : i === stepDone ? 'next' : '';
-      b.onclick = () => { st[1](); stepDone = Math.max(stepDone, i + 1); drawScen(); };
-      box.appendChild(b);
-    });
-  }
-  function syncSettings() { $('sLoop').value = S.settings.loopMode; $('sWin').value = S.settings.windowMs; $('sPre').value = S.settings.preRollMs; $('sRound').value = S.settings.rounding; $('sClick').value = S.settings.click ? '1' : '0'; }
+          let playheadEl = null, posValEl = null, masterFillEl = null, trackMeterEls = [], inputFillEl = null, armedMsgEl = null;
+          function startExport() {
+            popup = { kind: 'exporting', pct: 0 }; renderScreen();
+            const iv = setInterval(() => {
+              if (!popup || popup.kind !== 'exporting') { clearInterval(iv); return; }
+              popup.pct = Math.min(1, popup.pct + 0.15);
+              if (popup.pct >= 1) { clearInterval(iv); popup = null; }
+              renderScreen();
+            }, 120);
+          }
 
-  /* ---- screen ---- */
-  const lanesEl = $('lanes'), canv = [], infoEls = [], decEls = [], stEls = [], offEls = [];
-  for (let i = 0; i < 4; i++) {
-    const info = document.createElement('div'); info.className = 'lane-info'; info.onclick = () => { sel(i); $('stage').focus(); };
-    info.innerHTML = '<div class="tn">TRACK ' + (i + 1) + '</div><div class="tstate"></div><div class="off"></div>';
-    const wave = document.createElement('div'); wave.className = 'lane-wave';
-    const c = document.createElement('canvas'); const d = document.createElement('div'); d.className = 'decision'; wave.append(c, d);
-    lanesEl.append(info, wave); canv.push(c); infoEls.push(info); decEls.push(d); stEls.push(info.children[1]); offEls.push(info.children[2]);
-  }
-  const ph = document.createElement('div'); ph.className = 'playhead'; ph.innerHTML = '<i></i>'; lanesEl.appendChild(ph);
-  const phI = ph.firstChild;
+          function renderScreen() {
+            const scr = $('screen'), c = PAL[theme];
+            scr.innerHTML = ''; scr.style.background = c.bg;
+            playheadEl = null; posValEl = null; masterFillEl = null; trackMeterEls = []; inputFillEl = null; armedMsgEl = null;
 
-  function drawWave(i) {
-    const c = canv[i], dpr = window.devicePixelRatio || 1, w = Math.max(10, c.clientWidth), h = 64;
-    c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
-    const g = c.getContext('2d'); g.scale(dpr, dpr); g.fillStyle = '#12110e'; g.fillRect(0, 0, w, h);
-    const css = getComputedStyle(document.documentElement);
-    if (S.loopLen) {
-      g.strokeStyle = '#2a261d'; g.lineWidth = 1;
-      for (let b = 0; b <= S.bars * 4; b++) { const x = Math.round(b / (S.bars * 4) * (w - 1)) + .5; g.beginPath(); g.moveTo(x, b % 4 === 0 ? 0 : h - 6); g.lineTo(x, h); g.stroke(); }
-      g.strokeStyle = '#4a4333'; for (let b = 0; b <= S.bars; b++) { const x = Math.round(b / S.bars * (w - 1)) + .5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
-    }
-    const p = S.tracks[i].part; if (!p) return;
-    const buf = FT.render(S, i), cols = Math.min(600, Math.floor(w)); let pk = 0.0001; for (let k = 0; k < buf.length; k += 7) pk = Math.max(pk, Math.abs(buf[k]));
-    g.fillStyle = S.tracks[i].mute ? '#6b6452' : css.getPropertyValue('--accent').trim() || '#e9a43a';
-    for (let x = 0; x < cols; x++) {
-      const a = Math.floor(x / cols * buf.length), b = Math.max(a + 1, Math.floor((x + 1) / cols * buf.length)); let mn = 0, mx = 0;
-      for (let k = a; k < b; k += 3) { const v = buf[k]; if (v < mn) mn = v; if (v > mx) mx = v; }
-      const y1 = h / 2 - mx / pk * (h / 2 - 4), y2 = h / 2 - mn / pk * (h / 2 - 4), xx = x / cols * w;
-      g.fillRect(xx, y1, Math.max(1, w / cols), Math.max(1, y2 - y1));
-    }
-    const ox = FT.onsetPos(S, i) / S.loopLen * w; g.fillStyle = '#86c47c'; g.beginPath(); g.moveTo(ox - 5, 0); g.lineTo(ox + 5, 0); g.lineTo(ox, 8); g.fill();
-  }
-  const human = n => { const ms = n / SR * 1000, a = Math.abs(ms); return (ms < 0 ? '-' : '+') + (a >= 1000 ? (a / 1000).toFixed(2) + ' s' : a.toFixed(0) + ' ms'); };
-  function draw() {
-    for (let i = 0; i < 4; i++) {
-      const t = S.tracks[i], p = t.part, armed = rec && rec.kind === 'part' && rec.track === i;
-      infoEls[i].classList.toggle('sel', S.selected === i);
-      const st = stEls[i]; st.className = 'tstate';
-      if (armed) { st.classList.add(ctx && ctx.currentTime >= rec.windowStart ? 'rec' : 'arm'); st.textContent = ctx && ctx.currentTime >= rec.windowStart ? 'RECORDING' : 'ARMED'; }
-      else if (rec && rec.kind === 'first' && i === 0) { st.classList.add('rec'); st.textContent = 'RECORDING'; }
-      else if (t.mute) { st.classList.add('mute'); st.textContent = 'MUTED'; }
-      else st.textContent = p ? 'PART' : 'EMPTY';
-      if (p && S.loopLen) {
-        const bs = FT.barSamples(S);
-        offEls[i].innerHTML = 'offset <span class="f ' + (field === 'ms' && S.selected === i ? 'on' : '') + '"><b>' + human(p.offset) + '</b></span><br><span class="f ' + (field === 'bars' && S.selected === i ? 'on' : '') + '"><b>' + (p.offset / bs >= 0 ? '+' : '') + (p.offset / bs).toFixed(2) + ' bar</b></span>';
-        decEls[i].textContent = p.reason; decEls[i].className = 'decision ' + (p.aligned && i > 0 ? 'ok' : (p.reason.indexOf('deliberate') >= 0 ? 'warn' : ''));
-      } else { offEls[i].textContent = ''; decEls[i].textContent = ''; decEls[i].className = 'decision'; }
-      drawWave(i);
-    }
-    $('kvLoop').textContent = S.loopLen ? S.bars + ' bars · ' + S.bpm.toFixed(2) + ' BPM · ' + (S.loopLen / SR).toFixed(2) + ' s' : 'not set';
-    $('kvMode').textContent = S.settings.loopMode === 'repeat' ? 'repeat' : 'play once';
-    const w = FT.windowSamples(S); $('kvWin').textContent = !S.loopLen ? 'after first part' : w > 0 ? '±' + (w / SR * 1000).toFixed(0) + ' ms' : 'off';
-    const bp = $('barsPrompt'); bp.classList.toggle('on', S.status === 'confirmBars');
-    if (S.status === 'confirmBars') {
-      const len = S.pending.trimmed.length; $('barsInfo').textContent = 'You played ' + (len / SR).toFixed(2) + ' s.';
-      const ch = $('barChips'); ch.innerHTML = '';
-      FT.BAR_CHOICES.forEach(b => { const x = document.createElement('button'); x.className = 'chip' + (S.pending.bars === b ? ' on' : ''); x.textContent = b + (b > 1 ? ' bars' : ' bar') + ' = ' + FT.bpmFor(len, b, SR).toFixed(1) + ' BPM'; x.onclick = () => { dispatch({ type: 'SET_BARS', bars: b }); }; ch.appendChild(x); });
-    }
-    const lg = $('log'); lg.innerHTML = ''; S.log.slice(0, 12).forEach(m => { const li = document.createElement('li'); li.textContent = m; lg.appendChild(li); });
-    if (!S.log.length) { const li = document.createElement('li'); li.textContent = 'Nothing yet. Click the screen and press Enter, then play some keys.'; lg.appendChild(li); }
-  }
-  function frame() {
-    requestAnimationFrame(frame);
-    const now = ctx.currentTime; let label = 'Empty', cls = 'mode', pos = '-';
-    if (rec && rec.kind === 'first') { label = 'Rec first take'; cls += ' rec'; pos = (now - rec.t0).toFixed(1) + ' s'; }
-    else if (S.status === 'confirmBars') label = 'How many bars?';
-    else if (rec && rec.kind === 'part') { if (now < rec.T0 - 0.0) { label = 'Armed'; cls += ' arm'; pos = 'starts in ' + (rec.T0 - now).toFixed(1) + ' s'; } else { label = 'Recording'; cls += ' rec'; } }
-    else if (S.status === 'ready') label = T.playing ? 'Playing' : 'Stopped';
-    if (S.loopLen && T.playing && now >= T.epoch) { const p = (S.settings.loopMode === 'repeat' ? (now - T.epoch) % loopSec() : Math.min(loopSec(), now - T.epoch)); pos = p.toFixed(2) + ' s'; phI.style.transform = 'translateX(' + Math.round(p / loopSec() * (ph.clientWidth - 2)) + 'px)'; }
-    else phI.style.transform = 'translateX(0)';
-    if (rec && rec.kind === 'part' && now >= rec.windowStart) draw();
-    if ($('mode').textContent !== label) $('mode').textContent = label; $('mode').className = cls; $('kvPos').textContent = pos;
-  }
+            const monBox = { text: inp.mon ? 'MON IN' : 'MON OFF', fg: inp.mon ? c.labelInactive : c.orange };
+            const now = ctx ? ctx.currentTime : 0;
+            const isArmed = rec && rec.kind === 'part' && now < rec.windowStart;
+            const isRec = (rec && rec.kind === 'first') || (rec && rec.kind === 'part' && now >= rec.windowStart);
 
-  /* ---- input ---- */
-  function nudge(dir, coarse) { if (S.status === 'ready') dispatch({ type: 'NUDGE', track: S.selected, unit: field, dir, coarse }); }
-  document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
-    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if (KEYMAP[k] && !e.repeat) { e.preventDefault(); hit(KEYMAP[k]); return; }
-    if (e.repeat && k !== 'ArrowUp' && k !== 'ArrowDown') return;
-    if (k === 'Enter') { e.preventDefault(); doRecord(); }
-    else if (k === ' ') { e.preventDefault(); if (S.status === 'ready') { if (T.playing) { stopPlayback(); rec = null; draw(); } else play(); } }
-    else if (k >= '1' && k <= '4') { sel(+k - 1); }
-    else if (k === 'ArrowLeft' || k === 'ArrowRight') {
-      e.preventDefault();
-      if (S.status === 'confirmBars') { const i = FT.BAR_CHOICES.indexOf(S.pending.bars); const j = Math.max(0, Math.min(FT.BAR_CHOICES.length - 1, i + (k === 'ArrowRight' ? 1 : -1))); dispatch({ type: 'SET_BARS', bars: FT.BAR_CHOICES[j] }); }
-      else { field = field === 'ms' ? 'bars' : 'ms'; draw(); }
-    }
-    else if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); nudge(k === 'ArrowUp' ? 1 : -1, e.shiftKey); }
-    else if (k === 'Backspace') { e.preventDefault(); dispatch({ type: 'UNDO', track: S.selected }); }
-    else if (k === 'Escape') cancelRec();
-  });
-  $('stage').addEventListener('pointerdown', () => $('stage').focus());
-  $('bRec').onclick = doRecord;
-  $('bPlay').onclick = () => { ensureAudio(); if (S.status === 'ready') { T.playing ? (stopPlayback(), draw()) : play(); } };
-  $('bUndo').onclick = () => dispatch({ type: 'UNDO', track: S.selected });
-  $('bMute').onclick = () => dispatch({ type: 'MUTE', track: S.selected });
-  $('bReset').onclick = () => { stopPlayback(); rec = null; dispatch({ type: 'RESET' }); syncSettings(); stepDone = 0; drawScen(); };
-  const bindSel = (id, key, conv) => $(id).onchange = e => { dispatch({ type: 'SET_SETTING', key, value: conv(e.target.value) }); e.target.blur(); };
-  bindSel('sLoop', 'loopMode', v => v); bindSel('sWin', 'windowMs', Number); bindSel('sPre', 'preRollMs', Number); bindSel('sRound', 'rounding', v => v); bindSel('sClick', 'click', v => v === '1');
-  window.addEventListener('resize', () => draw());
-  draw(); drawScen();
-  // a tiny frame loop before audio exists so the header never looks frozen
-  (function pre() { if (!ctx) requestAnimationFrame(pre); })();
-})();
-</script>
+            // Update hardware LEDs & RAM indicator
+            $('bRec').className = 'hw-btn rec-led' + (isRec || isArmed ? ' active' : '');
+            $('bPlay').className = 'hw-btn' + (T.playing ? ' on' : '');
+            $('bShift').className = 'hw-btn' + (shiftHeld ? ' on' : '');
+            $('ramPill').textContent = `RAM ${S.loopLen ? loopSec().toFixed(1) : '0.0'} / ${FT.MAX_TRACK_SEC.toFixed(0)}s`;
+
+            if (view === 'settings') {
+              renderTopBar(scr, c, projName, [{ label: '', value: 'Settings', w: 200 }], [monBox]);
+              const rows = [
+                { k: 'loopMode', label: 'Loop Mode', opts: [['repeat', 'Repeat'], ['once', 'Play once']], scope: 'This project', help: 'Repeat loops forever. Play once stops at the end of one pass.' },
+                { k: 'click', label: 'Click in playback', opts: [[false, 'Off'], [true, 'On']], unit: 'Count-in always plays', scope: 'This project', help: 'Plays a click during playback. Count-in before recording always clicks.' },
+                { k: 'ts', label: 'Time signature', opts: [['4/4', '4/4']], unit: 'Fixed', fixed: true, scope: '' },
+                { k: 'windowMs', label: 'Snap to loop start', opts: [[0, 'Off'], [30, '30'], [60, '60'], [100, '100'], [150, '150']], unit: 'ms', scope: 'This device', help: 'If the first note of a new Part lands within this window of loop start, it snaps onto loop start.' },
+                { k: 'preRollMs', label: 'Keep before start', opts: [[0, 'None'], [60, '60'], [120, '120'], [250, '250'], [500, '500']], unit: 'ms', scope: 'This device', help: 'Audio captured before loop start so early first notes can be aligned cleanly.' },
+                { k: 'rounding', label: 'Round tempo', opts: [['off', 'Off'], ['0.1', '0.1 BPM'], ['1', '1 BPM']], scope: 'This device', help: 'Rounds the BPM derived from your first Part by trimming or padding silence at the end.' }
+              ];
+              rows.forEach((r, i) => {
+                const active = i === setRow, bg = active ? c.listSel : c.bg;
+                const row = el('div', `position:absolute;left:0;top:${44 + i * 52}px;width:800px;height:52px;background:${bg};cursor:${r.fixed ? 'default' : 'pointer'};`, null, scr);
+                if (!r.fixed) row.onclick = () => { setRow = i; renderScreen(); };
+                if (active) el('div', `position:absolute;left:16px;top:16px;font-size:17px;font-weight:700;color:${c.labelActive};`, '→', row);
+                el('div', `position:absolute;left:40px;top:16px;font-size:17px;color:${r.fixed ? c.labelInactive : c.labelActive};`, r.label, row);
+                let x = 290;
+                const curVal = r.fixed ? '4/4' : S.settings[r.k];
+                r.opts.forEach(([val, txt]) => {
+                  const w = Math.max(56, Math.round(txt.length * 8) + 28), sel = curVal === val;
+                  const o = el('div', `position:absolute;left:${x}px;top:10px;width:${w}px;height:32px;cursor:pointer;`, null, row);
+                  el('div', `position:absolute;left:0;top:0;width:${w}px;height:2px;background:${sel ? (r.fixed ? c.labelInactive : c.labelActive) : bg};`, null, o);
+                  el('div', `position:absolute;left:0;top:2px;width:${w}px;font-size:14px;font-weight:${sel && !r.fixed ? '700' : '400'};line-height:30px;text-align:center;color:${sel && !r.fixed ? c.labelActive : c.labelInactive};`, txt, o);
+                  if (!r.fixed) o.onclick = e => { e.stopPropagation(); setRow = i; dispatch({ type: 'SET_SETTING', key: r.k, value: val }); };
+                  x += w + 6;
+                });
+                if (r.unit) el('div', `position:absolute;left:${x + 6}px;top:19px;font-size:12px;color:${c.labelInactive};`, r.unit, row);
+                if (r.scope) el('div', `position:absolute;right:16px;top:19px;font-size:12px;color:${c.labelInactive};`, r.scope, row);
+                el('div', `position:absolute;left:40px;top:51px;width:744px;height:1px;background:${c.barInactive};`, null, row);
+              });
+              const hr = rows[setRow];
+              el('div', `position:absolute;left:40px;top:370px;font-size:14px;font-weight:700;color:${c.labelActive};`, `${hr.label} · ${hr.scope}`, scr);
+              el('div', `position:absolute;left:40px;top:392px;width:720px;font-size:14px;line-height:19px;color:${c.labelInactive};`, hr.help || '', scr);
+              renderBottom(scr, c, ['Reset', '', '', '', '', '', '', 'Close'], [() => {
+                const defs = { loopMode: 'repeat', click: false, windowMs: 60, preRollMs: 120, rounding: '0.1' };
+                const k = rows[setRow].k; if (defs[k] !== undefined) dispatch({ type: 'SET_SETTING', key: k, value: defs[k] });
+              }, null, null, null, null, null, null, () => { view = 'main'; renderScreen(); }]);
+            } else if (view === 'input') {
+              renderTopBar(scr, c, projName, [{ label: '', value: 'Input', w: 200 }], [monBox]);
+              const maxG = [22, 25, 44][inp.src];
+              const srcRow = el('div', `position:absolute;left:0;top:44px;width:800px;height:52px;background:${inRow === 0 ? c.listSel : c.bg};cursor:pointer;`, null, scr);
+              srcRow.onclick = () => { inRow = 0; renderScreen(); };
+              if (inRow === 0) el('div', `position:absolute;left:16px;top:16px;font-size:17px;font-weight:700;color:${c.labelActive};`, '→', srcRow);
+              el('div', `position:absolute;left:40px;top:16px;font-size:17px;color:${c.labelActive};`, 'Source', srcRow);
+              let sx = 290;
+              ['Line', 'Mic low gain', 'Mic high gain'].forEach((t, j) => {
+                const w = Math.max(56, Math.round(t.length * 8) + 28), sel = inp.src === j;
+                const o = el('div', `position:absolute;left:${sx}px;top:10px;width:${w}px;height:32px;cursor:pointer;`, null, srcRow);
+                el('div', `position:absolute;left:0;top:0;width:${w}px;height:2px;background:${sel ? c.labelActive : (inRow === 0 ? c.listSel : c.bg)};`, null, o);
+                el('div', `position:absolute;left:0;top:2px;width:${w}px;font-size:14px;font-weight:${sel ? '700' : '400'};line-height:30px;text-align:center;color:${sel ? c.labelActive : c.labelInactive};`, t, o);
+                o.onclick = e => { e.stopPropagation(); inRow = 0; inp.src = j; inp.mon = j === 0; inp.gain = Math.min(inp.gain, [22, 25, 44][j]); renderScreen(); };
+                sx += w + 6;
+              });
+              el('div', `position:absolute;left:40px;top:51px;width:744px;height:1px;background:${c.barInactive};`, null, srcRow);
+
+              const gRow = el('div', `position:absolute;left:0;top:96px;width:800px;height:52px;background:${inRow === 1 ? c.listSel : c.bg};cursor:pointer;`, null, scr);
+              gRow.onclick = () => { inRow = 1; renderScreen(); };
+              if (inRow === 1) el('div', `position:absolute;left:16px;top:16px;font-size:17px;font-weight:700;color:${c.labelActive};`, '→', gRow);
+              el('div', `position:absolute;left:40px;top:16px;font-size:17px;color:${c.labelActive};`, 'Gain', gRow);
+              el('div', `position:absolute;left:92px;top:19px;font-size:12px;color:${c.labelInactive};`, `0 to +${maxG} dB`, gRow);
+              const bw = Math.round(340 * inp.gain / maxG);
+              el('div', `position:absolute;left:290px;top:23px;width:340px;height:6px;background:${c.barInactive};`, null, gRow);
+              el('div', `position:absolute;left:290px;top:23px;width:${bw}px;height:6px;background:${c.labelActive};`, null, gRow);
+              el('div', `position:absolute;left:${290 + bw - 1}px;top:17px;width:2px;height:18px;background:${c.labelActive};`, null, gRow);
+              el('div', `position:absolute;left:650px;top:16px;font-size:17px;font-weight:700;color:${c.labelActive};`, `+${inp.gain.toFixed(1)} dB`, gRow);
+              el('div', `position:absolute;left:40px;top:51px;width:744px;height:1px;background:${c.barInactive};`, null, gRow);
+
+              const mRow = el('div', `position:absolute;left:0;top:148px;width:800px;height:52px;background:${inRow === 2 ? c.listSel : c.bg};cursor:pointer;`, null, scr);
+              mRow.onclick = () => { inRow = 2; renderScreen(); };
+              if (inRow === 2) el('div', `position:absolute;left:16px;top:16px;font-size:17px;font-weight:700;color:${c.labelActive};`, '→', mRow);
+              el('div', `position:absolute;left:40px;top:16px;font-size:17px;color:${c.labelActive};`, 'Monitoring', mRow);
+              ['Off', 'On'].forEach((t, j) => {
+                const sel = (inp.mon ? 1 : 0) === j, o = el('div', `position:absolute;left:${290 + j * 62}px;top:10px;width:56px;height:32px;cursor:pointer;`, null, mRow);
+                el('div', `position:absolute;left:0;top:0;width:56px;height:2px;background:${sel ? c.labelActive : (inRow === 2 ? c.listSel : c.bg)};`, null, o);
+                el('div', `position:absolute;left:0;top:2px;width:56px;font-size:14px;font-weight:${sel ? '700' : '400'};line-height:30px;text-align:center;color:${sel ? c.labelActive : c.labelInactive};`, t, o);
+                o.onclick = e => { e.stopPropagation(); inRow = 2; inp.mon = j === 1; renderScreen(); };
+              });
+              el('div', `position:absolute;left:40px;top:51px;width:744px;height:1px;background:${c.barInactive};`, null, mRow);
+
+              // Input meter & feedback protection
+              const dbX = db => Math.round(40 + (Math.max(-48, Math.min(0, db)) + 48) / 48 * 720);
+              el('div', `position:absolute;left:40px;top:226px;font-size:12px;color:${c.labelInactive};`, 'Input level', scr);
+              const pkBox = el('div', 'position:absolute;right:40px;top:222px;display:flex;align-items:baseline;gap:8px;', null, scr);
+              el('span', `font-size:14px;font-weight:700;padding:0 6px;color:${c.bg};background:${inp.clip ? c.orange : c.bg};`, 'CLIP', pkBox);
+              el('span', `font-size:12px;color:${c.labelInactive};`, 'Peak', pkBox);
+              el('span', `font-size:14px;font-weight:700;color:${c.labelActive};`, `${Math.round(inp.peakDb)} dB`, pkBox);
+              el('div', `position:absolute;left:40px;top:246px;width:720px;height:18px;background:${c.barInactive};`, null, scr);
+              inputFillEl = el('div', `position:absolute;left:40px;top:246px;width:${Math.max(0, dbX(inp.level) - 40)}px;height:18px;background:${c.barActive};`, null, scr);
+              el('div', `position:absolute;left:${dbX(inp.peakDb) - 1}px;top:246px;width:2px;height:18px;background:${c.labelActive};`, null, scr);
+              el('div', `position:absolute;left:490px;top:242px;width:1px;height:26px;background:${c.labelInactive};`, null, scr);
+              el('div', `position:absolute;left:670px;top:242px;width:1px;height:26px;background:${c.labelInactive};`, null, scr);
+              el('div', `position:absolute;left:490px;top:284px;width:181px;font-size:12px;text-align:center;color:${c.labelInactive};`, 'aim here', scr);
+              [-48, -36, -24, -18, -12, -6, 0].forEach(d => el('div', `position:absolute;left:${d === -48 ? 40 : d === 0 ? 752 : dbX(d) - 9}px;top:270px;font-size:12px;color:${c.labelInactive};`, String(d).replace('-', '−'), scr));
+              el('div', `position:absolute;left:0;top:300px;width:800px;height:1px;background:${c.topBarFrame};`, null, scr);
+              el('div', `position:absolute;left:40px;top:318px;font-size:12px;color:${c.labelInactive};`, 'Feedback protection', scr);
+              el('div', `position:absolute;left:40px;top:341px;width:14px;height:14px;border:1px solid ${inp.mon ? c.barActive : c.labelInactive};background:${inp.mon ? c.barActive : c.bg};`, null, scr);
+              el('div', `position:absolute;left:64px;top:338px;font-size:17px;font-weight:700;color:${c.labelActive};`, inp.mon ? 'On' : 'Off', scr);
+              el('div', `position:absolute;left:64px;top:364px;width:340px;font-size:14px;line-height:19px;color:${c.labelInactive};`, inp.mon ? 'Watching the monitor for feedback. Nothing is being turned down.' : 'Monitoring is off, so nothing can feed back. Protection switches on with monitoring.', scr);
+              el('div', `position:absolute;left:470px;top:318px;font-size:12px;color:${c.labelInactive};`, 'Monitor level reduced by', scr);
+              el('div', `position:absolute;left:470px;top:344px;width:200px;height:6px;background:${c.barInactive};`, null, scr);
+              el('div', `position:absolute;left:686px;top:338px;font-size:17px;font-weight:700;color:${c.labelActive};`, '0 dB', scr);
+              el('div', `position:absolute;left:470px;top:364px;width:290px;font-size:12px;line-height:16px;color:${c.labelInactive};`, 'Only the monitor is turned down. The recording is not affected.', scr);
+
+              renderBottom(scr, c, [
+                { t: 'Line', on: inp.src === 0 }, { t: 'Mic low', on: inp.src === 1 }, { t: 'Mic high', on: inp.src === 2 },
+                { t: 'Monitor', on: inp.mon }, '', '', '', 'Close'
+              ], [
+                () => { inp.src = 0; inp.mon = true; inp.gain = Math.min(inp.gain, 22); renderScreen(); },
+                () => { inp.src = 1; inp.mon = false; inp.gain = Math.min(inp.gain, 25); renderScreen(); },
+                () => { inp.src = 2; inp.mon = false; inp.gain = Math.min(inp.gain, 44); renderScreen(); },
+                () => { inp.mon = !inp.mon; renderScreen(); }, null, null, null, () => { view = 'main'; renderScreen(); }
+              ]);
+            } else if (view === 'project') {
+              renderTopBar(scr, c, projName, [{ label: '', value: 'Project', w: 200 }], [monBox].concat(dirty ? [{ text: 'Unsaved', fg: c.orange }] : []));
+              el('div', `position:absolute;left:40px;top:48px;width:16px;height:12px;border:2px solid ${c.labelInactive};`, null, scr);
+              el('div', `position:absolute;left:40px;top:45px;width:7px;height:4px;background:${c.labelInactive};`, null, scr);
+              el('div', `position:absolute;left:64px;top:45px;font-size:14px;color:${c.labelActive};`, 'SD / Projects', scr);
+              el('div', `position:absolute;right:40px;top:47px;font-size:12px;color:${c.labelInactive};`, `${PROJECTS.length} projects · 3.2 GB free`, scr);
+              [['Name', 40], ['Parts', 340], ['Loop', 440], ['Saved', 620]].forEach(([t, x]) => el('div', `position:absolute;left:${x}px;top:76px;font-size:12px;color:${c.labelInactive};`, t, scr));
+              PROJECTS.forEach((d, i) => {
+                const r = el('div', `position:absolute;left:0;top:${94 + i * 38}px;width:780px;height:38px;background:${i === projRow ? c.listSel : c.bg};cursor:pointer;`, null, scr);
+                r.onclick = () => { projRow = i; renderScreen(); };
+                if (i === projRow) el('div', `position:absolute;left:16px;top:9px;font-size:17px;font-weight:700;color:${c.labelActive};`, '→', r);
+                const nm = el('div', 'position:absolute;left:40px;top:9px;display:flex;align-items:baseline;gap:8px;', null, r);
+                el('span', `font-size:17px;font-weight:700;color:${c.labelActive};`, d[0], nm);
+                if (d[0] === projName) el('span', `font-size:12px;color:${c.labelInactive};`, 'open', nm);
+                el('div', `position:absolute;left:340px;top:11px;font-size:14px;color:${c.labelActive};`, d[2], r);
+                el('div', `position:absolute;left:440px;top:11px;font-size:14px;color:${c.labelActive};`, d[3], r);
+                el('div', `position:absolute;left:620px;top:11px;font-size:14px;color:${c.labelInactive};`, d[4], r);
+                el('div', `position:absolute;left:40px;top:37px;width:740px;height:1px;background:${c.barInactive};`, null, r);
+              });
+              renderBottom(scr, c, ['New', 'Open', 'Save', 'Save as', 'Rename', 'Export WAV', '', 'Close'], [
+                () => { dispatch({ type: 'RESET' }); projName = 'Untitled 01'; view = 'main'; renderScreen(); },
+                () => { projName = PROJECTS[projRow][0]; dirty = false; view = 'main'; renderScreen(); },
+                () => { dirty = false; renderScreen(); },
+                () => { nameTitle = 'Save as'; nameStr = projName.toUpperCase().slice(0, 16); nameCur = Math.min(15, nameStr.length); view = 'name'; renderScreen(); },
+                () => { nameTitle = 'Rename'; nameStr = projName.toUpperCase().slice(0, 16); nameCur = Math.min(15, nameStr.length); view = 'name'; renderScreen(); },
+                () => { popup = { kind: 'export', repeats: 1 }; renderScreen(); },
+                null, () => { view = 'main'; renderScreen(); }
+              ]);
+            } else if (view === 'name') {
+              renderTopBar(scr, c, projName, [{ label: '', value: nameTitle, w: 200 }], [monBox]);
+              el('div', `position:absolute;left:40px;top:60px;font-size:12px;color:${c.labelInactive};`, 'Name', scr);
+              el('div', `position:absolute;right:40px;top:60px;font-size:12px;color:${c.labelInactive};`, `${nameStr.length} / 16`, scr);
+              for (let i = 0; i < 16; i++) {
+                const cell = el('div', `position:absolute;left:${40 + i * 42}px;top:84px;width:42px;height:48px;background:${i === nameCur ? c.listSel : c.bg};cursor:pointer;`, null, scr);
+                cell.onclick = () => { nameCur = i; renderScreen(); };
+                el('div', `position:absolute;left:0;top:0;width:42px;height:2px;background:${i === nameCur ? c.labelActive : c.bg};`, null, cell);
+                el('div', `position:absolute;left:0;top:46px;width:42px;height:2px;background:${c.barInactive};`, null, cell);
+                el('div', `position:absolute;left:0;top:14px;width:42px;font-size:17px;font-weight:700;text-align:center;color:${c.labelActive};`, nameStr[i] || '', cell);
+              }
+              el('div', `position:absolute;left:40px;top:166px;font-size:12px;color:${c.labelInactive};`, 'Letter at the cursor', scr);
+              CHARS.forEach((ch, i) => {
+                const sel = nameStr[nameCur] === ch, sc = el('div', `position:absolute;left:${40 + i * 18}px;top:188px;width:18px;height:34px;background:${sel ? c.listSel : c.bg};cursor:pointer;`, null, scr);
+                el('div', `position:absolute;left:0;top:0;width:18px;height:2px;background:${sel ? c.labelActive : c.bg};`, null, sc);
+                el('div', `position:absolute;left:0;top:8px;width:18px;font-size:14px;font-weight:${sel ? '700' : '400'};text-align:center;color:${sel ? c.labelActive : c.labelInactive};`, ch, sc);
+                sc.onclick = () => { const arr = nameStr.padEnd(nameCur + 1, ' ').split(''); arr[nameCur] = ch; nameStr = arr.join('').trimEnd(); renderScreen(); };
+              });
+              el('div', `position:absolute;left:40px;top:250px;font-size:14px;color:${c.labelInactive};`, 'Click a cell or character, or use Left/Right to move cursor.', scr);
+              el('div', `position:absolute;left:40px;top:250px;font-size:14px;color:${c.labelInactive};`, 'Jog picks the letter. Left/Right move cursor. Or type on keyboard.', scr);
+              el('div', `position:absolute;left:0;top:300px;width:800px;height:1px;background:${c.topBarFrame};`, null, scr);
+              el('div', `position:absolute;left:40px;top:318px;font-size:12px;color:${c.labelInactive};`, 'Saves to', scr);
+              el('div', `position:absolute;left:40px;top:338px;font-size:14px;color:${c.labelActive};`, `SD / Projects / ${nameStr || 'UNTITLED'}`, scr);
+              renderBottom(scr, c, ['Delete', 'Space', 'Clear', '', '', '', 'Cancel', { t: 'Save', on: true }], [
+                () => { if (nameStr.length) { nameStr = nameStr.slice(0, nameCur) + nameStr.slice(nameCur + 1); nameCur = Math.min(nameCur, nameStr.length); } renderScreen(); },
+                () => { const arr = nameStr.padEnd(nameCur + 1, ' ').split(''); arr[nameCur] = ' '; nameStr = arr.join('').slice(0, 16); nameCur = Math.min(15, nameCur + 1); renderScreen(); },
+                () => { nameStr = ''; nameCur = 0; renderScreen(); },
+                null, null, null, () => { view = 'project'; renderScreen(); },
+                () => { projName = nameStr.trim() || 'UNTITLED'; dirty = false; view = 'project'; renderScreen(); }
+              ]);
+            } else {
+              // Main / Offset / Bars Prompt
+              const isOffset = view === 'offset', H = isOffset ? 72 : 93, G = isOffset ? 3 : 2, T0 = 58, bottomY = T0 + 4 * H + 3 * G;
+              const stBox = isRec ? { glyph: '●', text: 'REC', fg: c.red, glyphColor: c.red }
+                : isArmed ? { glyph: '●', text: 'ARMED', fg: c.topBarText, glyphColor: c.red }
+                  : T.playing ? { glyph: '▶', text: 'PLAY', fg: c.topBarText }
+                    : { glyph: '■', text: 'STOP', fg: c.topBarText };
+              const topFields = [
+                { label: 'BPM', value: S.status === 'confirmBars' ? '—' : S.bpm ? S.bpm.toFixed(1) : '—', w: 104 },
+                { label: 'BARS', value: S.status === 'confirmBars' ? '?' : S.bars ? String(S.bars) : '—', w: 80 },
+                { label: 'POS', value: '1.1.00', w: 110 }
+              ];
+              renderTopBar(scr, c, projName, topFields, [monBox, stBox]);
+
+              // Loop mode & ruler
+              const lm = el('div', 'position:absolute;left:16px;top:36px;height:20px;display:flex;align-items:center;gap:6px;', null, scr);
+              el('span', `font-size:17px;font-weight:700;color:${c.labelInactive};`, S.settings.loopMode === 'repeat' ? '↻' : '→', lm);
+              el('span', `font-size:12px;color:${c.labelInactive};`, S.settings.loopMode === 'repeat' ? 'Repeat' : 'Play once', lm);
+
+              const rul = el('div', 'position:absolute;left:168px;top:36px;width:600px;height:20px;', null, scr);
+              if (S.status !== 'confirmBars' && S.bars) {
+                const totalBeats = S.bars * 4;
+                for (let j = 0; j <= totalBeats; j++) {
+                  const x = Math.min(Math.round(j / totalBeats * 600), 599), isBar = j % 4 === 0;
+                  el('div', `position:absolute;left:${x}px;top:${isBar ? 0 : 14}px;width:1px;height:${isBar ? 20 : 6}px;background:${c.barInactive};`, null, rul);
+                }
+                for (let b = 0; b < S.bars; b++) el('div', `position:absolute;left:${Math.round(b / S.bars * 600) + 5}px;top:2px;font-size:12px;color:${c.labelInactive};`, String(b + 1), rul);
+              } else {
+                el('div', `position:absolute;left:8px;top:2px;font-size:12px;color:${c.labelInactive};`, S.status === 'confirmBars' ? `Loop ${(S.pending.trimmed.length / SR).toFixed(2)} s · bars not set` : 'Record Track 1 to set the Loop', rul);
+                el('div', `position:absolute;left:8px;top:2px;font-size:12px;color:${c.labelInactive};`, S.status === 'confirmBars' ? `Loop ${(S.pending.trimmed.length / SR).toFixed(2)} s · bars not set` : 'Press ● Rec, play pads/keys, press ● Rec again to set Loop', rul);
+              }
+              el('div', `position:absolute;left:0;top:18px;width:600px;height:1px;background:${c.marker};`, null, rul);
+              el('div', `position:absolute;left:0;top:11px;width:2px;height:8px;background:${c.marker};`, null, rul);
+              el('div', `position:absolute;left:598px;top:11px;width:2px;height:8px;background:${c.marker};`, null, rul);
+
+              const nameTop = Math.round((H - 57) / 2);
+              const splitPx = (S.loopLen && T.playing && ctx && ctx.currentTime >= T.epoch) ? Math.round(((ctx.currentTime - T.epoch) % loopSec()) / loopSec() * 600) : 0;
+
+              for (let i = 0; i < 4; i++) {
+                const t = S.tracks[i], p = t.part, trArmed = rec && rec.kind === 'part' && rec.track === i && now < rec.windowStart;
+                const trRec = (rec && rec.kind === 'first' && i === 0) || (rec && rec.kind === 'part' && rec.track === i && now >= rec.windowStart);
+                const hot = S.selected === i || trArmed || trRec;
+                const lane = el('div', `position:absolute;left:0;top:${T0 + i * (H + G)}px;width:800px;height:${H}px;`, null, scr);
+                const hdr = el('div', `position:absolute;left:0;top:0;width:164px;height:${H}px;background:${hot ? c.listSel : c.list};cursor:pointer;`, null, lane);
+                hdr.onclick = () => { sel(i); $('stage').focus(); };
+                hdr.onclick = () => { dispatch({ type: 'SELECT', track: i }); $('stage').focus(); };
+                el('div', `position:absolute;left:16px;top:${nameTop}px;width:16px;font-size:17px;font-weight:700;color:${hot ? c.labelActive : c.labelInactive};`, String(i + 1), hdr);
+                el('div', `position:absolute;left:40px;top:${nameTop}px;font-size:17px;font-weight:700;color:${t.mute ? c.labelInactive : c.labelActive};`, t.name, hdr);
+                const mBox = el('div', `position:absolute;left:134px;top:${nameTop}px;width:20px;height:20px;border:1px solid ${t.mute ? c.orange : c.barInactive};background:${t.mute ? c.orange : (hot ? c.listSel : c.list)};color:${t.mute ? c.bg : c.labelInactive};font-size:14px;font-weight:700;line-height:18px;text-align:center;cursor:pointer;`, 'M', hdr);
+                mBox.onclick = e => { e.stopPropagation(); dispatch({ type: 'MUTE', track: i }); };
+
+                const infoLine = el('div', `position:absolute;left:40px;top:${nameTop + 26}px;height:20px;display:flex;align-items:center;white-space:nowrap;`, null, hdr);
+                if (trArmed || trRec) el('span', `font-size:17px;font-weight:700;color:${c.red};margin-right:5px;`, '●', infoLine);
+                const infoTxt = trRec ? 'Recording' : trArmed ? 'Armed' : (p && p.offset) ? `Offset ${FT.fmtMs(S, p.offset)}` : p ? `Part 1 · ${S.bars} bars` : (hot ? 'Input' : '');
+                el('span', `font-size:12px;color:${c.labelInactive};`, infoTxt, infoLine);
+
+                el('div', `position:absolute;left:40px;top:${nameTop + 54}px;width:114px;height:3px;background:${c.barInactive};`, null, hdr);
+                const mFill = el('div', `position:absolute;left:40px;top:${nameTop + 54}px;width:${Math.round(114 * meterVals[i])}px;height:3px;background:${trRec ? c.red : c.barActive};`, null, hdr);
+                trackMeterEls.push(mFill);
+                el('div', `position:absolute;left:137px;top:${nameTop + 52}px;width:1px;height:7px;background:${c.labelInactive};`, null, hdr);
+
+                const wCan = el('canvas', `position:absolute;left:168px;top:0;width:600px;height:${H}px;`, null, lane);
+                drawLaneWave(wCan, c, i, H, splitPx);
+
+                if (trRec || trArmed || (p && !p.raw.length) || (!p && !trRec && !trArmed)) {
+                  const msg = trRec ? (rec.kind === 'first' ? 'Recording first take · press Rec or Enter to stop' : 'Recording · stops at the Loop end')
+                    : trArmed ? `Waiting for the loop start · ${(Math.max(0, rec.T0 - now)).toFixed(1)} s`
+                      : !p ? 'No Part' : '';
+                  if (msg) {
+                    const mel = el('div', `position:absolute;left:184px;top:${Math.round(H / 2 - 9)}px;font-size:14px;color:${c.labelInactive};`, msg, lane);
+                    if (trArmed) armedMsgEl = mel;
+                  }
+                  if (trRec || trArmed || !p) {
+                    const msg = trRec ? (rec.kind === 'first' ? 'Recording first take · press ● Rec to stop' : 'Recording · stops at Loop end')
+                      : trArmed ? `Waiting for loop start · ${(Math.max(0, rec.T0 - now)).toFixed(1)} s`
+                        : 'No Part';
+                    const mel = el('div', `position:absolute;left:184px;top:${Math.round(H / 2 - 9)}px;font-size:14px;color:${c.labelInactive};`, msg, lane);
+                    if (trArmed) armedMsgEl = mel;
+                  }
+                  if (p && p.reason && !trRec && !trArmed && !isOffset) {
+                    el('div', `position:absolute;right:40px;top:4px;font-size:12px;color:${p.aligned && i > 0 ? c.barActive : c.labelInactive};`, p.reason, lane);
+                  }
+                  if (trArmed || trRec) el('div', `position:absolute;left:168px;top:0;width:2px;height:${H}px;background:${c.red};`, null, lane);
+                  else if (p && S.loopLen) {
+                    const ox = 168 + Math.round(FT.onsetPos(S, i) / S.loopLen * 600);
+                    el('div', `position:absolute;left:${ox}px;top:0;width:2px;height:${H}px;background:${c.marker};`, null, lane);
+                  }
+                }
+
+                // Master meter
+                el('div', `position:absolute;left:782px;top:${T0}px;width:6px;height:${bottomY - T0}px;background:${c.barInactive};`, null, scr);
+                masterFillEl = el('div', `position:absolute;left:782px;top:${bottomY}px;width:6px;height:0px;background:${c.barActive};`, null, scr);
+
+                // Playhead
+                if (S.status !== 'confirmBars') {
+                  const px = 168 + splitPx;
+                  playheadEl = el('div', `position:absolute;left:${px}px;top:36px;width:1px;height:${bottomY - 36}px;background:${c.labelActive};pointer-events:none;`, null, scr);
+                  el('div', `position:absolute;left:-3px;top:0;width:7px;height:5px;background:${c.labelActive};`, null, playheadEl);
+                }
+
+                // Offset band (7d)
+                if (isOffset) {
+                  const p = S.tracks[S.selected].part, bs = FT.barSamples(S);
+                  const band = el('div', `position:absolute;left:0;top:358px;width:800px;height:78px;background:${c.list};`, null, scr);
+                  el('div', `position:absolute;left:0;top:0;width:800px;height:1px;background:${c.topBarFrame};`, null, band);
+                  el('div', `position:absolute;left:16px;top:12px;font-size:17px;font-weight:700;color:${c.labelActive};`, 'Offset', band);
+                  el('div', `position:absolute;left:16px;top:38px;font-size:12px;color:${c.labelInactive};`, `Track ${S.selected + 1} · ${S.tracks[S.selected].name} · Part 1`, band);
+                  el('div', `position:absolute;left:16px;top:55px;font-size:12px;color:${c.labelInactive};`, `Loop ${Math.round(loopSec() * 1000)} ms · ${S.bars} bars`, band);
+                  el('div', `position:absolute;left:200px;top:29px;font-size:17px;font-weight:700;color:${c.labelActive};`, '→', band);
+
+                  const fTime = el('div', `position:absolute;left:224px;top:11px;width:196px;height:56px;background:${offsetField === 'ms' ? c.listSel : c.list};cursor:pointer;`, null, band);
+                  fTime.onclick = () => { offsetField = 'ms'; renderScreen(); };
+                  el('div', `position:absolute;left:0;top:0;width:196px;height:${offsetField === 'ms' ? 2 : 1}px;background:${offsetField === 'ms' ? c.labelActive : c.barInactive};`, null, fTime);
+                  el('div', `position:absolute;left:12px;top:10px;font-size:12px;color:${c.labelInactive};`, 'Time', fTime);
+                  if (offsetField === 'ms') el('div', `position:absolute;right:12px;top:9px;font-size:14px;font-weight:700;color:${c.labelActive};`, 'JOG', fTime);
+                  el('div', `position:absolute;left:12px;top:29px;font-size:17px;font-weight:700;color:${c.labelActive};`, p ? FT.fmtMs(S, p.offset) : '0 ms', fTime);
+                  el('div', `position:absolute;right:12px;top:32px;font-size:12px;color:${c.labelInactive};`, '±1 ms', fTime);
+
+                  const fBars = el('div', `position:absolute;left:436px;top:11px;width:196px;height:56px;background:${offsetField === 'bars' ? c.listSel : c.list};cursor:pointer;`, null, band);
+                  fBars.onclick = () => { offsetField = 'bars'; renderScreen(); };
+                  el('div', `position:absolute;left:0;top:0;width:196px;height:${offsetField === 'bars' ? 2 : 1}px;background:${offsetField === 'bars' ? c.labelActive : c.barInactive};`, null, fBars);
+                  el('div', `position:absolute;left:12px;top:10px;font-size:12px;color:${c.labelInactive};`, 'Bars', fBars);
+                  if (offsetField === 'bars') el('div', `position:absolute;right:12px;top:9px;font-size:14px;font-weight:700;color:${c.labelActive};`, 'JOG', fBars);
+                  const bFrac = p ? p.offset / bs : 0;
+                  el('div', `position:absolute;left:12px;top:29px;font-size:17px;font-weight:700;color:${c.labelActive};`, `${bFrac >= 0 ? '+' : ''}${bFrac.toFixed(3)}`, fBars);
+                  el('div', `position:absolute;right:12px;top:32px;font-size:12px;color:${c.labelInactive};`, `${(bFrac * 4).toFixed(1)} beats`, fBars);
+
+                  el('div', `position:absolute;left:652px;top:14px;font-size:12px;color:${c.labelInactive};`, 'Part starts at', band);
+                  el('div', `position:absolute;left:652px;top:31px;font-size:17px;font-weight:700;color:${c.marker};`, p ? fmtPos(FT.onsetPos(S, S.selected) / SR) : '1.1.00', band);
+                  el('div', `position:absolute;left:652px;top:55px;font-size:12px;color:${c.labelInactive};`, S.settings.loopMode === 'repeat' ? 'Wraps at Loop end' : 'Loop Mode: Play once', band);
+
+                  renderBottom(scr, c, [{ t: 'Time', on: offsetField === 'ms' }, { t: 'Bars', on: offsetField === 'bars' }, 'Snap 1/16', 'Zero', '− 1/16', '+ 1/16', 'Cancel', 'Done'], [
+                    () => { offsetField = 'ms'; renderScreen(); },
+                    () => { offsetField = 'bars'; renderScreen(); },
+                    () => { const p0 = S.tracks[S.selected].part; if (p0) { const step = FT.barSamples(S) / 16; dispatch({ type: 'SET_OFFSET', track: S.selected, offset: Math.round(p0.offset / step) * step }); } },
+                    () => dispatch({ type: 'SET_OFFSET', track: S.selected, offset: 0 }),
+                    () => dispatch({ type: 'NUDGE', track: S.selected, unit: '16th', dir: -1 }),
+                    () => dispatch({ type: 'NUDGE', track: S.selected, unit: '16th', dir: 1 }),
+                    () => { dispatch({ type: 'SET_OFFSET', track: S.selected, offset: offsetOrig }); view = 'main'; renderScreen(); },
+                    () => { view = 'main'; renderScreen(); }
+                  ]);
+                } else if (S.status === 'confirmBars') {
+                  // How many bars? (7e)
+                  const len = S.pending.trimmed.length, pr = el('div', `position:absolute;left:0;top:228px;width:800px;height:212px;background:${c.list};`, null, scr);
+                  const len = S.pending.trimmed.length, choices = FT.choicesFor(len, SR);
+                  const pr = el('div', `position:absolute;left:0;top:228px;width:800px;height:212px;background:${c.list};`, null, scr);
+                  el('div', `position:absolute;left:0;top:0;width:800px;height:1px;background:${c.topBarFrame};`, null, pr);
+                  el('div', `position:absolute;left:16px;top:16px;font-size:17px;font-weight:700;color:${c.labelActive};`, 'How many bars?', pr);
+                  el('div', `position:absolute;right:16px;top:19px;font-size:12px;color:${c.labelInactive};`, `Track 1 · Part 1 · ${(len / SR).toFixed(3)} s`, pr);
+                  el('div', `position:absolute;left:16px;top:42px;font-size:14px;color:${c.labelInactive};`, 'This Part sets the Loop. Its length in bars sets the tempo.', pr);
+                  FT.BAR_CHOICES.forEach((b, i) => {
+                    const sub = el('div', 'position:absolute;left:16px;top:42px;display:flex;gap:8px;', null, pr);
+                    if (S.pending.memFull) el('span', `font-size:14px;font-weight:700;color:${c.orange};`, 'Memory full.', sub);
+                    el('span', `font-size:14px;color:${c.labelInactive};`, S.pending.memFull ? 'Recording stopped at 30 s. Everything was kept.' : 'This Part sets the Loop. Its length in bars sets the tempo.', sub);
+                    choices.forEach((b, i) => {
+                      const sel = S.pending.bars === b, cell = el('div', `position:absolute;left:${i * 100}px;top:78px;width:99px;height:96px;background:${sel ? c.listSel : c.button};cursor:pointer;`, null, pr);
+                      cell.onclick = () => dispatch({ type: 'SET_BARS', bars: b });
+                      el('div', `position:absolute;left:0;top:0;width:99px;height:2px;background:${sel ? c.labelActive : c.button};`, null, cell);
+                      const hd = el('div', 'position:absolute;left:16px;top:12px;display:flex;align-items:baseline;gap:5px;', null, cell);
+                      el('span', `font-size:17px;font-weight:700;color:${c.labelActive};`, String(b), hd);
+                      el('span', `font-size:12px;color:${c.labelInactive};`, b === 1 ? 'bar' : 'bars', hd);
+                      el('div', `position:absolute;left:16px;top:52px;font-size:17px;color:${c.labelActive};`, FT.bpmFor(len, b, SR).toFixed(1), cell);
+                      el('div', `position:absolute;left:16px;top:74px;font-size:12px;color:${c.labelInactive};`, 'BPM', cell);
+                    });
+                    el('div', `position:absolute;left:616px;top:90px;font-size:12px;color:${c.labelInactive};`, 'Result', pr);
+                    el('div', `position:absolute;left:616px;top:108px;font-size:17px;font-weight:700;color:${c.labelActive};`, `${FT.bpmFor(len, S.pending.bars, SR).toFixed(1)} BPM`, pr);
+                    el('div', `position:absolute;left:616px;top:134px;font-size:12px;color:${c.labelInactive};`, `${(len / SR / S.pending.bars).toFixed(3)} s per bar · 4/4`, pr);
+                    el('div', `position:absolute;left:616px;top:152px;font-size:12px;color:${c.labelInactive};`, `Loop Mode: ${S.settings.loopMode === 'repeat' ? 'Repeat' : 'Play once'}`, pr);
+                    el('div', `position:absolute;left:16px;top:188px;font-size:12px;color:${c.labelInactive};`, 'Buttons 1–6 or Left/Right to choose, OK or Enter to confirm', pr);
+                    el('div', `position:absolute;left:16px;top:188px;font-size:12px;color:${c.labelInactive};`, 'Jog or buttons 1–6 to choose, OK to confirm', pr);
+
+                    renderBottom(scr, c, FT.BAR_CHOICES.map(b => ({ t: String(b), on: S.pending.bars === b })).concat(['Cancel', { t: 'OK', on: true }]), [
+                      ...FT.BAR_CHOICES.map(b => () => dispatch({ type: 'SET_BARS', bars: b })),
+                      renderBottom(scr, c, choices.map(b => ({ t: String(b), on: S.pending.bars === b })).concat(['Cancel', { t: 'OK', on: true }]), [
+                        ...choices.map(b => () => dispatch({ type: 'SET_BARS', bars: b })),
+                        () => dispatch({ type: 'CANCEL_BARS' }),
+                        () => { ensureAudio(); dispatch({ type: 'CONFIRM_BARS' }); startPlayback(ctx.currentTime + 0.1); renderScreen(); }
+                      ]);
+                  } else if (isArmed) {
+                    renderBottom(scr, c, ['Disarm', 'Mute', { t: 'Monitor', on: inp.mon }, '', '', '', '', 'Stop'], [
+                      cancelRec, () => dispatch({ type: 'MUTE', track: S.selected }), () => { inp.mon = !inp.mon; renderScreen(); },
+                      null, null, null, null, () => { cancelRec(); stopPlayback(); renderScreen(); }
+                    ]);
+                  } else if (isRec) {
+                    renderBottom(scr, c, [{ t: 'Stop Rec', red: true }, 'Mute', { t: 'Monitor', on: inp.mon }, '', '', '', '', 'Stop'], [
+                      () => { if (rec && rec.kind === 'first') doRecord(); else if (rec && rec.kind === 'part') finishPart(); },
+                      () => { if (rec && rec.kind === 'first') stopFirstTake(false); else if (rec && rec.kind === 'part') finishPart(); },
+                      () => dispatch({ type: 'MUTE', track: S.selected }),
+                      () => { inp.mon = !inp.mon; renderScreen(); },
+                      null, null, null, null, () => { rec = null; stopPlayback(); renderScreen(); }
+                    ]);
+                  } else {
+                    renderBottom(scr, c, [
+                      S.status === 'empty' ? 'Rec' : 'Arm', 'Mute', S.tracks[S.selected].prev ? 'Undo' : '', S.tracks[S.selected].part ? 'Offset' : '', '', 'Input', 'Settings', 'Project'
+                    ], [
+                      doRecord,
+                      () => dispatch({ type: 'MUTE', track: S.selected }),
+                      () => dispatch({ type: 'UNDO', track: S.selected }),
+                      () => { if (S.tracks[S.selected].part) { offsetOrig = S.tracks[S.selected].part.offset; view = 'offset'; renderScreen(); } },
+                      null,
+                      () => { view = 'input'; renderScreen(); },
+                      () => { view = 'settings'; renderScreen(); },
+                      () => { view = 'project'; renderScreen(); }
+                    ]);
+                  }
+                }
+
+                // Popups (8g, 8h, 8j, 8m)
+                if (popup) {
+                  const box = el('div', `position:absolute;left:150px;top:138px;width:500px;height:200px;border:1px solid ${c.topBarFrame};background:${c.list};`, null, scr);
+                  el('div', `position:absolute;left:-1px;top:-1px;width:500px;height:2px;background:${c.labelActive};`, null, box);
+                  if (popup.kind === 'replace') {
+                    const t = S.tracks[popup.track];
+                    el('div', `position:absolute;left:24px;top:22px;font-size:17px;font-weight:700;color:${c.labelActive};`, '● Replace Part?', box);
+                    el('div', `position:absolute;left:24px;top:56px;width:450px;font-size:14px;line-height:20px;color:${c.labelActive};`, `Track ${popup.track + 1} already has a Part. Recording replaces it after the count-in.`, box);
+                    el('div', `position:absolute;left:24px;top:116px;font-size:12px;color:${c.labelInactive};`, `${t.name} · Part 1 · ${S.bars} bars`, box);
+                    renderBottom(scr, c, ['', '', '', '', '', '', 'Cancel', { t: 'Replace', red: true }], [
+                      null, null, null, null, null, null,
+                      () => { popup = null; renderScreen(); },
+                      () => { const tr = popup.track; popup = null; startPartArm(tr); }
+                    ]);
+                  } else if (popup.kind === 'nosound') {
+                    el('div', `position:absolute;left:24px;top:22px;font-size:17px;font-weight:700;color:${c.labelActive};`, 'No sound in this take', box);
+                    el('div', `position:absolute;left:24px;top:56px;width:450px;font-size:14px;line-height:20px;color:${c.labelActive};`, 'Nothing was kept. Play keys on the keyboard while recording.', box);
+                    el('div', `position:absolute;left:24px;top:56px;width:450px;font-size:14px;line-height:20px;color:${c.labelActive};`, 'Nothing was kept. Play the pads or keys while recording.', box);
+                    el('div', `position:absolute;left:24px;top:116px;font-size:12px;color:${c.labelInactive};`, 'Check the source and gain in Input.', box);
+                    renderBottom(scr, c, ['', '', '', '', '', '', 'Input', 'OK'], [
+                      null, null, null, null, null, null,
+                      () => { popup = null; view = 'input'; renderScreen(); },
+                      () => { popup = null; renderScreen(); }
+                    ]);
+                  } else if (popup.kind === 'memfull') {
+                    el('div', `position:absolute;left:24px;top:22px;font-size:17px;font-weight:700;color:${c.labelActive};`, 'Not enough memory', box);
+                    el('div', `position:absolute;left:24px;top:56px;width:450px;font-size:14px;line-height:20px;color:${c.labelActive};`, `Track ${popup.track + 1} was not armed. A new Part needs room for one full Loop (${loopSec().toFixed(1)} s).`, box);
+                    el('div', `position:absolute;left:24px;top:116px;font-size:12px;color:${c.labelInactive};`, 'Remove a Part, or save and start a new project.', box);
+                    renderBottom(scr, c, ['', '', '', '', '', '', 'Project', 'OK'], [
+                      null, null, null, null, null, null,
+                      () => { popup = null; view = 'project'; renderScreen(); },
+                      () => { popup = null; renderScreen(); }
+                    ]);
+                  } else if (popup.kind === 'export') {
+                    el('div', `position:absolute;left:24px;top:22px;font-size:17px;font-weight:700;color:${c.labelActive};`, 'Export WAV', box);
+                    el('div', `position:absolute;left:24px;top:56px;width:450px;font-size:14px;color:${c.labelActive};`, `${projName}.wav to SD / Exports`, box);
+                    const fld = el('div', `position:absolute;left:24px;top:90px;width:450px;height:52px;background:${c.listSel};`, null, box);
+                    el('div', `position:absolute;left:0;top:0;width:450px;height:2px;background:${c.labelActive};`, null, fld);
+                    el('div', `position:absolute;left:12px;top:17px;font-size:14px;color:${c.labelInactive};`, 'Repeats', fld);
+                    el('div', `position:absolute;left:120px;top:15px;font-size:17px;font-weight:700;color:${c.labelActive};`, String(popup.repeats), fld);
+                    el('div', `position:absolute;left:180px;top:18px;font-size:12px;color:${c.labelInactive};`, `× Loop · ${(loopSec() * popup.repeats).toFixed(1)} s file`, fld);
+                    el('div', `position:absolute;right:12px;top:16px;font-size:14px;font-weight:700;color:${c.labelActive};`, 'JOG / ↑↓', fld);
+                    el('div', `position:absolute;right:12px;top:16px;font-size:14px;font-weight:700;color:${c.labelActive};`, 'JOG', fld);
+                    renderBottom(scr, c, ['', '', '', '', '', '', 'Cancel', { t: 'Export', on: true }], [
+                      null, null, null, null, null, null,
+                      () => { popup = null; renderScreen(); },
+                      startExport
+                    ]);
+                  } else if (popup.kind === 'exporting') {
+                    el('div', `position:absolute;left:24px;top:22px;font-size:17px;font-weight:700;color:${c.labelActive};`, 'Exporting mix', box);
+                    el('div', `position:absolute;left:24px;top:56px;width:450px;font-size:14px;color:${c.labelActive};`, `${projName}.wav · to SD / Exports`, box);
+                    el('div', `position:absolute;left:24px;top:104px;width:390px;height:6px;background:${c.barInactive};`, null, box);
+                    el('div', `position:absolute;left:24px;top:104px;width:${Math.round(390 * popup.pct)}px;height:6px;background:${c.labelActive};`, null, box);
+                    el('div', `position:absolute;right:24px;top:98px;font-size:14px;font-weight:700;color:${c.labelActive};`, `${Math.round(popup.pct * 100)}%`, box);
+                    renderBottom(scr, c, ['', '', '', '', '', '', '', 'Cancel'], [null, null, null, null, null, null, null, () => { popup = null; renderScreen(); }]);
+                  }
+                }
+
+                const lg = $('log'); lg.innerHTML = ''; S.log.slice(0, 12).forEach(m => { const li = document.createElement('li'); li.textContent = m; lg.appendChild(li); });
+                if (!S.log.length) { const li = document.createElement('li'); li.textContent = 'Nothing yet. Click the screen and press Enter, then play some keys.'; lg.appendChild(li); }
+                if (S.log.length) $('lastEvent').innerHTML = `<span>Status:</span>${S.log[0]}`;
+              }
+
+              function frame() {
+                /* ---- 10 Hz / 20 ms hardware-capped UI refresh ---- */
+                function frame(ts) {
+                  requestAnimationFrame(frame);
+                  const now = ctx ? ctx.currentTime : 0;
+                  for (let i = 0; i < 4; i++) {
+                    meterVals[i] = Math.max(T.playing && S.tracks[i].part && !S.tracks[i].mute ? 0.25 + 0.2 * Math.abs(Math.sin(now * 7 + i)) : 0, meterVals[i] * 0.9);
+                    if (trackMeterEls[i]) trackMeterEls[i].style.width = Math.round(114 * meterVals[i]) + 'px';
+                  }
+                  masterMeter = Math.max(T.playing ? 0.35 + 0.2 * Math.abs(Math.sin(now * 6)) : 0, masterMeter * 0.9);
+                  if (masterFillEl) {
+                    const mh = view === 'offset' ? 297 : 378, fh = Math.round(mh * masterMeter), top0 = 58 + mh - fh;
+                    masterFillEl.style.top = top0 + 'px'; masterFillEl.style.height = fh + 'px';
+                  }
+                  if (inp.level > -48) {
+                    inp.level = Math.max(-48, inp.level - 0.6);
+                    if (inputFillEl) inputFillEl.style.width = Math.max(0, Math.round((inp.level + 48) / 48 * 720)) + 'px';
+                  }
+                  if (inp.clip && performance.now() > inp.clipUntil) { inp.clip = false; if (view === 'input') renderScreen(); }
+                  if (playheadEl && S.loopLen && T.playing && now >= T.epoch) {
+                    const p = S.settings.loopMode === 'repeat' ? (now - T.epoch) % loopSec() : Math.min(loopSec(), now - T.epoch);
+                    playheadEl.style.left = (168 + Math.round(p / loopSec() * 600)) + 'px';
+                    if (posValEl) posValEl.textContent = fmtPos(p);
+                  } else if (rec && rec.kind === 'first' && posValEl) {
+                    posValEl.textContent = (now - rec.t0).toFixed(1) + ' s';
+                    if (posValEl && ts - last10Hz >= 100) { last10Hz = ts; posValEl.textContent = fmtPos(p); }
+                  } else if (rec && rec.kind === 'first' && posValEl && ts - last10Hz >= 100) {
+                    last10Hz = ts; posValEl.textContent = (now - rec.t0).toFixed(1) + ' s';
+                  }
+                  if (rec && rec.kind === 'part') {
+                    if (!rec.started && now >= rec.windowStart) { rec.started = true; renderScreen(); }
+                    else if (armedMsgEl && now < rec.T0) armedMsgEl.textContent = `Waiting for the loop start · ${(rec.T0 - now).toFixed(1)} s`;
+                    else if (armedMsgEl && now < rec.T0 && ts - last10Hz >= 100) { last10Hz = ts; armedMsgEl.textContent = `Waiting for loop start · ${(rec.T0 - now).toFixed(1)} s`; }
+                  }
+                }
+
+                /* ---- input ---- */
+                document.addEventListener('keydown', e => {
+                  if (e.ctrlKey || e.metaKey || e.altKey) return;
+                  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+                  if (KEYMAP[k] && !e.repeat && view !== 'name') { e.preventDefault(); hit(KEYMAP[k]); return; }
+                  if (e.repeat && k !== 'ArrowUp' && k !== 'ArrowDown') return;
+
+                  if (popup) {
+                    if (k === 'Escape') { popup = null; renderScreen(); }
+                    else if (k === 'Enter') {
+                      if (popup.kind === 'replace') { const tr = popup.track; popup = null; startPartArm(tr); }
+                      else if (popup.kind === 'nosound') { popup = null; renderScreen(); }
+                      else if (popup.kind === 'export') { startExport(); }
+                    } else if (popup.kind === 'export' && (k === 'ArrowUp' || k === 'ArrowDown')) {
+                      e.preventDefault(); popup.repeats = Math.max(1, Math.min(16, popup.repeats + (k === 'ArrowUp' ? 1 : -1))); renderScreen();
+                    }
+                    return;
+                    /* ---- Hardware Jog / Arrow / Button Actions ---- */
+                    function jogStep(dir, coarse) {
+                      jogAngle = (jogAngle + dir * 24) % 360;
+                      $('jogNotch').style.transform = `rotate(${jogAngle}deg)`;
+                      if (popup && popup.kind === 'export') {
+                        popup.repeats = Math.max(1, Math.min(16, popup.repeats + dir)); renderScreen(); return;
+                      }
+
+                      if (k === 'Escape') {
+                        if (view !== 'main') { if (view === 'offset') dispatch({ type: 'SET_OFFSET', track: S.selected, offset: offsetOrig }); view = 'main'; renderScreen(); }
+                        else cancelRec();
+                        return;
+                      }
+                      if (view === 'settings') {
+                        const keys = ['loopMode', 'click', 'ts', 'windowMs', 'preRollMs', 'rounding'];
+                        const opts = { loopMode: ['repeat', 'once'], click: [false, true], windowMs: [0, 30, 60, 100, 150], preRollMs: [0, 60, 120, 250, 500], rounding: ['off', '0.1', '1'] };
+                        if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); do { setRow = (setRow + (k === 'ArrowDown' ? 1 : 5)) % 6; } while (setRow === 2); renderScreen(); }
+                        else if (k === 'ArrowLeft' || k === 'ArrowRight') {
+                          e.preventDefault(); const key = keys[setRow], arr = opts[key]; if (!arr) return;
+                          const idx = arr.indexOf(S.settings[key]), nxt = Math.max(0, Math.min(arr.length - 1, idx + (k === 'ArrowRight' ? 1 : -1)));
+                          dispatch({ type: 'SET_SETTING', key, value: arr[nxt] });
+                        }
+                        return;
+                        const key = keys[setRow], arr = opts[key]; if (!arr) return;
+                        const idx = arr.indexOf(S.settings[key]), nxt = Math.max(0, Math.min(arr.length - 1, idx + dir));
+                        dispatch({ type: 'SET_SETTING', key, value: arr[nxt] });
+                      } else if (view === 'input') {
+                        if (inRow === 0) { inp.src = Math.max(0, Math.min(2, inp.src + dir)); inp.mon = inp.src === 0; inp.gain = Math.min(inp.gain, [22, 25, 44][inp.src]); }
+                        else if (inRow === 1) { inp.gain = Math.max(0, Math.min([22, 25, 44][inp.src], inp.gain + dir * (coarse ? 4 : 1.5))); }
+                        else inp.mon = dir > 0;
+                        renderScreen();
+                      } else if (view === 'project') {
+                        projRow = (projRow + dir + PROJECTS.length) % PROJECTS.length; renderScreen();
+                      } else if (view === 'name') {
+                        const idx = Math.max(0, CHARS.indexOf(nameStr[nameCur] || 'A'));
+                        const nxt = (idx + dir + CHARS.length) % CHARS.length;
+                        const arr = nameStr.padEnd(nameCur + 1, ' ').split(''); arr[nameCur] = CHARS[nxt]; nameStr = arr.join('').trimEnd(); renderScreen();
+                      } else if (S.status === 'confirmBars') {
+                        const list = FT.choicesFor(S.pending.trimmed.length, SR);
+                        const i = list.indexOf(S.pending.bars), j = Math.max(0, Math.min(list.length - 1, i + dir));
+                        dispatch({ type: 'SET_BARS', bars: list[j] });
+                      } else if (view === 'offset') {
+                        dispatch({ type: 'NUDGE', track: S.selected, unit: offsetField, dir, coarse });
+                      } else {
+                        dispatch({ type: 'SELECT', track: (S.selected + dir + 4) % 4 });
+                      }
+                      if (view === 'input') {
+                        if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); inRow = (inRow + (k === 'ArrowDown' ? 1 : 2)) % 3; renderScreen(); }
+                        else if (k === 'ArrowLeft' || k === 'ArrowRight') {
+                          e.preventDefault(); const d = k === 'ArrowRight' ? 1 : -1;
+                          if (inRow === 0) { inp.src = Math.max(0, Math.min(2, inp.src + d)); inp.mon = inp.src === 0; inp.gain = Math.min(inp.gain, [22, 25, 44][inp.src]); }
+                          else if (inRow === 1) { inp.gain = Math.max(0, Math.min([22, 25, 44][inp.src], inp.gain + d * (e.shiftKey ? 4 : 1.5))); }
+                          else inp.mon = d > 0;
+                          renderScreen();
+                        }
+                        return;
+                      }
+                      function arrowDir(dx, dy, coarse) {
+                        if (view === 'settings') {
+                          if (dy) { do { setRow = (setRow + dy + 6) % 6; } while (setRow === 2); renderScreen(); }
+                          if (dx) jogStep(dx, coarse);
+                        } else if (view === 'input') {
+                          if (dy) { inRow = (inRow + dy + 3) % 3; renderScreen(); }
+                          if (dx) jogStep(dx, coarse);
+                        } else if (view === 'project') {
+                          if (dy) { projRow = (projRow + dy + PROJECTS.length) % PROJECTS.length; renderScreen(); }
+                        } else if (view === 'name') {
+                          if (dx) { nameCur = Math.max(0, Math.min(15, nameCur + dx)); renderScreen(); }
+                          if (dy) jogStep(dy, false);
+                        } else if (S.status === 'confirmBars') {
+                          if (dx) jogStep(dx, false);
+                        } else if (view === 'offset') {
+                          if (dx) { offsetField = offsetField === 'ms' ? 'bars' : 'ms'; renderScreen(); }
+                          if (dy) dispatch({ type: 'NUDGE', track: S.selected, unit: offsetField, dir: -dy, coarse });
+                        } else if (dy) {
+                          dispatch({ type: 'SELECT', track: (S.selected + dy + 4) % 4 });
+                        }
+                        if (view === 'project') {
+                          if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); projRow = (projRow + (k === 'ArrowDown' ? 1 : PROJECTS.length - 1)) % PROJECTS.length; renderScreen(); }
+                          else if (k === 'Enter') { projName = PROJECTS[projRow][0]; dirty = false; view = 'main'; renderScreen(); }
+                        }
+                        function pressOk() {
+                          if (popup) {
+                            if (popup.kind === 'replace') { const tr = popup.track; popup = null; startPartArm(tr); }
+                            else if (popup.kind === 'nosound' || popup.kind === 'memfull') { popup = null; renderScreen(); }
+                            else if (popup.kind === 'export') { startExport(); }
+                            return;
+                          }
+                          if (view === 'name') {
+                            if (k === 'ArrowLeft' || k === 'ArrowRight') { e.preventDefault(); nameCur = Math.max(0, Math.min(15, nameCur + (k === 'ArrowRight' ? 1 : -1))); renderScreen(); }
+                            else if (k === 'ArrowUp' || k === 'ArrowDown') {
+                              e.preventDefault(); const idx = Math.max(0, CHARS.indexOf(nameStr[nameCur] || 'A'));
+                              const nxt = (idx + (k === 'ArrowDown' ? 1 : CHARS.length - 1)) % CHARS.length;
+                              const arr = nameStr.padEnd(nameCur + 1, ' ').split(''); arr[nameCur] = CHARS[nxt]; nameStr = arr.join('').trimEnd(); renderScreen();
+                            } else if (k === 'Backspace') {
+                              e.preventDefault();
+                              if (nameStr.length) { nameStr = nameStr.slice(0, Math.max(0, nameCur - 1)) + nameStr.slice(nameCur); nameCur = Math.max(0, nameCur - 1); renderScreen(); }
+                            } else if (k.length === 1 && CHARS.includes(k.toUpperCase())) {
+                              e.preventDefault(); const arr = nameStr.padEnd(nameCur + 1, ' ').split(''); arr[nameCur] = k.toUpperCase(); nameStr = arr.join('').slice(0, 16).trimEnd(); nameCur = Math.min(15, nameCur + 1); renderScreen();
+                            } else if (k === 'Enter') { projName = nameStr.trim() || 'UNTITLED'; dirty = false; view = 'project'; renderScreen(); }
+                            return;
+                          }
+                          if (view === 'offset') { view = 'main'; renderScreen(); }
+                          else if (view === 'project') { projName = PROJECTS[projRow][0]; dirty = false; view = 'main'; renderScreen(); }
+                          else if (view === 'name') { projName = nameStr.trim() || 'UNTITLED'; dirty = false; view = 'project'; renderScreen(); }
+                          else if (S.status === 'confirmBars') { ensureAudio(); dispatch({ type: 'CONFIRM_BARS' }); startPlayback(ctx.currentTime + 0.1); renderScreen(); }
+                          else doRecord();
+                        }
+                        function pressEsc() {
+                          if (popup) { popup = null; renderScreen(); }
+                          else if (view !== 'main') { if (view === 'offset') dispatch({ type: 'SET_OFFSET', track: S.selected, offset: offsetOrig }); view = 'main'; renderScreen(); }
+                          else cancelRec();
+                        }
+
+                        if (k === 'Enter') { e.preventDefault(); if (view === 'offset') { view = 'main'; renderScreen(); } else doRecord(); }
+                        else if (k === ' ') { e.preventDefault(); if (S.status === 'ready') { if (T.playing) { stopPlayback(); rec = null; renderScreen(); } else play(); } }
+                        else if (k >= '1' && k <= '6' && S.status === 'confirmBars') { dispatch({ type: 'SET_BARS', bars: FT.BAR_CHOICES[+k - 1] }); }
+                        else if (k >= '1' && k <= '4') { sel(+k - 1); }
+                        else if (k === 'ArrowLeft' || k === 'ArrowRight') {
+                          e.preventDefault();
+                          if (S.status === 'confirmBars') { const i = FT.BAR_CHOICES.indexOf(S.pending.bars); const j = Math.max(0, Math.min(FT.BAR_CHOICES.length - 1, i + (k === 'ArrowRight' ? 1 : -1))); dispatch({ type: 'SET_BARS', bars: FT.BAR_CHOICES[j] }); }
+                          else if (view === 'offset') { offsetField = offsetField === 'ms' ? 'bars' : 'ms'; renderScreen(); }
+                        }
+                        else if (k === 'ArrowUp' || k === 'ArrowDown') {
+                          e.preventDefault();
+                          if (view === 'offset') dispatch({ type: 'NUDGE', track: S.selected, unit: offsetField, dir: k === 'ArrowUp' ? 1 : -1, coarse: e.shiftKey });
+                          else sel((S.selected + (k === 'ArrowDown' ? 1 : 3)) % 4);
+                        }
+                        else if (k === 'Backspace') { e.preventDefault(); dispatch({ type: 'UNDO', track: S.selected }); }
+                        /* ---- Hardware Button & Keyboard Wiring ---- */
+                        Array.from($('hwFnRow').children).forEach((b, i) => {
+                          b.onclick = () => { $('stage').focus(); if (shiftHeld && view === 'main' && i === 5) { inp.mon = !inp.mon; renderScreen(); return; } if (bottomHandlers[i]) bottomHandlers[i](); };
+                        });
+
+                        $('stage').addEventListener('pointerdown', () => $('stage').focus());
+                        $('jog').addEventListener('wheel', e => { e.preventDefault(); jogStep(e.deltaY > 0 ? 1 : -1, e.shiftKey || shiftHeld); }, { passive: false });
+                        $('bJogL').onclick = () => jogStep(-1, shiftHeld);
+                        $('bJogR').onclick = () => jogStep(1, shiftHeld);
+                        $('bOk').onclick = pressOk;
+                        $('bUp').onclick = () => arrowDir(0, -1, shiftHeld);
+                        $('bDown').onclick = () => arrowDir(0, 1, shiftHeld);
+                        $('bLeft').onclick = () => arrowDir(-1, 0, shiftHeld);
+                        $('bRight').onclick = () => arrowDir(1, 0, shiftHeld);
+                        $('bShift').onclick = () => { shiftHeld = !shiftHeld; renderScreen(); };
+                        $('bRec').onclick = doRecord;
+                        $('bPlay').onclick = () => { ensureAudio(); if (S.status === 'ready') { T.playing ? (stopPlayback(), renderScreen()) : play(); } };
+                        $('bPlay').onclick = () => { ensureAudio(); if (S.status === 'ready') { T.playing ? (stopPlayback(), renderScreen()) : (startPlayback(ctx.currentTime + 0.1), renderScreen()); } };
+                        $('bUndo').onclick = () => dispatch({ type: 'UNDO', track: S.selected });
+                        $('bEsc').onclick = () => { if (popup) popup = null; else if (view !== 'main') view = 'main'; else cancelRec(); renderScreen(); };
+                        $('bEsc').onclick = pressEsc;
+                        $('bMon').onclick = () => { inp.mon = !inp.mon; renderScreen(); };
+                        $('bTheme').onclick = () => { theme = theme === 'Original' ? 'Monochrome' : 'Original'; $('bTheme').textContent = 'Theme: ' + theme; renderScreen(); };
+                        $('bReset').onclick = () => { stopPlayback(); rec = null; view = 'main'; popup = null; dispatch({ type: 'RESET' }); stepDone = 0; drawScen(); };
+                        $('bReset').onclick = () => { stopPlayback(); rec = null; view = 'main'; popup = null; dispatch({ type: 'RESET' }); };
+                        $('stage').addEventListener('pointerdown', () => $('stage').focus());
+
+                        renderScreen(); drawScen();
+                        document.addEventListener('keydown', e => {
+                          if (e.ctrlKey || e.metaKey || e.altKey) return;
+                          const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+                          if (KEYMAP[k] && !e.repeat && view !== 'name') { e.preventDefault(); hit(KEYMAP[k]); return; }
+                          if (e.repeat && k !== 'ArrowUp' && k !== 'ArrowDown') return;
+
+                          if (view === 'name') {
+                            if (k === 'Backspace') { e.preventDefault(); if (nameStr.length) { nameStr = nameStr.slice(0, Math.max(0, nameCur - 1)) + nameStr.slice(nameCur); nameCur = Math.max(0, nameCur - 1); renderScreen(); } return; }
+                            if (k.length === 1 && CHARS.includes(k.toUpperCase())) { e.preventDefault(); const arr = nameStr.padEnd(nameCur + 1, ' ').split(''); arr[nameCur] = k.toUpperCase(); nameStr = arr.join('').slice(0, 16).trimEnd(); nameCur = Math.min(15, nameCur + 1); renderScreen(); return; }
+                          }
+                          if (k === 'Enter') { e.preventDefault(); pressOk(); }
+                          else if (k === 'Escape') { e.preventDefault(); pressEsc(); }
+                          else if (k === ' ') { e.preventDefault(); if (S.status === 'ready') { T.playing ? (stopPlayback(), renderScreen()) : (ensureAudio(), startPlayback(ctx.currentTime + 0.1), renderScreen()); } }
+                          else if (k >= '1' && k <= '6' && S.status === 'confirmBars') { const list = FT.choicesFor(S.pending.trimmed.length, SR); dispatch({ type: 'SET_BARS', bars: list[+k - 1] }); }
+                          else if (k >= '1' && k <= '4' && view === 'main') dispatch({ type: 'SELECT', track: +k - 1 });
+                          else if (k === 'ArrowLeft') { e.preventDefault(); arrowDir(-1, 0, e.shiftKey || shiftHeld); }
+                          else if (k === 'ArrowRight') { e.preventDefault(); arrowDir(1, 0, e.shiftKey || shiftHeld); }
+                          else if (k === 'ArrowUp') { e.preventDefault(); arrowDir(0, -1, e.shiftKey || shiftHeld); }
+                          else if (k === 'ArrowDown') { e.preventDefault(); arrowDir(0, 1, e.shiftKey || shiftHeld); }
+                          else if (k === 'Backspace') { e.preventDefault(); dispatch({ type: 'UNDO', track: S.selected }); }
+                        });
+
+                        renderScreen();
+                      })();
+  </script>
+</body>
+
+</html>

@@ -22,6 +22,10 @@ synth-plugin-sdk/build/
 __pycache__/
 *.py[cod]
 
+# Node / Simulator build outputs
+node_modules/
+prototype/sim/dist/
+
 # IDE / OS files
 .project
 .cproject
