@@ -39,7 +39,7 @@ What I have and have not verified:
 | 13 | Settings, project-wide versus device-wide | Yes | Yes | Unknown | Open | Unknown | No | Needs the project file decision |
 | 14 | Project: new, open, save, save as, rename | Partly | Mock only | Unknown | Open | Unknown | No | File format not decided |
 | 15 | Export WAV with 1 to 16 repeats | Yes | Fake progress only | Partly | Open | Partly | No | Stock WAV export exists |
-| 16 | Pads played live and captured as audio on a track | Partly | Partly | Unknown | Open | Unknown | No | See finding 4 |
+| 16 | Pads played live and captured as audio on a track | Partly | Partly | Partly | Open | Partly | No | Small change, and it needs the same two changes as feature 4 (see finding 4) |
 | 17 | Lo-fi master chain: glue compressor, saturation, wow and flutter, bit-crush | Partly | No | Unknown | Open | No | No | Mostly to be written, after the CPU is measured |
 | 18 | Screens: main, recording states, offset, bars, settings, input, project | Yes | Yes | Partly | Partly | Yes | No | The design assigns the eight screen buttons, jog and arrows on every screen; the printed-label mapping is still open. Redraw cost unmeasured |
 | 19 | Popups: replace, no sound, memory full, export progress, SD missing | Yes | Partly | Yes | n/a | Yes | No | SD-missing is not in the simulator |
@@ -59,7 +59,7 @@ What I have and have not verified:
 1. **Arming a take inside the audio interrupt is the riskiest change.** Sample-accurate recording needs new code in the part of the firmware where a mistake means glitches or a hang. It should be the first slice built and tested on the device.
 2. **Undo probably does not fit in memory.** The simulator keeps the previous take for each track. Four 30 s Parts already use about 10.1 of 11.25 MiB, so a single undo copy at that length (about 2.5 MiB) does not fit. Options: undo only for shorter loops, store the previous take on the SD card, or drop undo from v1. This is a decision for the owner.
 3. **Bar choices now follow the design.** The design offers 1, 2, 3, 4, 6 and 8 bars, and 12 to 32 bars after a long first take that ran out of memory. The original decision (1, 2, 4, 8, 16) is superseded. One small mismatch remains: the simulator's long list is 8, 12, 16, 20, 24, 32, while the design's frame 8i shows 12, 16, 20, 24, 28, 32.
-4. **Recording pad hits as audio has no known path.** The stock recorder's sources are line, mic, radio and USB. I did not find the internal mix as a recording source. A new research ticket is needed before feature 16 can be called buildable.
+4. **Recording pad hits as audio has a route, and it is small.** The recorder has no internal source today, but the audio graph already has record queues on every voice and the master, built for the exporter. The best option is a pad-bus source on reserved voices recorded dry into the Part buffer. It needs the same two changes as later-Part recording: stop the recorder freezing voice updates, and arm the start inside the audio interrupt. CPU and RAM costs are estimates. `docs/research/pad-recording-path.md`.
 5. **Several simulator features are mock-ups.** The project list, the export progress, the level meters and the feedback protection are drawn but do nothing real. They count as screens, not as proven features.
 6. **No feature has a device test yet.** Until the recovery drill (ticket 07) and the stock build (ticket 06) are done, nothing should be flashed.
 
@@ -77,7 +77,7 @@ Each slice is flashed by the owner and checked on the device before the next sta
 - Ticket 09 settles features 5 and 6.
 - Ticket 10 settles feature 17 and the memory plan.
 - Ticket 11 fills the "Real control" column.
-- New research tickets are needed for finding 4 and for how projects are stored.
+- Ticket 16 (project storage) and ticket 17 (display pipeline and motion) are in progress.
 
 ## Added from the design (`docs/design/four-track-recorder-design.zip`)
 7. **The design lists things it wanted but left out.** The ones that need an owner decision: an "Unsaved changes" question before New or Open; a quick monitoring toggle on the main screen; a protection indicator on the main screen; deleting a project. None is in the matrix yet.
