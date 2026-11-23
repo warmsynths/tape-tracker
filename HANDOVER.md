@@ -20,6 +20,7 @@ See `wayfinder/tickets/`. A ticket's `status:` and `blocked-by:` lines tell you 
 - Open and takeable by you: 06 (build the stock Original firmware and measure sizes). It may be blocked by network access to the ARM toolchain; if so, record that and write the owner a checklist.
 - Open and needs the owner: 07 (recovery drill on their device), 13 (measure the audio round-trip delay with a cable), 08 (they play the prototype and report back).
 - Blocked: 09, 10, 11 (alignment rules, effects and budget, screen and controls), then 12 (write the v1 spec).
+- `docs/readiness-matrix.md` lists every feature against six readiness checks and the findings that came out of it. Keep it up to date as tickets close. The simulator in `prototype/sim` was added after this handover was first written; its tests had not been run when the matrix was drafted.
 - Not created yet, offered and not yet answered: a research ticket on how the display pipeline works, and a hardware test ticket for what animation the Original can really sustain.
 
 ## Waiting on the owner

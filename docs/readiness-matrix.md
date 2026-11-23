@@ -1,0 +1,79 @@
+# Readiness matrix
+
+Which features are ready to be built into the firmware, and what is still missing for each. Drafted from the decisions in `wayfinder/`, the research in `docs/research/`, and a reading of the simulator source in `prototype/sim/`.
+
+## How to read it
+A feature is ready to build only when every check below says Yes. Looking right in the simulator is one check out of six, because a browser hides what makes firmware hard: it has unlimited CPU, perfect timing and as much memory as it wants.
+
+| Check | Question |
+|---|---|
+| Decided | Is the rule written down in the map with no open question? |
+| Simulator | Does the simulator do it, and is there a test? |
+| Fits hardware | Does it fit the Original's memory and CPU? |
+| Real control | Is it mapped to a real button, wheel or pad? (Ticket 11 is still open, so this is "Open" for almost everything.) |
+| Firmware path | Do we know which stock code to change or add? |
+| Device test | Is there a short test you can run on the device? (None defined yet.) |
+
+Cell values: **Yes**, **Partly**, **No**, **Unknown**, **Open** (waiting on a named ticket), **n/a**.
+
+What I have and have not verified:
+- Simulator column: read from the source. The four logic tests exist (first take, alignment, starting tempo, nudge and undo) but **I have not run them**; installing the simulator's packages has not finished here.
+- Hardware columns: taken from the research files, which contain no measurements from a real device. Every CPU figure is a guess.
+
+## The matrix
+
+| # | Feature | Decided | Simulator | Fits hardware | Real control | Firmware path | Device test | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| 1 | First take records freely, silence before the first note is cut | Yes | Yes, tested | Partly | Open | Partly | No | Needs recorder change |
+| 2 | Choose bars, tempo derived from the length played | Yes | Yes, tested | Yes | Open | Yes | No | Check bar choices (see finding 3) |
+| 3 | Optional starting tempo with a one-bar count-in | Yes | Yes, tested | Partly | Open | Unknown | No | Needs a click sound source |
+| 4 | Later Parts: arm, wait for loop start, keep pre-roll, record one loop, stop | Yes | Yes, not tested | Partly | Open | Partly | No | Highest risk, see finding 1 |
+| 5 | First note snaps to the loop start inside the window | Partly | Yes, tested | Partly | n/a | Yes | No | Window size is a guess |
+| 6 | Offset in ms, bars or sixteenths, wrapping around the loop | Partly | Yes, tested | Yes | Open | Unknown | No | Play-once case undecided |
+| 7 | Undo the last take per track | Yes | Yes, tested | No | Open | Unknown | No | Memory problem, see finding 2 |
+| 8 | Loop Mode: repeat or play once | Yes | Yes, not tested | Yes | Open | Yes | No | Stock loop modes exist |
+| 9 | Mute per track | Partly | Yes | Yes | Open | Yes | No | Only implied in the design |
+| 10 | Four mono tracks playing in sync from RAM | Yes | Yes | Partly | n/a | Partly | No | CPU unmeasured |
+| 11 | Live input monitor with feedback protection | Yes | Partly | Partly | Open | Partly | No | Protection is text only in the simulator |
+| 12 | Input setup: line, mic low, mic high, gain, level meter | Yes | Yes | Yes | Open | Yes | No | Gain functions found in code |
+| 13 | Settings, project-wide versus device-wide | Yes | Yes | Unknown | Open | Unknown | No | Needs the project file decision |
+| 14 | Project: new, open, save, save as, rename | Partly | Mock only | Unknown | Open | Unknown | No | File format not decided |
+| 15 | Export WAV with 1 to 16 repeats | Yes | Fake progress only | Partly | Open | Partly | No | Stock WAV export exists |
+| 16 | Pads played live and captured as audio on a track | Partly | Partly | Unknown | Open | Unknown | No | See finding 4 |
+| 17 | Lo-fi master chain: glue compressor, saturation, wow and flutter, bit-crush | Partly | No | Unknown | Open | No | No | Mostly to be written, after the CPU is measured |
+| 18 | Screens: main, recording states, offset, bars, settings, input, project | Yes | Yes | Partly | Open | Yes | No | Redraw cost unmeasured |
+| 19 | Popups: replace, no sound, memory full, export progress, SD missing | Yes | Partly | Yes | n/a | Yes | No | SD-missing is not in the simulator |
+| 20 | First take stops at the memory limit and is kept | Yes | Yes | Yes | n/a | Yes | No | |
+| 21 | Click during playback and before a Part | Yes | Yes | Partly | Open | Unknown | No | Same click source as feature 3 |
+| 22 | 4/4 only | Yes | Yes | Yes | n/a | Yes | No | |
+
+## Evidence notes
+1. Stock recording is rounded to a 128-sample block and triggered from the screen loop, and the recorder writes to the start of the whole sample pool. It must be pointed at each Part's own memory and must stop freezing other voices. `docs/research/record-path-and-latency.md`, `docs/research/cpu-ram-budget.md`.
+2. Alignment detector: about 15 ms per 10 s loop, an estimate. `docs/research/onset-detection.md`.
+3. Four 30 s mono Parts take about 10.1 of the 11.25 MiB sample pool. `docs/research/cpu-ram-budget.md`.
+4. Stock effects: only a gate-style compressor, crude saturation curves and bit-crush exist. Wow and flutter, a proper glue compressor and sample-rate reduction would be new code. `docs/research/master-fx-availability.md`.
+5. Gain ranges: line about 0 to +22 dB, mic low 0 to +25 dB, mic high 0 to +44 dB, from the audio chip code.
+
+## Findings this table surfaced
+1. **Arming a take inside the audio interrupt is the riskiest change.** Sample-accurate recording needs new code in the part of the firmware where a mistake means glitches or a hang. It should be the first slice built and tested on the device.
+2. **Undo probably does not fit in memory.** The simulator keeps the previous take for each track. Four 30 s Parts already use about 10.1 of 11.25 MiB, so a single undo copy at that length (about 2.5 MiB) does not fit. Options: undo only for shorter loops, store the previous take on the SD card, or drop undo from v1. This is a decision for the owner.
+3. **The simulator's bar choices differ from the decision.** The decision was 1, 2, 4, 8 and 16 bars. The simulator offers 1, 2, 3, 4, 6 and 8, with a longer list up to 32. Either update the decision or the simulator.
+4. **Recording pad hits as audio has no known path.** The stock recorder's sources are line, mic, radio and USB. I did not find the internal mix as a recording source. A new research ticket is needed before feature 16 can be called buildable.
+5. **Several simulator features are mock-ups.** The project list, the export progress, the level meters and the feedback protection are drawn but do nothing real. They count as screens, not as proven features.
+6. **No feature has a device test yet.** Until the recovery drill (ticket 07) and the stock build (ticket 06) are done, nothing should be flashed.
+
+## Proposed build slices
+Each slice is flashed by the owner and checked on the device before the next starts.
+1. Record one track and loop it back, with sample-accurate starts. This proves the audio path and the memory plan (features 1, 8, 10).
+2. The loop rules: bars prompt, tempo, later Parts, alignment, offset (features 2, 4, 5, 6).
+3. Input setup, monitoring and feedback protection (features 11, 12).
+4. Settings, projects and export (features 13, 14, 15).
+5. Screens and popups on the real display (features 18, 19, 21).
+6. Pads and the lo-fi chain, if the research and CPU budget allow (features 16, 17).
+
+## What turns a cell to Yes
+- Tickets 06 and 13 and a first device test fill the "Fits hardware" and "Device test" columns.
+- Ticket 09 settles features 5 and 6.
+- Ticket 10 settles feature 17 and the memory plan.
+- Ticket 11 fills the "Real control" column.
+- New research tickets are needed for finding 4 and for how projects are stored.
