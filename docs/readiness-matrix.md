@@ -25,7 +25,7 @@ What I have and have not verified:
 | # | Feature | Decided | Simulator | Fits hardware | Real control | Firmware path | Device test | Verdict |
 |---|---|---|---|---|---|---|---|---|
 | 1 | First take records freely, silence before the first note is cut | Yes | Yes, tested | Partly | Open | Partly | No | Needs recorder change |
-| 2 | Choose bars, tempo derived from the length played | Yes | Yes, tested | Yes | Open | Yes | No | Check bar choices (see finding 3) |
+| 2 | Choose bars, tempo derived from the length played | Yes | Yes, tested | Yes | Open | Yes | No | Bar choices follow the design (see finding 3) |
 | 3 | Optional starting tempo with a one-bar count-in | Yes | Yes, tested | Partly | Open | Unknown | No | Needs a click sound source |
 | 4 | Later Parts: arm, wait for loop start, keep pre-roll, record one loop, stop | Yes | Yes, not tested | Partly | Open | Partly | No | Highest risk, see finding 1 |
 | 5 | First note snaps to the loop start inside the window | Partly | Yes, tested | Partly | n/a | Yes | No | Window size is a guess |
@@ -34,14 +34,14 @@ What I have and have not verified:
 | 8 | Loop Mode: repeat or play once | Yes | Yes, not tested | Yes | Open | Yes | No | Stock loop modes exist |
 | 9 | Mute per track | Partly | Yes | Yes | Open | Yes | No | Only implied in the design |
 | 10 | Four mono tracks playing in sync from RAM | Yes | Yes | Partly | n/a | Partly | No | CPU unmeasured |
-| 11 | Live input monitor with feedback protection | Yes | Partly | Partly | Open | Partly | No | Protection is text only in the simulator |
+| 11 | Live input monitor with feedback protection | Yes | Partly | Partly | Open | Unknown | No | Protection is text only in the simulator; the design also shows how far the monitor is turned down, which needs a gain-reduction readout from the limiter |
 | 12 | Input setup: line, mic low, mic high, gain, level meter | Yes | Yes | Yes | Open | Yes | No | Gain functions found in code |
 | 13 | Settings, project-wide versus device-wide | Yes | Yes | Unknown | Open | Unknown | No | Needs the project file decision |
 | 14 | Project: new, open, save, save as, rename | Partly | Mock only | Unknown | Open | Unknown | No | File format not decided |
 | 15 | Export WAV with 1 to 16 repeats | Yes | Fake progress only | Partly | Open | Partly | No | Stock WAV export exists |
 | 16 | Pads played live and captured as audio on a track | Partly | Partly | Unknown | Open | Unknown | No | See finding 4 |
 | 17 | Lo-fi master chain: glue compressor, saturation, wow and flutter, bit-crush | Partly | No | Unknown | Open | No | No | Mostly to be written, after the CPU is measured |
-| 18 | Screens: main, recording states, offset, bars, settings, input, project | Yes | Yes | Partly | Open | Yes | No | Redraw cost unmeasured |
+| 18 | Screens: main, recording states, offset, bars, settings, input, project | Yes | Yes | Partly | Partly | Yes | No | The design assigns the eight screen buttons, jog and arrows on every screen; the printed-label mapping is still open. Redraw cost unmeasured |
 | 19 | Popups: replace, no sound, memory full, export progress, SD missing | Yes | Partly | Yes | n/a | Yes | No | SD-missing is not in the simulator |
 | 20 | First take stops at the memory limit and is kept | Yes | Yes | Yes | n/a | Yes | No | |
 | 21 | Click during playback and before a Part | Yes | Yes | Partly | Open | Unknown | No | Same click source as feature 3 |
@@ -57,7 +57,7 @@ What I have and have not verified:
 ## Findings this table surfaced
 1. **Arming a take inside the audio interrupt is the riskiest change.** Sample-accurate recording needs new code in the part of the firmware where a mistake means glitches or a hang. It should be the first slice built and tested on the device.
 2. **Undo probably does not fit in memory.** The simulator keeps the previous take for each track. Four 30 s Parts already use about 10.1 of 11.25 MiB, so a single undo copy at that length (about 2.5 MiB) does not fit. Options: undo only for shorter loops, store the previous take on the SD card, or drop undo from v1. This is a decision for the owner.
-3. **The simulator's bar choices differ from the decision.** The decision was 1, 2, 4, 8 and 16 bars. The simulator offers 1, 2, 3, 4, 6 and 8, with a longer list up to 32. Either update the decision or the simulator.
+3. **Bar choices now follow the design.** The design offers 1, 2, 3, 4, 6 and 8 bars, and 12 to 32 bars after a long first take that ran out of memory. The original decision (1, 2, 4, 8, 16) is superseded. One small mismatch remains: the simulator's long list is 8, 12, 16, 20, 24, 32, while the design's frame 8i shows 12, 16, 20, 24, 28, 32.
 4. **Recording pad hits as audio has no known path.** The stock recorder's sources are line, mic, radio and USB. I did not find the internal mix as a recording source. A new research ticket is needed before feature 16 can be called buildable.
 5. **Several simulator features are mock-ups.** The project list, the export progress, the level meters and the feedback protection are drawn but do nothing real. They count as screens, not as proven features.
 6. **No feature has a device test yet.** Until the recovery drill (ticket 07) and the stock build (ticket 06) are done, nothing should be flashed.
@@ -77,3 +77,7 @@ Each slice is flashed by the owner and checked on the device before the next sta
 - Ticket 10 settles feature 17 and the memory plan.
 - Ticket 11 fills the "Real control" column.
 - New research tickets are needed for finding 4 and for how projects are stored.
+
+## Added from the design (`docs/design/four-track-recorder-design.zip`)
+7. **The design lists things it wanted but left out.** The ones that need an owner decision: an "Unsaved changes" question before New or Open; a quick monitoring toggle on the main screen; a protection indicator on the main screen; deleting a project. None is in the matrix yet.
+8. **Play once mode and Offset wrap is still open.** The design flags that a wrapped piece would sound before the Part itself, and that frame 7d would need to draw differently if the alignment-rules ticket chooses cut or delay instead of wrapping.
