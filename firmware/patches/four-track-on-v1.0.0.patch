@@ -1,0 +1,1616 @@
+diff --git a/core/AudioEngine/MixerAndFxs.h b/core/AudioEngine/MixerAndFxs.h
+index 87f77b6..0103466 100644
+--- a/core/AudioEngine/MixerAndFxs.h
++++ b/core/AudioEngine/MixerAndFxs.h
+@@ -25,7 +25,8 @@ class MixerAndFxs
+         kDryMixChannel,
+         kDelayChannel,
+         kReverbChannel,
+-        kInputChannel
++        kInputChannel,
++        kLoopChannel // looped Part of the four-track test build
+     };
+ 
+     static constexpr int kExternalInputsCount = 1;
+@@ -37,7 +38,7 @@ class MixerAndFxs
+ #endif
+     static constexpr int kTrackMixerOutputsCount = 1;
+     static constexpr int kTrackAndSendsMixerInputs =
+-      kTrackMixerOutputsCount + kExternalInputsCount + FxType::kFxCount;
++      kTrackMixerOutputsCount + kExternalInputsCount + FxType::kFxCount + 1; // +1: loop player
+     static constexpr int kTracksAndSynthVoices = voicesCount + kSynthParts;
+ 
+     MixerAndFxs();
+diff --git a/core/AudioEngine/mtAudioEngine.cpp b/core/AudioEngine/mtAudioEngine.cpp
+index 4d59561..ac56304 100644
+--- a/core/AudioEngine/mtAudioEngine.cpp
++++ b/core/AudioEngine/mtAudioEngine.cpp
+@@ -128,6 +128,11 @@ AudioPlaySdWav* audioEngine::getSdPlayer()
+     return &playerWavFromSD;
+ }
+ 
++AudioPlayLoops* audioEngine::getLoopPlayer()
++{
++    return &loopPlayer;
++}
++
+ audioEngine::audioEngine()
+ {
+     for (int voiceIdx = 0; voiceIdx < kVoices; voiceIdx++)
+@@ -145,6 +150,14 @@ audioEngine::audioEngine()
+ 
+     connectInputToOutput(&input, &output);
+     connectInputToMixer(&input, &mixerAndFxs);
++    for (int channel = 0; channel < (int)MixerAndFxChannelType::kChannelCount; channel++)
++    {
++        connections.push_back(new AudioConnection(
++          &loopPlayer,
++          0,
++          mixerAndFxs.getTracksAndSendsMixer((MixerAndFxChannelType)channel),
++          MixerAndFxs<kVoices>::TrackAndFxsChannels::kLoopChannel));
++    }
+     connectMixerToOutput(&mixerAndFxs, &output);
+     connectMixerToExportQueue(&mixerAndFxs, &exportQueues);
+     connectSpecialInputsToOutput(&output);
+diff --git a/core/AudioEngine/mtAudioEngine.h b/core/AudioEngine/mtAudioEngine.h
+index 8d04081..521b0b8 100644
+--- a/core/AudioEngine/mtAudioEngine.h
++++ b/core/AudioEngine/mtAudioEngine.h
+@@ -192,6 +192,7 @@ class audioEngine
+     ExportQueues* getExportQueues();
+     MixerAndFxs<kVoices>* getMixerAndFx();
+     AudioPlaySdWav* getSdPlayer();
++    AudioPlayLoops* getLoopPlayer();
+ 
+     friend class playerEngine;
+ 
+@@ -232,6 +233,7 @@ class audioEngine
+     SdStream sdStream;
+     std::vector<AudioConnection*> connections;
+     AudioInput input;
++    AudioPlayLoops loopPlayer; // declared before mixerAndFxs so it updates before the mixer
+     AudioPlaySdWav playerWavFromSD;
+     AudioSynthWaveform testWaveform;
+     AudioPlayMemory metronomeTick;
+diff --git a/core/interface/core/interface.cpp b/core/interface/core/interface.cpp
+index fbebd91..2dd99e6 100644
+--- a/core/interface/core/interface.cpp
++++ b/core/interface/core/interface.cpp
+@@ -10,6 +10,7 @@
+ #include "core/titleBar.h"
+ 
+ #include "imageViewer/imageViewer.h"
++#include "fourTrack/fourTrack.h"
+ #include "instrumentEditor/instrumentEditor.h"
+ #include "masterParams/masterParams.h"
+ #include "patternEditor/patternEditor.h"
+@@ -51,7 +52,7 @@ extern uint8_t isAudioOutMuted();
+ //=======================================================================
+ //=======================================================================
+ 
+-const uint8_t Interface::modulesCount = 13;
++const uint8_t Interface::modulesCount = 14;
+ const hModule Interface::modules[modulesCount] = {
+     &projectEditor,    // 0
+     &sampleImporter,   // 1
+@@ -66,6 +67,7 @@ const hModule Interface::modules[modulesCount] = {
+     &imageViewer,      // 10
+     nullptr,           // 11
+     &masterParams,     // 12
++    &fourTrack,        // 13 (test build: opened with the Song button)
+ };
+ 
+ const uint8_t Interface::modulesButtonsCount = 11;
+@@ -79,7 +81,7 @@ const uint32_t Interface::modulesButtons[modulesButtonsCount][3] = {
+     { interfaceButtonSampleEdit, 6, 0 },
+     { interfaceButtonSampleRec, 8, 0 },
+     { interfaceButtonSampleLoad, 1, 0 },
+-    { interfaceButtonSong, 4, 0 },
++    { interfaceButtonSong, 13, 0 }, // test build: Song opens the Four-Track screen
+     { interfaceButtonConfig, 7, 0 },
+ };
+ 
+diff --git a/core/interface/fourTrack/fFourTrack.cpp b/core/interface/fourTrack/fFourTrack.cpp
+new file mode 100644
+index 0000000..87eee5e
+--- /dev/null
++++ b/core/interface/fourTrack/fFourTrack.cpp
+@@ -0,0 +1,477 @@
++#include "fourTrack.h"
++
++#include "Platform.h"
++#include "Recorder.h"
++#include "TrackerImpl.h"
++#include "core/interface.h"
++#include "core/songTimer.h"
++#include "mtAudioEngine.h"
++#include "mtPadBoard.h"
++#include "mtPadsBacklight.h"
++#include "mtStructs.h"
++
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++
++cFourTrack fourTrack;
++static cFourTrack* FT = &fourTrack;
++
++namespace
++{
++// Sample clock of the Original (see docs/research/record-path-and-latency.md): 44117.647 Hz.
++constexpr uint32_t kSampleRate = 44118;
++
++// Longest loop, and the room each track gets. The extra room holds the audio recorded just
++// before and after the loop, for aligning a Part later.
++constexpr uint32_t kMaxLoopFrames = kSampleRate * 24;
++constexpr uint32_t kRegionFrames = kSampleRate * 26;
++constexpr uint32_t kRegionBytes = kRegionFrames * sizeof(int16_t);
++
++// A Part starts recording when the loop is this close to its end (about 200 ms), and not if it
++// is closer than about 50 ms, so the start of the loop is never missed.
++constexpr uint32_t kLeadFrames = kSampleRate / 5;
++constexpr uint32_t kMinLeadFrames = kSampleRate / 20;
++// Extra audio kept after the end of the loop (about 136 ms).
++constexpr uint32_t kPostFrames = 6000;
++
++// Four regions at the very top of the sample memory, one per track. That area is shared with
++// the Sample Editor and instrument samples, so do not use them with this test build.
++int16_t* regionStart(int track)
++{
++    return externalRamSampleMemory +
++           (SAMPLE_MEMORY_SIZE - (uint32_t)(track + 1) * kRegionBytes) / sizeof(int16_t);
++}
++} // namespace
++
++static void functRec() { FT->pressRecord(); }
++static void functStop() { FT->pressStop(); }
++static void functPlay() { FT->pressPlay(); }
++static void functTrack1() { FT->selectTrack(0); }
++static void functTrack2() { FT->selectTrack(1); }
++static void functTrack3() { FT->selectTrack(2); }
++static void functTrack4() { FT->selectTrack(3); }
++
++static void functSwitchModule(uint8_t button)
++{
++    FT->eventFunct(eventSwitchModule, FT, &button, 0);
++}
++
++cFourTrack::cFourTrack()
++  : session(kMaxLoopFrames)
++{
++}
++
++void cFourTrack::start(uint32_t options)
++{
++    (void)options;
++    moduleRefresh = 1;
++    memoryFullFlag = false;
++
++    songTimer.hide();
++
++    ip->setButtonObj(interfaceButtonPerformance, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonParams, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonFile, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonConfig, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonMaster, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonSamplePlay, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonSampleEdit, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonSampleRec, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonSampleLoad, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonSong, buttonPress, functSwitchModule);
++    ip->setButtonObj(interfaceButtonPattern, buttonPress, functSwitchModule);
++
++    // Line input, as the stock Sample Recorder sets it up.
++    Sgtl5000* codec = platform->getCodecAudio();
++    codec->setInputType(Sgtl5000::InputType::kLineIn);
++    // Same input gain as the Sample Recorder screen (set it there; 0 to 100 percent).
++    codec->setLineInLevel(mtProject.values.gainLineIn * 15 / 100);
++#ifndef TRACKER_MINI
++    platform->getRadio()->enableLineInput(false);
++#endif
++
++    recorder.setFullMemoryCallback([]() { FT->memoryFullFlag = true; });
++    recorder.setFirstBlockCallback([]() {
++        FT->recordStartPosition = engine.getLoopPlayer()->position();
++        FT->recordStartKnown = true;
++    });
++
++    // Hear the input while recording, as the stock Sample Recorder does.
++    engine.forceLineInStreamVolume(DEFAULT_LINE_IN_VOLUME);
++
++    shownLevelText[0] = 0;
++    shownStatusText[0] = 0;
++    for (int t = 0; t < FourTrackSession::kTracks; t++)
++    {
++        shownTrackText[t][0] = 0;
++    }
++
++    showScreen();
++    setDefaultScreenFunct();
++    refreshTexts(true);
++}
++
++void cFourTrack::stop()
++{
++    // Leave nothing running behind another screen.
++    if (session.mode() != FourTrackSession::Mode::Idle)
++    {
++        pressStop(); // keeps a first take, cancels anything else
++    }
++    if (session.playing())
++    {
++        session.pressStop();
++    }
++    engine.getLoopPlayer()->stop();
++
++    moduleRefresh = 0;
++    engine.refreshLineInStreamVolume(); // back to the normal project setting
++    for (int t = 0; t < FourTrackSession::kTracks; t++)
++    {
++        display.setControlHide(trackLabel[t]);
++    }
++    display.setControlHide(statusLabel);
++    display.setControlHide(hintLabel);
++    display.setControlHide(levelLabel);
++    mtPadBoard.releaseAllInstruments();
++    padsBacklight.clearGlobalPads(1, 1, 1);
++    songTimer.show();
++}
++
++void cFourTrack::setDefaultScreenFunct()
++{
++    ip->clearButtonsRange(interfaceButton0, interfaceButton7);
++    ip->clearAllPots();
++
++    ip->setButtonObj(interfaceButton0, buttonPress, functRec);
++    ip->setButtonObj(interfaceButton1, buttonPress, functStop);
++    ip->setButtonObj(interfaceButton2, buttonPress, functPlay);
++    ip->setButtonObj(interfaceButton4, buttonPress, functTrack1);
++    ip->setButtonObj(interfaceButton5, buttonPress, functTrack2);
++    ip->setButtonObj(interfaceButton6, buttonPress, functTrack3);
++    ip->setButtonObj(interfaceButton7, buttonPress, functTrack4);
++    ip->setButtonObj(interfaceButtonRec, buttonPress, functRec);
++    ip->setButtonObj(interfaceButtonPlay, buttonPress, functPlay);
++}
++
++//------------------------------------------------------------------------------------------------
++// Actions from the buttons
++
++void cFourTrack::selectTrack(int track)
++{
++    session.selectTrack(track);
++    refreshTexts(false);
++}
++
++void cFourTrack::pressRecord()
++{
++    const FourTrackSession::Mode before = session.mode();
++    session.pressRecord();
++    if (before != FourTrackSession::Mode::Idle)
++    {
++        return;
++    }
++
++    const int track = session.recordingTrack();
++    if (session.mode() == FourTrackSession::Mode::RecordingFirst)
++    {
++        engine.getLoopPlayer()->stop();
++        memoryFullFlag = false;
++        configureRecorder(track);
++        recorder.record();
++    }
++    else if (session.mode() == FourTrackSession::Mode::Armed)
++    {
++        syncPlayer();
++    }
++    refreshTexts(true);
++}
++
++void cFourTrack::pressStop()
++{
++    if (session.mode() == FourTrackSession::Mode::RecordingFirst)
++    {
++        recorder.stop();
++        session.firstRecordedFrames(recorder.getLength(), memoryFullFlag);
++        if (session.mode() == FourTrackSession::Mode::RecordingFirst)
++        {
++            session.pressStop();
++        }
++        onFirstTakeFinished();
++    }
++    else if (session.mode() != FourTrackSession::Mode::Idle)
++    {
++        cancelRecording();
++    }
++    else
++    {
++        session.pressStop();
++    }
++    syncPlayer();
++    refreshTexts(true);
++}
++
++void cFourTrack::pressPlay()
++{
++    if (session.mode() != FourTrackSession::Mode::Idle)
++    {
++        return;
++    }
++    session.pressPlay();
++    syncPlayer();
++    refreshTexts(true);
++}
++
++//------------------------------------------------------------------------------------------------
++// Recording and playing
++
++void cFourTrack::configureRecorder(int track)
++{
++    Recorder::Config config;
++    config.destinationBufferAddress = regionStart(track);
++    config.destinationBufferSize = kRegionBytes;
++    config.destinationChannels = 1;
++    config.sourceChannels = 1;
++    config.source = Recorder::Config::Source::kI2s;
++    recorder.setConfig(config);
++}
++
++void cFourTrack::cancelRecording()
++{
++    if (session.mode() == FourTrackSession::Mode::RecordingFirst)
++    {
++        recorder.stop();
++        session.pressStop(); // a first take with nothing kept
++    }
++    else if (session.mode() == FourTrackSession::Mode::RecordingPart)
++    {
++        recorder.stop();
++        session.pressStop();
++    }
++    else if (session.mode() == FourTrackSession::Mode::Armed)
++    {
++        session.pressStop();
++    }
++}
++
++void cFourTrack::startPlayer()
++{
++    AudioPlayLoops* player = engine.getLoopPlayer();
++    for (int t = 0; t < FourTrackSession::kTracks; t++)
++    {
++        player->setTrack(t, session.hasPart(t) ? partData[t] : nullptr);
++    }
++    player->start(session.loopFrames());
++}
++
++void cFourTrack::syncPlayer()
++{
++    AudioPlayLoops* player = engine.getLoopPlayer();
++    if (session.playing() && !player->isPlaying())
++    {
++        startPlayer();
++    }
++    else if (!session.playing() && player->isPlaying())
++    {
++        player->stop();
++    }
++}
++
++void cFourTrack::onFirstTakeFinished()
++{
++    // The first Part defines the loop. It sits at the start of its track's region.
++    for (int t = 0; t < FourTrackSession::kTracks; t++)
++    {
++        partData[t] = nullptr;
++    }
++    if (session.hasPart(session.selected()))
++    {
++        partData[session.selected()] = regionStart(session.selected());
++    }
++
++    AudioPlayLoops* player = engine.getLoopPlayer();
++    player->stop(); // so syncPlayer starts it again from the top with the new Parts
++}
++
++void cFourTrack::serviceFirstTake()
++{
++    const bool stoppedByItself = !recorder.isRecordingActive();
++    session.firstRecordedFrames(recorder.getLength(), memoryFullFlag || stoppedByItself);
++    if (session.mode() == FourTrackSession::Mode::RecordingFirst && stoppedByItself)
++    {
++        session.pressStop();
++    }
++    if (session.mode() != FourTrackSession::Mode::RecordingFirst)
++    {
++        onFirstTakeFinished();
++        syncPlayer();
++    }
++}
++
++void cFourTrack::serviceArmed()
++{
++    AudioPlayLoops* player = engine.getLoopPlayer();
++    if (!player->isPlaying())
++    {
++        return;
++    }
++
++    const uint32_t length = session.loopFrames();
++    const uint32_t position = player->position();
++    if (position + kLeadFrames >= length && position + kMinLeadFrames <= length)
++    {
++        configureRecorder(session.recordingTrack());
++        recordStartKnown = false;
++        memoryFullFlag = false;
++        recorder.record();
++        session.armWindowReached();
++    }
++}
++
++void cFourTrack::servicePartRecording()
++{
++    if (!recordStartKnown)
++    {
++        return;
++    }
++
++    const uint32_t length = session.loopFrames();
++    const uint32_t start = recordStartPosition;
++    // How far into the recording the loop's first sample falls.
++    const uint32_t firstSample = (length - (start % length)) % length;
++    const uint32_t needed = firstSample + length + kPostFrames;
++
++    if (needed > kRegionFrames || !recorder.isRecordingActive())
++    {
++        // Too long for the room, or the recorder stopped by itself: drop this take.
++        recorder.stop();
++        session.pressStop();
++        return;
++    }
++
++    if (recorder.getLength() >= needed)
++    {
++        recorder.stop();
++        const int track = session.recordingTrack();
++        partData[track] = regionStart(track) + firstSample;
++        engine.getLoopPlayer()->setTrack(track, partData[track]);
++        session.partRecorded();
++    }
++}
++
++//------------------------------------------------------------------------------------------------
++
++void cFourTrack::update()
++{
++    switch (session.mode())
++    {
++        case FourTrackSession::Mode::RecordingFirst: serviceFirstTake(); break;
++        case FourTrackSession::Mode::Armed: serviceArmed(); break;
++        case FourTrackSession::Mode::RecordingPart: servicePartRecording(); break;
++        case FourTrackSession::Mode::Idle: break;
++    }
++
++    refreshTexts(false);
++    refreshLevel();
++}
++
++void cFourTrack::refreshTexts(bool force)
++{
++    bool changed = force;
++    const int recTrack = session.recordingTrack();
++    for (int t = 0; t < FourTrackSession::kTracks; t++)
++    {
++        const char* state = session.hasPart(t) ? "PART" : "EMPTY";
++        if (t == recTrack)
++        {
++            switch (session.mode())
++            {
++                case FourTrackSession::Mode::RecordingFirst:
++                case FourTrackSession::Mode::RecordingPart: state = "RECORDING"; break;
++                case FourTrackSession::Mode::Armed: state = "ARMED, waiting for the loop"; break;
++                case FourTrackSession::Mode::Idle: break;
++            }
++        }
++        std::snprintf(trackText[t],
++                      sizeof(trackText[t]),
++                      "%s Track %d   %s",
++                      (t == session.selected()) ? ">" : " ",
++                      t + 1,
++                      state);
++        if (force || std::strcmp(trackText[t], shownTrackText[t]) != 0)
++        {
++            std::strcpy(shownTrackText[t], trackText[t]);
++            display.setControlText(trackLabel[t], shownTrackText[t]);
++            display.setControlColors(trackLabel[t],
++                                     (t == session.selected())
++                                       ? display.getTheme().activeButtonLabelsColors
++                                       : display.getTheme().activeLabelsColors);
++            display.refreshControl(trackLabel[t]);
++            changed = true;
++        }
++    }
++
++    const uint32_t frames = (session.mode() == FourTrackSession::Mode::RecordingFirst)
++                              ? recorder.getLength()
++                              : session.loopFrames();
++    const uint32_t tenths = frames * 10 / kSampleRate;
++    if (frames == 0)
++    {
++        std::snprintf(statusText, sizeof(statusText), "No loop yet");
++    }
++    else
++    {
++        std::snprintf(statusText,
++                      sizeof(statusText),
++                      "%s %u.%u s  %s",
++                      (session.mode() == FourTrackSession::Mode::RecordingFirst) ? "RECORDING" : "LOOP",
++                      (unsigned)(tenths / 10),
++                      (unsigned)(tenths % 10),
++                      session.playing() ? "PLAYING" : "STOPPED");
++    }
++    if (force || std::strcmp(statusText, shownStatusText) != 0)
++    {
++        std::strcpy(shownStatusText, statusText);
++        display.setControlText(statusLabel, shownStatusText);
++        display.refreshControl(statusLabel);
++        changed = true;
++    }
++    if (changed)
++    {
++        display.synchronizeRefresh();
++    }
++}
++
++void cFourTrack::refreshLevel()
++{
++    // Input level as a text bar from -60 dB to 0 dB. Integer formatting only.
++    AudioAnalyzeRMS* rms = engine.getAudioInput()->getRecordingRmsI2s(0);
++    static float level = 0.0f;
++    if (rms != nullptr && rms->available())
++    {
++        level = rms->read();
++    }
++    int db = -60;
++    if (level > 0.001f)
++    {
++        db = (int)(20.0f * std::log10(level));
++        if (db < -60) db = -60;
++        if (db > 0) db = 0;
++    }
++    const int filled = (db + 60) / 3; // 0..20
++    char bar[24];
++    for (int i = 0; i < 20; i++)
++    {
++        bar[i] = (i < filled) ? '|' : '.';
++    }
++    bar[20] = 0;
++    std::snprintf(levelText, sizeof(levelText), "IN  %s  %d dB", bar, db);
++    if (std::strcmp(levelText, shownLevelText) != 0)
++    {
++        std::strcpy(shownLevelText, levelText);
++        display.setControlText(levelLabel, shownLevelText);
++        display.refreshControl(levelLabel);
++        display.synchronizeRefresh();
++    }
++}
+diff --git a/core/interface/fourTrack/fourTrack.h b/core/interface/fourTrack/fourTrack.h
+new file mode 100644
+index 0000000..fbba917
+--- /dev/null
++++ b/core/interface/fourTrack/fourTrack.h
+@@ -0,0 +1,68 @@
++#ifndef INTERFACE_FOURTRACK_H_
++#define INTERFACE_FOURTRACK_H_
++
++#include "FourTrackSession.h"
++#include "core/modulesBase.h"
++
++// Four-track test screen, opened with the Song button in this build.
++// Buttons under the screen: 1 Rec, 2 Stop, 3 Play, 5 to 8 select track 1 to 4.
++// The first Part recorded sets the loop. Later Parts wait for the loop to come round and record
++// exactly one loop, then all tracks play in sync.
++class cFourTrack : public ModuleBase
++{
++  public:
++    virtual void update() override;
++    virtual void start(uint32_t options) override;
++    virtual void stop() override;
++
++    virtual void initDisplayControls() override;
++    virtual void destroyDisplayControls() override {}
++
++    cFourTrack();
++
++    void pressRecord();
++    void pressStop();
++    void pressPlay();
++    void selectTrack(int track);
++
++    // Set from the audio interrupt when the first block of a recording arrives.
++    volatile uint32_t recordStartPosition = 0;
++    volatile bool recordStartKnown = false;
++    volatile bool memoryFullFlag = false;
++
++  private:
++    void showScreen();
++    void setDefaultScreenFunct();
++    void refreshTexts(bool force);
++    void refreshLevel();
++
++    void configureRecorder(int track);
++    void syncPlayer();
++    void startPlayer();
++    void onFirstTakeFinished();
++    void serviceFirstTake();
++    void serviceArmed();
++    void servicePartRecording();
++    void cancelRecording();
++
++    FourTrackSession session;
++    const int16_t* partData[FourTrackSession::kTracks]{};
++
++    hControl label[8]{};
++    hControl bgLabel = -1;
++    hControl trackLabel[FourTrackSession::kTracks]{};
++    hControl statusLabel = -1;
++    hControl hintLabel = -1;
++    hControl levelLabel = -1;
++
++    char trackText[FourTrackSession::kTracks][40]{};
++    char shownTrackText[FourTrackSession::kTracks][40]{};
++    char statusText[64]{};
++    char shownStatusText[64]{};
++    char levelText[64]{};
++    char shownLevelText[64]{};
++};
++
++extern cFourTrack fourTrack;
++
++#endif /* INTERFACE_FOURTRACK_H_ */
+diff --git a/core/interface/fourTrack/gFourTrack.cpp b/core/interface/fourTrack/gFourTrack.cpp
+new file mode 100644
+index 0000000..ef90bbc
+--- /dev/null
++++ b/core/interface/fourTrack/gFourTrack.cpp
+@@ -0,0 +1,120 @@
++#include "fourTrack.h"
++
++void cFourTrack::initDisplayControls()
++{
++    strControlProperties prop{};
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        prop.colors = display.getTheme().activeLabelsColors;
++        prop.text = (char*)"";
++        prop.style =
++          (controlStyleShow | controlStyleCenterX | controlStyleCenterY | controlStyleFont3);
++        prop.x = (800 / 8) * i + (800 / 16);
++        prop.y = 424;
++        prop.w = 800 / 8 - 6;
++        prop.h = 55;
++        prop.value = 0;
++        label[i] = display.createControl<cLabel>(&prop);
++    }
++
++    strControlProperties bg{};
++    bg.text = nullptr;
++    bg.colors = nullptr;
++    bg.value = 255;
++    bg.style = controlStyleNoTransparency | controlStyleShow;
++    bg.x = 0;
++    bg.w = 800;
++    bg.y = 425;
++    bg.h = 54;
++    bgLabel = display.createControl<cBgLabel>(&bg);
++
++    for (int t = 0; t < FourTrackSession::kTracks; t++)
++    {
++        strControlProperties tp{};
++        tp.colors = display.getTheme().activeLabelsColors;
++        tp.text = (char*)"";
++        tp.style = (controlStyleShow | controlStyleCenterX | controlStyleCenterY | controlStyleFont4);
++        tp.x = 400;
++        tp.y = 75 + t * 48;
++        tp.w = 780;
++        tp.h = 40;
++        trackLabel[t] = display.createControl<cLabel>(&tp);
++    }
++
++    strControlProperties sp{};
++    sp.colors = display.getTheme().activeLabelsColors;
++    sp.text = (char*)"";
++    sp.style = (controlStyleShow | controlStyleCenterX | controlStyleCenterY | controlStyleFont3);
++    sp.x = 400;
++    sp.y = 285;
++    sp.w = 780;
++    sp.h = 36;
++    statusLabel = display.createControl<cLabel>(&sp);
++
++    strControlProperties hp{};
++    hp.colors = display.getTheme().inactiveLabelsColors;
++    hp.text = (char*)"";
++    hp.style = (controlStyleShow | controlStyleCenterX | controlStyleCenterY | controlStyleFont1);
++    hp.x = 400;
++    hp.y = 325;
++    hp.w = 780;
++    hp.h = 30;
++    hintLabel = display.createControl<cLabel>(&hp);
++
++    strControlProperties lp{};
++    lp.colors = display.getTheme().activeLabelsColors;
++    lp.text = (char*)"";
++    lp.style = (controlStyleShow | controlStyleCenterX | controlStyleCenterY | controlStyleFont3);
++    lp.x = 400;
++    lp.y = 375;
++    lp.w = 780;
++    lp.h = 36;
++    levelLabel = display.createControl<cLabel>(&lp);
++}
++
++void cFourTrack::showScreen()
++{
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        display.setControlText(label[i], "");
++        display.setControlColors(label[i], display.getTheme().activeLabelsColors);
++        display.setControlStyle(
++          label[i],
++          controlStyleShow | controlStyleCenterX | controlStyleCenterY | controlStyleFont3);
++    }
++
++    display.setControlText(label[0], "Rec");
++    display.setControlColors(label[0], display.getTheme().activeButtonLabelsColors);
++    display.setControlText(label[1], "Stop");
++    display.setControlText(label[2], "Play");
++    display.setControlText(label[4], "Track 1");
++    display.setControlText(label[5], "Track 2");
++    display.setControlText(label[6], "Track 3");
++    display.setControlText(label[7], "Track 4");
++
++    titleBar->show();
++    titleBar->showRightLabel(false);
++    titleBar->setTitle("Four-Track");
++
++    display.setControlText(hintLabel, "Pick a track, press Rec. The first Part sets the loop.");
++
++    for (int t = 0; t < FourTrackSession::kTracks; t++)
++    {
++        display.setControlShow(trackLabel[t]);
++        display.refreshControl(trackLabel[t]);
++    }
++    display.setControlShow(statusLabel);
++    display.setControlShow(hintLabel);
++    display.setControlShow(levelLabel);
++    display.setControlText(levelLabel, "");
++    display.refreshControl(statusLabel);
++    display.refreshControl(hintLabel);
++    display.refreshControl(levelLabel);
++
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        display.refreshControl(label[i]);
++    }
++    display.refreshControl(bgLabel);
++    display.synchronizeRefresh();
++}
+diff --git a/core/libs/Audio/Audio.h b/core/libs/Audio/Audio.h
+index 9bc0f43..316fbc8 100644
+--- a/core/libs/Audio/Audio.h
++++ b/core/libs/Audio/Audio.h
+@@ -59,6 +59,7 @@
+ #include "mixer.h"
+ #include "monoToStereo.h"
+ #include "mux.h"
++#include "play_loops.h"
+ #include "play_memory.h"
+ #include "play_sd_wav.h"
+ #include "record_queue.h"
+diff --git a/core/libs/Audio/loop_fill.h b/core/libs/Audio/loop_fill.h
+new file mode 100644
+index 0000000..9d4c488
+--- /dev/null
++++ b/core/libs/Audio/loop_fill.h
+@@ -0,0 +1,77 @@
++#ifndef LOOP_FILL_H_
++#define LOOP_FILL_H_
++
++#include <stdint.h>
++
++// Writes `count` samples to `out`, reading `data` cyclically from `position`.
++// `position` is advanced modulo `length`. With `length == 0` the output is silence.
++// Pure function with no hardware dependencies, so it can be tested on a PC.
++inline void loopFillBlock(const int16_t* data, uint32_t length, uint32_t& position, int16_t* out, int count)
++{
++    if (length == 0 || data == nullptr)
++    {
++        for (int i = 0; i < count; i++)
++        {
++            out[i] = 0;
++        }
++        position = 0;
++        return;
++    }
++
++    if (position >= length)
++    {
++        position %= length;
++    }
++
++    for (int i = 0; i < count; i++)
++    {
++        out[i] = data[position];
++        if (++position >= length)
++        {
++            position = 0;
++        }
++    }
++}
++
++
++// Mixes several looping mono regions into `out`, all read at the same position so they stay in
++// sync. `tracks[i]` may be nullptr (silent). Each region is `length` samples long. The sum is
++// clipped to 16 bits. `position` is where the block starts; the caller advances it.
++inline void loopMixBlock(const int16_t* const* tracks,
++                         int trackCount,
++                         uint32_t length,
++                         uint32_t position,
++                         int16_t* out,
++                         int count)
++{
++    if (length == 0)
++    {
++        for (int i = 0; i < count; i++)
++        {
++            out[i] = 0;
++        }
++        return;
++    }
++
++    uint32_t pos = position % length;
++    for (int i = 0; i < count; i++)
++    {
++        int32_t sum = 0;
++        for (int t = 0; t < trackCount; t++)
++        {
++            if (tracks[t] != nullptr)
++            {
++                sum += tracks[t][pos];
++            }
++        }
++        if (sum > 32767) sum = 32767;
++        if (sum < -32768) sum = -32768;
++        out[i] = (int16_t)sum;
++        if (++pos >= length)
++        {
++            pos = 0;
++        }
++    }
++}
++
++#endif /* LOOP_FILL_H_ */
+diff --git a/core/libs/Audio/mixer.cpp b/core/libs/Audio/mixer.cpp
+index 4581e6a..91542ae 100644
+--- a/core/libs/Audio/mixer.cpp
++++ b/core/libs/Audio/mixer.cpp
+@@ -70,6 +70,7 @@ AUDIO_CORE_RAM void AudioMixer<mixerSize>::update(void)
+ // for every class in one .cpp file (to avoid symbol visibility issues)
+ template class AudioMixer<2>;
+ template class AudioMixer<4>;
++template class AudioMixer<5>; // master mixer with the four-track loop input
+ template class AudioMixer<7>;
+ template class AudioMixer<8>;
+ template class AudioMixer<10>;
+diff --git a/core/libs/Audio/play_loops.cpp b/core/libs/Audio/play_loops.cpp
+new file mode 100644
+index 0000000..54bb982
+--- /dev/null
++++ b/core/libs/Audio/play_loops.cpp
+@@ -0,0 +1,70 @@
++#include "play_loops.h"
++
++#include "Audio.h"
++
++void AudioPlayLoops::setTrack(int track, const int16_t* data)
++{
++    if (track < 0 || track >= kTracks)
++    {
++        return;
++    }
++    AudioNoInterrupts();
++    trackData[track] = data;
++    AudioInterrupts();
++}
++
++void AudioPlayLoops::setMute(int track, bool mute)
++{
++    if (track < 0 || track >= kTracks)
++    {
++        return;
++    }
++    muted[track] = mute;
++}
++
++void AudioPlayLoops::start(uint32_t lengthFrames)
++{
++    AudioNoInterrupts();
++    loopLength = lengthFrames;
++    currentPosition = 0;
++    playing = (lengthFrames > 0);
++    AudioInterrupts();
++}
++
++void AudioPlayLoops::stop()
++{
++    AudioNoInterrupts();
++    playing = false;
++    AudioInterrupts();
++}
++
++void AudioPlayLoops::update(void)
++{
++    if (!playing)
++    {
++        return;
++    }
++
++    audio_block_t* block = allocate();
++    if (block == nullptr)
++    {
++        return;
++    }
++
++    const int16_t* active[kTracks];
++    for (int t = 0; t < kTracks; t++)
++    {
++        active[t] = muted[t] ? nullptr : trackData[t];
++    }
++
++    const uint32_t length = loopLength;
++    loopMixBlock(active, kTracks, length, currentPosition, block->data, AUDIO_BLOCK_SAMPLES);
++
++    if (length > 0)
++    {
++        currentPosition = (currentPosition + AUDIO_BLOCK_SAMPLES) % length;
++    }
++
++    transmit(block, 0);
++    release(block);
++}
+diff --git a/core/libs/Audio/play_loops.h b/core/libs/Audio/play_loops.h
+new file mode 100644
+index 0000000..765b6e3
+--- /dev/null
++++ b/core/libs/Audio/play_loops.h
+@@ -0,0 +1,42 @@
++#ifndef play_loops_h_
++#define play_loops_h_
++
++#include "AudioStream.h"
++#include "loop_fill.h"
++
++// Plays up to four mono 16-bit regions of memory as looping tracks that share one loop length
++// and one position, so they stay in sync. Output 0 carries the mono mix.
++class AudioPlayLoops : public AudioStream
++{
++  public:
++    static constexpr int kTracks = 4;
++
++    AudioPlayLoops()
++      : AudioStream(0, NULL)
++    {
++    }
++
++    // `data` is the start of the track's samples, or nullptr for an empty track.
++    void setTrack(int track, const int16_t* data);
++    void setMute(int track, bool mute);
++
++    // Starts all tracks from the beginning, each `lengthFrames` long.
++    void start(uint32_t lengthFrames);
++    void stop();
++    bool isPlaying() const { return playing; }
++
++    // Frame position where the next block starts, and the loop length.
++    uint32_t position() const { return currentPosition; }
++    uint32_t length() const { return loopLength; }
++
++    virtual void update(void) override;
++
++  private:
++    const int16_t* volatile trackData[kTracks] = {};
++    volatile bool muted[kTracks] = {};
++    volatile uint32_t loopLength = 0;
++    volatile uint32_t currentPosition = 0;
++    volatile bool playing = false;
++};
++
++#endif
+diff --git a/core/source/FourTrackSession.cpp b/core/source/FourTrackSession.cpp
+new file mode 100644
+index 0000000..737ab18
+--- /dev/null
++++ b/core/source/FourTrackSession.cpp
+@@ -0,0 +1,124 @@
++#include "FourTrackSession.h"
++
++int FourTrackSession::partCount() const
++{
++    int n = 0;
++    for (int i = 0; i < kTracks; i++)
++    {
++        if (parts[i])
++        {
++            n++;
++        }
++    }
++    return n;
++}
++
++void FourTrackSession::selectTrack(int track)
++{
++    if (currentMode != Mode::Idle || track < 0 || track >= kTracks)
++    {
++        return;
++    }
++    selectedTrack = track;
++}
++
++void FourTrackSession::pressRecord()
++{
++    if (currentMode != Mode::Idle)
++    {
++        return;
++    }
++
++    activeTrack = selectedTrack;
++    const bool onlyPartIsThis = (partCount() == 1 && parts[selectedTrack]);
++    if (loop == 0 || onlyPartIsThis)
++    {
++        currentMode = Mode::RecordingFirst;
++        firstFrames = 0;
++        full = false;
++        isPlaying = false;
++    }
++    else
++    {
++        currentMode = Mode::Armed;
++        isPlaying = true;
++    }
++}
++
++void FourTrackSession::pressStop()
++{
++    switch (currentMode)
++    {
++        case Mode::RecordingFirst: finishFirst(firstFrames); break;
++        case Mode::Armed:
++        case Mode::RecordingPart: currentMode = Mode::Idle; break;
++        case Mode::Idle: isPlaying = false; break;
++    }
++}
++
++void FourTrackSession::pressPlay()
++{
++    if (currentMode == Mode::Idle && loop > 0)
++    {
++        isPlaying = true;
++    }
++}
++
++void FourTrackSession::firstRecordedFrames(uint32_t frames, bool memoryFull)
++{
++    if (currentMode != Mode::RecordingFirst)
++    {
++        return;
++    }
++
++    firstFrames = frames;
++    if (firstFrames >= maxFrames)
++    {
++        firstFrames = maxFrames;
++        full = true;
++    }
++    else if (memoryFull)
++    {
++        full = true;
++    }
++
++    if (full)
++    {
++        finishFirst(firstFrames);
++    }
++}
++
++void FourTrackSession::armWindowReached()
++{
++    if (currentMode == Mode::Armed)
++    {
++        currentMode = Mode::RecordingPart;
++    }
++}
++
++void FourTrackSession::partRecorded()
++{
++    if (currentMode == Mode::RecordingPart)
++    {
++        parts[activeTrack] = true;
++        currentMode = Mode::Idle;
++    }
++}
++
++void FourTrackSession::finishFirst(uint32_t frames)
++{
++    currentMode = Mode::Idle;
++    if (frames == 0)
++    {
++        // Nothing recorded: keep whatever was there before.
++        isPlaying = (loop > 0);
++        return;
++    }
++
++    loop = frames;
++    for (int i = 0; i < kTracks; i++)
++    {
++        parts[i] = (i == activeTrack);
++    }
++    isPlaying = true;
++}
+diff --git a/core/source/FourTrackSession.h b/core/source/FourTrackSession.h
+new file mode 100644
+index 0000000..d210765
+--- /dev/null
++++ b/core/source/FourTrackSession.h
+@@ -0,0 +1,68 @@
++#ifndef FOURTRACKSESSION_H_
++#define FOURTRACKSESSION_H_
++
++#include <stdint.h>
++
++// Pure logic for the four-track test build: which track is selected, what Rec, Stop and Play
++// do in each mode, and when a Part exists. No hardware, so it is tested on a PC
++// (tests/host/four_track_session_test.cpp). The engine glue reports events to it.
++class FourTrackSession
++{
++  public:
++    static constexpr int kTracks = 4;
++
++    enum class Mode : uint8_t
++    {
++        Idle,
++        RecordingFirst, // free length; its length becomes the loop
++        Armed,          // waiting for the loop to come round
++        RecordingPart   // recording exactly one loop
++    };
++
++    explicit FourTrackSession(uint32_t maxLoopFrames)
++      : maxFrames(maxLoopFrames)
++    {
++    }
++
++    Mode mode() const { return currentMode; }
++    bool playing() const { return isPlaying; }
++    int selected() const { return selectedTrack; }
++    uint32_t loopFrames() const { return loop; }
++    bool memoryFull() const { return full; }
++    bool hasPart(int track) const { return track >= 0 && track < kTracks && parts[track]; }
++    int partCount() const;
++    // The track being recorded or armed, or -1.
++    int recordingTrack() const { return currentMode == Mode::Idle ? -1 : activeTrack; }
++
++    // Only changes the selection while idle.
++    void selectTrack(int track);
++
++    // Idle with no loop, or re-recording the only Part: a new first take (free length).
++    // Idle with a loop: arm the selected track (starts the loop if stopped).
++    void pressRecord();
++    // First take: keeps what was recorded and starts the loop. Armed or recording a Part: cancels,
++    // keeping the old Part. Idle: stops the loop.
++    void pressStop();
++    // Idle with a loop: starts it.
++    void pressPlay();
++
++    // Events from the engine side.
++    void firstRecordedFrames(uint32_t frames, bool memoryFull); // during RecordingFirst
++    void armWindowReached();                                    // Armed -> RecordingPart
++    void partRecorded();                                        // RecordingPart -> Idle
++
++  private:
++    void finishFirst(uint32_t frames);
++
++    uint32_t maxFrames;
++    uint32_t loop = 0;
++    uint32_t firstFrames = 0;
++    bool full = false;
++    bool isPlaying = false;
++    bool parts[kTracks] = { false, false, false, false };
++    int selectedTrack = 0;
++    int activeTrack = 0;
++    Mode currentMode = Mode::Idle;
++};
++
++#endif /* FOURTRACKSESSION_H_ */
+diff --git a/core/source/Recorder.cpp b/core/source/Recorder.cpp
+index a78a481..3e56005 100644
+--- a/core/source/Recorder.cpp
++++ b/core/source/Recorder.cpp
+@@ -31,6 +31,11 @@ void Recorder::setConfig(Config config)
+     }
+ }
+ 
++void Recorder::setFirstBlockCallback(std::function<void(void)> firstBlockCallback)
++{
++    Recorder::firstBlockCallback = firstBlockCallback;
++}
++
+ // todo: SR->fullMemoryDuringRecordFlag this flag should be set
+ void Recorder::setFullMemoryCallback(std::function<void(void)> fullMemoryCallback)
+ {
+@@ -78,6 +83,7 @@ void Recorder::record()
+ 
+     isActive = true;
+     recordingHeadIdx = 0;
++    DestinationChannelConfig::length = 0; // a new recording starts empty, not at the last length
+ }
+ 
+ void Recorder::update()
+@@ -151,6 +157,10 @@ void Recorder::update()
+             {
+                 if (recordingQueue[0]->available() > 0)
+                 {
++                    if (recordingHeadIdx == 0 && firstBlockCallback != nullptr)
++                    {
++                        firstBlockCallback();
++                    }
+                     memcpy(&channelConfig[0].initialAddress[recordingHeadIdx],
+                            recordingQueue[0]->readBuffer(),
+                            sizeof(int16_t) * AUDIO_BLOCK_SAMPLES);
+diff --git a/core/source/Recorder.h b/core/source/Recorder.h
+index c0e87aa..d22f7cd 100644
+--- a/core/source/Recorder.h
++++ b/core/source/Recorder.h
+@@ -29,6 +29,8 @@ class Recorder
+     void update();
+     void setConfig(Config config);
+     void setFullMemoryCallback(std::function<void(void)> fullMemoryCallback);
++    // Called from the audio interrupt just before the first block of a recording is copied.
++    void setFirstBlockCallback(std::function<void(void)> firstBlockCallback);
+ 
+     void record();
+     void stop();
+@@ -61,6 +63,7 @@ class Recorder
+     bool isActive = false;
+     uint32_t recordingHeadIdx;
+     std::function<void(void)> fullMemoryCallback = nullptr;
++    std::function<void(void)> firstBlockCallback = nullptr;
+ };
+ 
+ extern Recorder recorder;
+diff --git a/tests/host/four_track_session_test.cpp b/tests/host/four_track_session_test.cpp
+new file mode 100644
+index 0000000..b00c4fa
+--- /dev/null
++++ b/tests/host/four_track_session_test.cpp
+@@ -0,0 +1,164 @@
++#include "../../core/source/FourTrackSession.h"
++
++#include <cstdio>
++
++static int failures = 0;
++#define CHECK(cond, msg)                                       \
++    do                                                         \
++    {                                                          \
++        if (!(cond))                                           \
++        {                                                      \
++            std::printf("FAIL: %s (line %d)\n", msg, __LINE__); \
++            failures++;                                        \
++        }                                                      \
++    } while (0)
++
++using Mode = FourTrackSession::Mode;
++
++static FourTrackSession withLoop(uint32_t maxFrames, uint32_t loopFrames)
++{
++    FourTrackSession s(maxFrames);
++    s.pressRecord();
++    s.firstRecordedFrames(loopFrames, false);
++    s.pressStop();
++    return s;
++}
++
++int main()
++{
++    const uint32_t kMax = 1000;
++
++    {
++        FourTrackSession s(kMax);
++        CHECK(s.mode() == Mode::Idle && s.loopFrames() == 0 && !s.playing(), "starts idle, empty, stopped");
++        CHECK(s.selected() == 0, "track 1 selected");
++        s.pressPlay();
++        CHECK(!s.playing(), "play with no loop does nothing");
++        s.pressStop();
++        CHECK(s.mode() == Mode::Idle, "stop with nothing does nothing");
++    }
++    {   // first Part sets the loop and starts playing
++        FourTrackSession s(kMax);
++        s.pressRecord();
++        CHECK(s.mode() == Mode::RecordingFirst && s.recordingTrack() == 0, "rec with no loop records the first Part");
++        s.firstRecordedFrames(400, false);
++        s.pressStop();
++        CHECK(s.mode() == Mode::Idle && s.loopFrames() == 400 && s.hasPart(0), "stop keeps the first Part and sets the loop");
++        CHECK(s.playing(), "loop plays right after the first Part");
++        CHECK(!s.memoryFull(), "not full");
++    }
++    {   // nothing recorded keeps things empty
++        FourTrackSession s(kMax);
++        s.pressRecord();
++        s.pressStop();
++        CHECK(s.loopFrames() == 0 && !s.hasPart(0) && s.mode() == Mode::Idle, "stop with zero frames sets no loop");
++    }
++    {   // the first Part can be on any track
++        FourTrackSession s(kMax);
++        s.selectTrack(2);
++        s.pressRecord();
++        s.firstRecordedFrames(300, false);
++        s.pressStop();
++        CHECK(s.hasPart(2) && !s.hasPart(0) && s.loopFrames() == 300, "first Part on track 3");
++    }
++    {   // memory cap stops the first take by itself and keeps it
++        FourTrackSession s(kMax);
++        s.pressRecord();
++        s.firstRecordedFrames(kMax + 50, false);
++        CHECK(s.mode() == Mode::Idle && s.loopFrames() == kMax && s.memoryFull(), "cap stops and clamps the first Part");
++        FourTrackSession t(kMax);
++        t.pressRecord();
++        t.firstRecordedFrames(700, true);
++        CHECK(t.mode() == Mode::Idle && t.loopFrames() == 700 && t.memoryFull(), "memory full below the cap keeps the take");
++    }
++    {   // a later Part: arm, window, record, done
++        FourTrackSession s = withLoop(kMax, 500);
++        s.selectTrack(1);
++        s.pressRecord();
++        CHECK(s.mode() == Mode::Armed && s.recordingTrack() == 1, "rec on another track arms it");
++        CHECK(s.playing(), "arming keeps the loop playing");
++        s.armWindowReached();
++        CHECK(s.mode() == Mode::RecordingPart, "window reached starts recording");
++        s.partRecorded();
++        CHECK(s.mode() == Mode::Idle && s.hasPart(1) && s.hasPart(0) && s.loopFrames() == 500, "Part added, loop unchanged");
++        CHECK(s.playing(), "still playing");
++    }
++    {   // arming from stopped starts the loop
++        FourTrackSession s = withLoop(kMax, 500);
++        s.pressStop();
++        CHECK(!s.playing(), "stopped");
++        s.selectTrack(1);
++        s.pressRecord();
++        CHECK(s.mode() == Mode::Armed && s.playing(), "arm from stopped starts playing");
++    }
++    {   // stop cancels an armed or running part and keeps the old state
++        FourTrackSession s = withLoop(kMax, 500);
++        s.selectTrack(1);
++        s.pressRecord();
++        s.pressStop();
++        CHECK(s.mode() == Mode::Idle && !s.hasPart(1) && s.playing(), "stop cancels the arm and keeps playing");
++        s.pressRecord();
++        s.armWindowReached();
++        s.pressStop();
++        CHECK(s.mode() == Mode::Idle && !s.hasPart(1) && s.playing(), "stop discards a take in progress");
++        s.pressStop();
++        CHECK(!s.playing(), "stop again stops the loop");
++        s.pressPlay();
++        CHECK(s.playing(), "play restarts it");
++    }
++    {   // re-recording a track that has a Part replaces it on the next take, keeps the old one if cancelled
++        FourTrackSession s = withLoop(kMax, 500);
++        s.selectTrack(1);
++        s.pressRecord();
++        s.armWindowReached();
++        s.partRecorded();
++        s.pressRecord(); // track 2 again
++        s.pressStop();
++        CHECK(s.hasPart(1), "a cancelled re-record keeps the old Part");
++    }
++    {   // the only Part can be re-recorded from scratch, which redefines the loop
++        FourTrackSession s = withLoop(kMax, 500);
++        s.pressRecord();
++        CHECK(s.mode() == Mode::RecordingFirst, "re-recording the only Part is a new first take");
++        s.pressStop(); // nothing recorded
++        CHECK(s.loopFrames() == 500 && s.hasPart(0), "cancelled new first take keeps the old loop");
++        s.pressRecord();
++        s.firstRecordedFrames(250, false);
++        s.pressStop();
++        CHECK(s.loopFrames() == 250, "a new first take redefines the loop");
++    }
++    {   // with two Parts, re-recording the first is a normal later take
++        FourTrackSession s = withLoop(kMax, 500);
++        s.selectTrack(1);
++        s.pressRecord();
++        s.armWindowReached();
++        s.partRecorded();
++        s.selectTrack(0);
++        s.pressRecord();
++        CHECK(s.mode() == Mode::Armed, "with other Parts present, re-recording track 1 is a normal take");
++    }
++    {   // selecting and ignoring
++        FourTrackSession s = withLoop(kMax, 500);
++        s.selectTrack(3);
++        CHECK(s.selected() == 3, "select track 4");
++        s.selectTrack(9);
++        CHECK(s.selected() == 3, "out of range select is ignored");
++        s.pressRecord();
++        s.selectTrack(1);
++        CHECK(s.selected() == 3, "cannot change track while armed");
++        s.armWindowReached();
++        s.pressRecord();
++        CHECK(s.mode() == Mode::RecordingPart, "rec while recording is ignored");
++        s.pressPlay();
++        CHECK(s.mode() == Mode::RecordingPart, "play while recording is ignored");
++    }
++    {   // events in the wrong mode are ignored
++        FourTrackSession s(kMax);
++        s.armWindowReached();
++        s.partRecorded();
++        s.firstRecordedFrames(100, false);
++        CHECK(s.mode() == Mode::Idle && s.loopFrames() == 0, "stray events do nothing");
++    }
++    std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
++    return failures ? 1 : 0;
++}
+diff --git a/tests/host/loop_fill_test.cpp b/tests/host/loop_fill_test.cpp
+new file mode 100644
+index 0000000..d85dd80
+--- /dev/null
++++ b/tests/host/loop_fill_test.cpp
+@@ -0,0 +1,72 @@
++#include "../../core/libs/Audio/loop_fill.h"
++
++#include <cstdio>
++#include <vector>
++
++static int failures = 0;
++#define CHECK(cond, msg)                                       \
++    do                                                         \
++    {                                                          \
++        if (!(cond))                                           \
++        {                                                      \
++            std::printf("FAIL: %s (line %d)\n", msg, __LINE__); \
++            failures++;                                        \
++        }                                                      \
++    } while (0)
++
++int main()
++{
++    // Wraps across the end: three blocks of 4 over a loop of 6 repeat the data with no gap.
++    {
++        const int16_t data[6] = { 1, 2, 3, 4, 5, 6 };
++        uint32_t pos = 0;
++        std::vector<int16_t> out;
++        for (int b = 0; b < 3; b++)
++        {
++            int16_t blk[4];
++            loopFillBlock(data, 6, pos, blk, 4);
++            out.insert(out.end(), blk, blk + 4);
++        }
++        const int16_t expect[12] = { 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6 };
++        bool same = out.size() == 12;
++        for (int i = 0; same && i < 12; i++) same = out[i] == expect[i];
++        CHECK(same, "loop repeats data with no gap across the boundary");
++        CHECK(pos == 0, "position is back to 0 after 12 samples of a 6 loop");
++    }
++    // Position advances modulo length.
++    {
++        const int16_t data[5] = { 10, 20, 30, 40, 50 };
++        uint32_t pos = 3;
++        int16_t blk[4];
++        loopFillBlock(data, 5, pos, blk, 4);
++        CHECK(blk[0] == 40 && blk[1] == 50 && blk[2] == 10 && blk[3] == 20, "starts from position and wraps");
++        CHECK(pos == 2, "position advanced modulo length");
++    }
++    // Length 0 gives silence and leaves position at 0.
++    {
++        uint32_t pos = 7;
++        int16_t blk[4] = { 9, 9, 9, 9 };
++        loopFillBlock(nullptr, 0, pos, blk, 4);
++        CHECK(blk[0] == 0 && blk[1] == 0 && blk[2] == 0 && blk[3] == 0, "zero length gives zeros");
++        CHECK(pos == 0, "zero length resets position");
++    }
++    // Loop shorter than the block repeats several times inside one block.
++    {
++        const int16_t data[2] = { 7, 8 };
++        uint32_t pos = 0;
++        int16_t blk[5];
++        loopFillBlock(data, 2, pos, blk, 5);
++        CHECK(blk[0] == 7 && blk[1] == 8 && blk[2] == 7 && blk[3] == 8 && blk[4] == 7, "short loop repeats inside one block");
++        CHECK(pos == 1, "position after odd count");
++    }
++    // A position beyond the length (for example after a shorter new recording) is brought back in range.
++    {
++        const int16_t data[3] = { 1, 2, 3 };
++        uint32_t pos = 100;
++        int16_t blk[3];
++        loopFillBlock(data, 3, pos, blk, 3);
++        CHECK(pos < 3, "out of range position is wrapped");
++    }
++    std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
++    return failures ? 1 : 0;
++}
+diff --git a/tests/host/loop_mix_test.cpp b/tests/host/loop_mix_test.cpp
+new file mode 100644
+index 0000000..056a6c3
+--- /dev/null
++++ b/tests/host/loop_mix_test.cpp
+@@ -0,0 +1,76 @@
++#include "../../core/libs/Audio/loop_fill.h"
++
++#include <cstdio>
++
++static int failures = 0;
++#define CHECK(cond, msg)                                       \
++    do                                                         \
++    {                                                          \
++        if (!(cond))                                           \
++        {                                                      \
++            std::printf("FAIL: %s (line %d)\n", msg, __LINE__); \
++            failures++;                                        \
++        }                                                      \
++    } while (0)
++
++int main()
++{
++    // Two tracks are summed sample by sample.
++    {
++        const int16_t a[4] = { 1, 2, 3, 4 };
++        const int16_t b[4] = { 10, 20, 30, 40 };
++        const int16_t* tracks[2] = { a, b };
++        int16_t out[4];
++        loopMixBlock(tracks, 2, 4, 0, out, 4);
++        CHECK(out[0] == 11 && out[1] == 22 && out[2] == 33 && out[3] == 44, "two tracks sum");
++    }
++    // The block wraps past the end of the loop with no gap, for every track.
++    {
++        const int16_t a[3] = { 1, 2, 3 };
++        const int16_t b[3] = { 100, 200, 300 };
++        const int16_t* tracks[2] = { a, b };
++        int16_t out[5];
++        loopMixBlock(tracks, 2, 3, 2, out, 5); // starts at the last sample
++        CHECK(out[0] == 303 && out[1] == 101 && out[2] == 202 && out[3] == 303 && out[4] == 101, "wraps together");
++    }
++    // A null track is silent and the others still play.
++    {
++        const int16_t a[2] = { 5, 6 };
++        const int16_t* tracks[3] = { nullptr, a, nullptr };
++        int16_t out[2];
++        loopMixBlock(tracks, 3, 2, 0, out, 2);
++        CHECK(out[0] == 5 && out[1] == 6, "null tracks are skipped");
++    }
++    // The sum is clipped, not wrapped around.
++    {
++        const int16_t a[1] = { 30000 };
++        const int16_t b[1] = { 30000 };
++        const int16_t c[1] = { -30000 };
++        const int16_t d[1] = { -30000 };
++        const int16_t* hi[2] = { a, b };
++        const int16_t* lo[2] = { c, d };
++        int16_t out[1];
++        loopMixBlock(hi, 2, 1, 0, out, 1);
++        CHECK(out[0] == 32767, "clips high");
++        loopMixBlock(lo, 2, 1, 0, out, 1);
++        CHECK(out[0] == -32768, "clips low");
++    }
++    // Zero length or no tracks is silence.
++    {
++        int16_t out[3] = { 7, 7, 7 };
++        const int16_t a[1] = { 9 };
++        const int16_t* tracks[1] = { a };
++        loopMixBlock(tracks, 1, 0, 0, out, 3);
++        CHECK(out[0] == 0 && out[1] == 0 && out[2] == 0, "zero length is silence");
++    }
++    // A position beyond the loop length is wrapped into range.
++    {
++        const int16_t a[3] = { 1, 2, 3 };
++        const int16_t* tracks[1] = { a };
++        int16_t out[2];
++        loopMixBlock(tracks, 1, 3, 100, out, 2); // 100 % 3 == 1
++        CHECK(out[0] == 2 && out[1] == 3, "out of range position wraps");
++    }
++    std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
++    return failures ? 1 : 0;
++}
