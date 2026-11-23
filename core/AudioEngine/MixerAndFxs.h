@@ -25,7 +25,8 @@ class MixerAndFxs
         kDryMixChannel,
         kDelayChannel,
         kReverbChannel,
-        kInputChannel
+        kInputChannel,
+        kLoopChannel // looped Part of the four-track test build
     };
 
     static constexpr int kExternalInputsCount = 1;
@@ -33,7 +34,7 @@ class MixerAndFxs
     static constexpr int kSendsInputsCount = kFirstSynthSendInput + kSynthParts;
     static constexpr int kTrackMixerOutputsCount = 1;
     static constexpr int kTrackAndSendsMixerInputs =
-      kTrackMixerOutputsCount + kExternalInputsCount + FxType::kFxCount;
+      kTrackMixerOutputsCount + kExternalInputsCount + FxType::kFxCount + 1; // +1: loop player
     static constexpr int kTracksAndSynthVoices = voicesCount + kSynthParts;
 
     MixerAndFxs();
