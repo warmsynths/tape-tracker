@@ -1,0 +1,579 @@
+<title>Four-Track Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap">
+<style>
+/* Layout: a hardware-screen stage (loop info, four lanes, bars prompt) over free play, settings, walkthroughs and a plain-language log.
+   Single dark look by choice: it imitates a small device screen. One accent (tape amber) plus record red. */
+:root{
+  color-scheme:dark;
+  --bg:#12110e; --panel:#1b1914; --panel2:#24211a; --line:#3a352a;
+  --text:#e9e2cf; --dim:#9a9279; --accent:#e9a43a; --rec:#ff5b4a; --ok:#86c47c;
+  --ui:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --head:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--ui);font-size:13px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 40px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font:600 26px/1.1 var(--head);margin:0;letter-spacing:.01em}
+h2{font:600 12px/1 var(--head);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:0 0 10px}
+p{margin:0}
+.q{background:var(--panel);border:1px solid var(--line);padding:12px 14px;color:var(--dim);max-width:78ch}
+.q b{color:var(--text);font-weight:500}
+.note{color:var(--dim)}
+.stage{background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;outline:none}
+.stage:focus-visible{border-color:var(--accent)}
+.top{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.mode{font:600 15px var(--head);letter-spacing:.08em;text-transform:uppercase;min-width:11ch}
+.mode.rec{color:var(--rec)} .mode.arm{color:var(--accent)}
+.top .kv{color:var(--dim)} .top .kv b{color:var(--text);font-weight:500}
+.lanes{position:relative;display:grid;grid-template-columns:minmax(128px,190px) 1fr}
+.lane-info,.lane-wave{border-bottom:1px solid var(--line);padding:8px 10px;min-width:0}
+.lane-info{border-right:1px solid var(--line);display:flex;flex-direction:column;gap:3px;cursor:pointer}
+.lane-info.sel{background:#2b261b;box-shadow:inset 3px 0 var(--accent)}
+.tn{font:600 20px/1 var(--head)} .tstate{font-size:11px;letter-spacing:.08em;color:var(--dim)}
+.tstate.rec{color:var(--rec)} .tstate.arm{color:var(--accent)} .tstate.mute{color:var(--dim);text-decoration:line-through}
+.off{font-size:11px;color:var(--dim)} .off b{color:var(--text);font-weight:500}
+.off .f{padding:0 3px;border:1px solid transparent} .off .f.on{border-color:var(--accent);color:var(--accent)}
+.lane-wave canvas{display:block;width:100%;height:64px;background:var(--bg)}
+.decision{font-size:11px;color:var(--dim);margin-top:4px;min-height:2.9em}
+.decision.ok{color:var(--ok)} .decision.warn{color:var(--accent)}
+.playhead{position:absolute;top:0;bottom:0;left:190px;right:0;pointer-events:none}
+.playhead i{position:absolute;top:0;bottom:0;left:0;width:2px;background:#fff;opacity:.85;transform:translateX(0)}
+@media (max-width:560px){.lanes{grid-template-columns:104px 1fr}.playhead{left:104px}.tn{font-size:16px}}
+.bars{display:none;padding:12px 14px;border-top:1px solid var(--line);background:#241f14}
+.bars.on{display:block}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;padding:6px 10px;cursor:pointer}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+.fnrow{display:grid;grid-template-columns:repeat(8,1fr);border-top:1px solid var(--line)}
+.fnrow span{padding:7px 4px;text-align:center;font-size:11px;color:var(--dim);border-right:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fnrow span:last-child{border-right:0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.card{background:var(--panel);border:1px solid var(--line);padding:14px;min-width:0}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);padding:7px 11px;cursor:pointer}
+button:hover{border-color:var(--accent)} button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button.primary{border-color:var(--accent);color:var(--accent)} button.recbtn{border-color:var(--rec);color:var(--rec)}
+.set{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center}
+select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);padding:5px 6px;min-width:0}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 12px} .keys dt{color:var(--accent)} .keys dd{margin:0;color:var(--dim)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tab{padding:6px 10px} .tab.on{border-color:var(--accent);color:var(--accent)}
+.steps{display:flex;flex-direction:column;gap:8px;margin-top:10px;align-items:flex-start}
+.steps button.done{opacity:.5} .steps button.next{border-color:var(--accent);color:var(--accent)}
+.log{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto;margin:0;padding:0;list-style:none}
+.log li{padding-left:10px;border-left:2px solid var(--line)} .log li:first-child{border-color:var(--accent);color:var(--text)} .log li{color:var(--dim)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Four-Track Prototype</h1>
+    <p class="note">Throwaway sketch of how recording, aligning and offsetting should feel. Not the final screen design.</p>
+  </header>
+
+  <div class="q"><b>The question this answers.</b> Does this model feel right? The first part you record sets the loop. Each later part records one loop, and its first note is moved onto the loop start if it lands close enough. You can then shift any part in milliseconds or bars. Play it with the keyboard, or use the walkthroughs below to see the awkward cases without needing good timing.</div>
+
+  <section class="stage" id="stage" tabindex="0" aria-label="Four-track screen. Click it, then use the keyboard.">
+    <div class="top">
+      <span class="mode" id="mode">Empty</span>
+      <span class="kv">loop <b id="kvLoop">not set</b></span>
+      <span class="kv">position <b id="kvPos">-</b></span>
+      <span class="kv">mode <b id="kvMode">repeat</b></span>
+      <span class="kv">window <b id="kvWin">off</b></span>
+    </div>
+    <div class="lanes" id="lanes"></div>
+    <div class="bars" id="barsPrompt">
+      <div><b>How many bars was that?</b> <span class="note" id="barsInfo"></span></div>
+      <div class="chips" id="barChips"></div>
+      <div class="note" style="margin-top:8px">Left/Right to choose, Enter to confirm. No audio is stretched; the tempo comes from the length you played.</div>
+    </div>
+    <div class="fnrow" aria-hidden="true"><span>Enter Rec</span><span>Space Play</span><span>1-4 Track</span><span>&larr; &rarr; Field</span><span>&uarr; &darr; Offset</span><span>Shift Coarse</span><span>Bksp Undo</span><span>Esc Cancel</span></div>
+  </section>
+
+  <div class="cols">
+    <section class="card">
+      <h2>Free play</h2>
+      <div class="btnrow" style="margin-bottom:12px">
+        <button class="recbtn" id="bRec">Rec (Enter)</button>
+        <button id="bPlay">Play / Stop (Space)</button>
+        <button id="bUndo">Undo (Backspace)</button>
+        <button id="bMute">Mute track</button>
+        <button id="bReset">Reset everything</button>
+      </div>
+      <h2>Settings</h2>
+      <div class="set">
+        <label for="sLoop">Loop mode</label>
+        <select id="sLoop"><option value="repeat">repeat</option><option value="once">play once</option></select>
+        <label for="sWin">Alignment window</label>
+        <select id="sWin"><option value="0">off</option><option value="30">&plusmn;30 ms</option><option value="60" selected>&plusmn;60 ms</option><option value="100">&plusmn;100 ms</option><option value="150">&plusmn;150 ms</option></select>
+        <label for="sPre">Pre-roll</label>
+        <select id="sPre"><option value="0">none</option><option value="60">60 ms</option><option value="120" selected>120 ms</option><option value="250">250 ms</option><option value="500">500 ms</option></select>
+        <label for="sRound">Tempo rounding</label>
+        <select id="sRound"><option value="off" selected>off (exact length)</option><option value="0.1">nearest 0.1 BPM</option><option value="1">nearest 1 BPM</option></select>
+        <label for="sClick">Click while playing</label>
+        <select id="sClick"><option value="0" selected>off (count-in only)</option><option value="1">on</option></select>
+      </div>
+      <p class="note" style="margin-top:10px">Window and pre-roll apply to the next take you record. The count-in before a part always clicks.</p>
+    </section>
+
+    <section class="card">
+      <h2>Keyboard</h2>
+      <dl class="keys">
+        <dt>Enter</dt><dd>Record. First take: press again to stop. Later: arms the selected track.</dd>
+        <dt>Space</dt><dd>Play / stop</dd>
+        <dt>1 2 3 4</dt><dd>Select track</dd>
+        <dt>Left / Right</dt><dd>Offset field (ms or bars). Chooses bars in the prompt.</dd>
+        <dt>Up / Down</dt><dd>Change offset. Ms: 1 ms, Shift 10 ms. Bars: 1 bar, Shift 1 beat.</dd>
+        <dt>Backspace</dt><dd>Undo the last take on the track</dd>
+        <dt>Esc</dt><dd>Cancel an armed take</dd>
+        <dt>A S D F G H J K L ;</dt><dd>Guitar plucks (A minor pentatonic)</dd>
+        <dt>Q W E R T Y U I O P</dt><dd>Bass plucks</dd>
+        <dt>Z X C V B N M , . /</dt><dd>Drums: kick, snare, hat, open hat, clap, tom, tom, rim, shaker, cowbell</dd>
+      </dl>
+      <p class="note" style="margin-top:10px">Click the screen once so it has keyboard focus. Browser keyboard timing is a few milliseconds loose, which is a fair stand-in for a human.</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Walkthroughs</h2>
+    <p class="note" style="margin-bottom:10px">Each tab resets to a known start and plays a scripted performance, so you can watch the rule at work. Press the steps in order.</p>
+    <div class="tabs" id="tabs"></div>
+    <p id="tabDesc"></p>
+    <div class="steps" id="steps"></div>
+  </section>
+
+  <section class="card">
+    <h2>What just happened</h2>
+    <ul class="log" id="log"></ul>
+  </section>
+</div>
+
+<script id="logic">
+/* ---------- LOGIC: pure, no DOM, no audio. This is the part worth keeping. ---------- */
+const FourTrack = (function () {
+  const NT = 4, BPB = 4, BAR_CHOICES = [1, 2, 4, 8, 16];
+  const mod = (a, n) => ((a % n) + n) % n;
+  const amp = db => Math.pow(10, db / 20);
+  const resize = (buf, len) => { const o = new Float32Array(len); o.set(buf.subarray(0, Math.min(len, buf.length))); return o; };
+
+  // First-note detector: 32-sample peak envelope, adaptive noise floor, 5 ms confirmation,
+  // back-search to the true start, then a zero-crossing snap. Returns a sample index or -1.
+  function detectFirstOnset(x, sr) {
+    const cell = 32, n = Math.floor(x.length / cell);
+    if (n < 8) return -1;
+    const env = new Float32Array(n);
+    for (let i = 0; i < n; i++) { let m = 0; for (let j = i * cell; j < (i + 1) * cell; j++) { const a = Math.abs(x[j]); if (a > m) m = a; } env[i] = m; }
+    const sorted = Array.from(env).sort((a, b) => a - b);
+    const floor = sorted[Math.floor(n * 0.1)];
+    const thr = Math.max(amp(-50), floor * 4);
+    const conf = Math.max(1, Math.round(0.005 * sr / cell));
+    for (let i = 0; i < n - conf; i++) {
+      if (env[i] < thr) continue;
+      let above = 0; for (let k = 0; k <= conf; k++) if (env[i + k] >= thr) above++;
+      if (above < Math.ceil((conf + 1) / 2)) continue;
+      const s = i * cell, lim = Math.max(0, s - Math.round(0.015 * sr));
+      let p = s; while (p > lim && Math.abs(x[p]) >= thr * 0.25) p--;
+      let q = p; while (q < s + cell && Math.abs(x[q]) < thr * 0.25) q++;
+      const zc = Math.round(0.001 * sr); let z = q;
+      for (let k = q; k > Math.max(1, q - zc); k--) { if ((x[k - 1] <= 0 && x[k] > 0) || (x[k - 1] >= 0 && x[k] < 0)) { z = k; break; } }
+      return z;
+    }
+    return -1;
+  }
+  const bpmFor = (len, bars, sr) => bars * BPB * 60 / (len / sr);
+  function pickBars(len, sr) {
+    let best = 4, bd = 1e9;
+    for (const b of BAR_CHOICES) { const bpm = bpmFor(len, b, sr); if (bpm < 60 || bpm > 160) continue; const d = Math.abs(bpm - 100); if (d < bd) { bd = d; best = b; } }
+    return best;
+  }
+  function roundedLen(len, bars, sr, rounding) {
+    if (rounding === 'off') return len;
+    const step = rounding === '1' ? 1 : 0.1;
+    const bpm = Math.round(bpmFor(len, bars, sr) / step) * step;
+    return Math.round(bars * BPB * 60 / bpm * sr);
+  }
+  const windowSamples = s => !s.bpm ? 0 : Math.min(s.settings.windowMs / 1000 * s.sr, (60 / s.bpm / 4 / 2) * s.sr);
+  const barSamples = s => s.loopLen / s.bars;
+  const onsetPos = (s, t) => { const p = s.tracks[t].part; return p ? mod(p.onsetRel + p.alignShift + p.offset, s.loopLen) : 0; };
+
+  // Where each sample of a part sits inside the loop, wrapping around the loop ends.
+  function render(s, t) {
+    const p = s.tracks[t].part, L = s.loopLen, out = new Float32Array(L || 0);
+    if (!p || !L) return out;
+    const shift = p.alignShift + p.offset;
+    for (let i = 0; i < p.raw.length; i++) out[mod(i - p.preRoll + shift, L)] += p.raw[i];
+    return out;
+  }
+
+  function init(sr) {
+    return { sr, status: 'empty', loopLen: 0, bars: 0, bpm: 0, pending: null, selected: 0,
+      tracks: Array.from({ length: NT }, () => ({ part: null, prev: null, mute: false })),
+      settings: { loopMode: 'repeat', windowMs: 60, preRollMs: 120, rounding: 'off', click: false }, log: [] };
+  }
+  const fmtMs = (s, n) => { const ms = n / s.sr * 1000, a = Math.abs(ms); return (ms < 0 ? '-' : '+') + (a >= 1000 ? (a / 1000).toFixed(2) + ' s' : a.toFixed(0) + ' ms'); };
+  const say = (s, m) => { s.log = [m, ...s.log].slice(0, 40); };
+  const wrapHalf = (x, L) => Math.round(mod(x + L / 2, L) - L / 2);
+
+  function reduce(state, a) {
+    const s = { ...state, tracks: state.tracks.map(t => ({ ...t })), settings: { ...state.settings }, log: state.log };
+    switch (a.type) {
+      case 'RESET': return init(state.sr);
+      case 'SELECT': s.selected = a.track; return s;
+      case 'SET_SETTING': s.settings[a.key] = a.value; return s;
+      case 'MUTE': s.tracks[a.track].mute = !s.tracks[a.track].mute; return s;
+      case 'FIRST_TAKE': {
+        const onset = detectFirstOnset(a.samples, s.sr);
+        if (onset < 0) { say(s, 'No note was heard in that take, so nothing was kept.'); return s; }
+        const trimmed = a.samples.subarray(onset);
+        s.pending = { trimmed, bars: pickBars(trimmed.length, s.sr) };
+        s.status = 'confirmBars';
+        say(s, `First take: your first note came ${(onset / s.sr * 1000).toFixed(0)} ms after you pressed record, so that silence was cut. The loop is ${(trimmed.length / s.sr).toFixed(2)} s long. Choose how many bars it was.`);
+        return s;
+      }
+      case 'SET_BARS': if (s.pending) s.pending = { ...s.pending, bars: a.bars }; return s;
+      case 'CONFIRM_BARS': {
+        if (!s.pending) return s;
+        const bars = s.pending.bars, raw0 = s.pending.trimmed;
+        const len = roundedLen(raw0.length, bars, s.sr, s.settings.rounding);
+        const raw = len === raw0.length ? raw0 : resize(raw0, len);
+        s.loopLen = len; s.bars = bars; s.bpm = bpmFor(len, bars, s.sr); s.pending = null; s.status = 'ready';
+        s.tracks[0].part = { raw, preRoll: 0, onsetRel: 0, aligned: true, alignShift: 0, offset: 0, reason: 'First part. It defines the loop, so it starts exactly on the loop start.' };
+        s.selected = 0;
+        say(s, `Loop set: ${bars} bar${bars > 1 ? 's' : ''} in ${(len / s.sr).toFixed(3)} s, which works out to ${s.bpm.toFixed(2)} BPM.` + (len !== raw0.length ? ` The end was ${len > raw0.length ? 'padded' : 'trimmed'} by ${Math.abs(len - raw0.length) / s.sr * 1000 | 0} ms to round the tempo.` : ''));
+        return s;
+      }
+      case 'PART_TAKE': {
+        if (s.status !== 'ready') return s;
+        const t = a.track, onset = detectFirstOnset(a.raw, s.sr);
+        if (onset < 0) { say(s, `Track ${t + 1}: no note was heard, so nothing was kept.`); return s; }
+        const win = windowSamples(s), onsetRel = onset - a.preRoll;
+        let aligned = false, shift = 0, reason;
+        if (win <= 0) reason = 'Alignment is off, so the part stays exactly as you played it.';
+        else if (Math.abs(onsetRel) <= win) { aligned = true; shift = -onsetRel; reason = `First note was ${fmtMs(s, onsetRel)} from the loop start, inside the window of ±${(win / s.sr * 1000).toFixed(0)} ms, so it was moved onto the loop start.`; }
+        else reason = `First note is ${fmtMs(s, onsetRel)} from the loop start, outside ±${(win / s.sr * 1000).toFixed(0)} ms, so it counts as a deliberate entry and stays where you played it.`;
+        s.tracks[t].prev = s.tracks[t].part;
+        s.tracks[t].part = { raw: a.raw, preRoll: a.preRoll, onsetRel, aligned, alignShift: shift, offset: 0, reason };
+        s.selected = t;
+        say(s, `Track ${t + 1}: ${reason}`);
+        return s;
+      }
+      case 'NUDGE': {
+        const p = s.tracks[a.track].part; if (!p || !s.loopLen) return s;
+        const delta = a.unit === 'ms' ? Math.round((a.coarse ? 10 : 1) / 1000 * s.sr) * a.dir : Math.round(barSamples(s) * (a.coarse ? 0.25 : 1)) * a.dir;
+        s.tracks[a.track].part = { ...p, offset: wrapHalf(p.offset + delta, s.loopLen) };
+        return s;
+      }
+      case 'SET_OFFSET': {
+        const p = s.tracks[a.track].part; if (!p) return s;
+        s.tracks[a.track].part = { ...p, offset: wrapHalf(a.offset, s.loopLen) };
+        say(s, `Track ${a.track + 1}: offset set to ${fmtMs(s, s.tracks[a.track].part.offset)}.`);
+        return s;
+      }
+      case 'UNDO': {
+        const t = s.tracks[a.track];
+        if (!t.prev) { say(s, `Track ${a.track + 1}: nothing to undo.`); return s; }
+        t.part = t.prev; t.prev = null; say(s, `Track ${a.track + 1}: previous take restored.`); return s;
+      }
+    }
+    return s;
+  }
+  return { NT, BPB, BAR_CHOICES, detectFirstOnset, bpmFor, pickBars, roundedLen, windowSamples, barSamples, onsetPos, render, init, reduce, fmtMs };
+})();
+if (typeof module !== 'undefined') module.exports = FourTrack;
+</script>
+
+<script id="shell">
+/* ---------- SHELL: audio, keyboard and screen. Throwaway. ---------- */
+(function () {
+  const FT = FourTrack, SR = 44100, $ = id => document.getElementById(id);
+  let S = FT.init(SR), ctx = null, master = null;
+  let rec = null, field = 'ms', tabIdx = 0, stepDone = 0, scenarioKey = '';
+  const T = { playing: false, epoch: 0, nodes: [null, null, null, null], nextClick: 0 };
+  const mod = (a, n) => ((a % n) + n) % n;
+
+  /* ---- sounds ---- */
+  const cache = {};
+  function rnd(seedObj) { seedObj.s = (seedObj.s * 1664525 + 1013904223) >>> 0; return seedObj.s / 4294967296 * 2 - 1; }
+  function ks(f, dur, damp, soft) {
+    const n = Math.floor(SR * dur), N = Math.max(2, Math.round(SR / f)), ring = new Float32Array(N), o = new Float32Array(n), r = { s: 12345 + N };
+    for (let i = 0; i < N; i++) ring[i] = rnd(r);
+    for (let p = 0; p < soft; p++) for (let i = 0; i < N; i++) ring[i] = (ring[i] + ring[(i + 1) % N]) / 2;
+    let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(ring[i]));
+    let idx = 0; for (let i = 0; i < n; i++) { const a = ring[idx], b = ring[(idx + 1) % N]; ring[idx] = (a + b) * 0.5 * damp; o[i] = a / pk * 0.5; idx = (idx + 1) % N; }
+    return o;
+  }
+  function synth(kind, f) {
+    const key = kind + f; if (cache[key]) return cache[key];
+    const r = { s: 777 }; let out;
+    const mk = (d, fn) => { const o = new Float32Array(Math.floor(SR * d)); for (let i = 0; i < o.length; i++) o[i] = fn(i / SR, i); return o; };
+    if (kind === 'guitar') out = ks(f, 1.8, 0.9965, 1);
+    else if (kind === 'bass') out = ks(f, 1.3, 0.9985, 4);
+    else if (kind === 'kick') { let ph = 0; out = mk(0.4, t => { ph += 2 * Math.PI * (45 + 105 * Math.exp(-t * 30)) / SR; return Math.sin(ph) * Math.exp(-t * 8) * 0.85; }); }
+    else if (kind === 'snare') out = mk(0.25, t => (rnd(r) * Math.exp(-t * 22) * 0.45 + Math.sin(2 * Math.PI * 185 * t) * Math.exp(-t * 28) * 0.4));
+    else if (kind === 'chat' || kind === 'ohat') { let pv = 0; const dk = kind === 'chat' ? 90 : 14; out = mk(kind === 'chat' ? 0.08 : 0.4, t => { const x = rnd(r); const y = x - pv; pv = x; return y * Math.exp(-t * dk) * 0.3; }); }
+    else if (kind === 'clap') out = mk(0.3, t => rnd(r) * (Math.exp(-t * 60) + Math.exp(-(t - 0.012) * 60) * (t > 0.012 ? 1 : 0) + Math.exp(-(t - 0.024) * 25) * (t > 0.024 ? 1 : 0)) * 0.3);
+    else if (kind === 'tomL' || kind === 'tomH') { const f0 = kind === 'tomL' ? 120 : 190; let ph = 0; out = mk(0.4, t => { ph += 2 * Math.PI * (f0 * 0.65 + f0 * 0.35 * Math.exp(-t * 14)) / SR; return Math.sin(ph) * Math.exp(-t * 9) * 0.7; }); }
+    else if (kind === 'rim') out = mk(0.08, t => Math.sin(2 * Math.PI * 820 * t) * Math.exp(-t * 120) * 0.5 + rnd(r) * Math.exp(-t * 200) * 0.2);
+    else if (kind === 'shaker') { let pv = 0; out = mk(0.14, t => { const x = rnd(r); const y = x - pv; pv = x; return y * Math.min(1, t / 0.015) * Math.exp(-t * 28) * 0.25; }); }
+    else out = mk(0.35, t => ((Math.sin(2 * Math.PI * 540 * t) > 0 ? 1 : -1) + (Math.sin(2 * Math.PI * 800 * t) > 0 ? 1 : -1)) * Math.exp(-t * 12) * 0.12);
+    return (cache[key] = out);
+  }
+  const KEYMAP = {};
+  'asdfghjkl;'.split('').forEach((k, i) => KEYMAP[k] = { kind: 'guitar', f: [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 783.99][i] });
+  'qwertyuiop'.split('').forEach((k, i) => KEYMAP[k] = { kind: 'bass', f: [55, 65.41, 73.42, 82.41, 98, 110, 130.81, 146.83, 164.81, 196][i] });
+  ['kick', 'snare', 'chat', 'ohat', 'clap', 'tomL', 'tomH', 'rim', 'shaker', 'cowbell'].forEach((k, i) => KEYMAP['zxcvbnm,./'[i]] = { kind: k, f: 0 });
+
+  /* ---- audio engine ---- */
+  function ensureAudio() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+      master = ctx.createGain(); master.gain.value = 0.8;
+      const comp = ctx.createDynamicsCompressor(); master.connect(comp); comp.connect(ctx.destination);
+      setInterval(tick, 25); requestAnimationFrame(frame);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+  function playBuf(buf, when, gain) {
+    const ab = ctx.createBuffer(1, buf.length, SR); ab.copyToChannel(buf, 0);
+    const n = ctx.createBufferSource(); n.buffer = ab; const g = ctx.createGain(); g.gain.value = gain == null ? 1 : gain;
+    n.connect(g); g.connect(master); n.start(when || 0); return { n, g };
+  }
+  const loopSec = () => S.loopLen / SR;
+  function startTrack(i) {
+    stopTrack(i);
+    if (!S.tracks[i].part || !T.playing) return;
+    const now = ctx.currentTime + 0.01; let when, phase;
+    if (now < T.epoch) { when = T.epoch; phase = 0; } else { when = now; phase = (now - T.epoch) % loopSec(); }
+    if (S.settings.loopMode === 'once' && now - T.epoch >= loopSec()) return;
+    const ab = ctx.createBuffer(1, S.loopLen, SR); ab.copyToChannel(FT.render(S, i), 0);
+    const n = ctx.createBufferSource(); n.buffer = ab; n.loop = S.settings.loopMode === 'repeat';
+    const g = ctx.createGain(); g.gain.value = S.tracks[i].mute ? 0 : 1; n.connect(g); g.connect(master);
+    n.start(when, phase); T.nodes[i] = { n, g };
+  }
+  function stopTrack(i) { const o = T.nodes[i]; if (o) { try { o.n.stop(); } catch (e) { } o.n.disconnect(); T.nodes[i] = null; } }
+  function refreshAudio() { if (ctx && T.playing) for (let i = 0; i < 4; i++) startTrack(i); }
+  function startPlayback(at) {
+    ensureAudio(); for (let i = 0; i < 4; i++) stopTrack(i);
+    T.playing = true; T.epoch = at; for (let i = 0; i < 4; i++) startTrack(i);
+    T.nextClick = Math.max(0, Math.ceil((ctx.currentTime - at) / (60 / S.bpm)));
+  }
+  function stopPlayback() { T.playing = false; for (let i = 0; i < 4; i++) stopTrack(i); }
+  function clickAt(t, accent) {
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = accent ? 1600 : 1100; o.type = 'square';
+    g.gain.setValueAtTime(0.14, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.03); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.04);
+  }
+  function tick() {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    if (T.playing && S.bpm && S.settings.click) {
+      const beat = 60 / S.bpm;
+      while (T.epoch + T.nextClick * beat < now + 0.12) { const t = T.epoch + T.nextClick * beat; if (t >= now - 0.01) clickAt(t, T.nextClick % 4 === 0); T.nextClick++; }
+    }
+    if (T.playing && S.settings.loopMode === 'once' && S.loopLen && now - T.epoch > loopSec() + 0.05 && !rec) { stopPlayback(); draw(); }
+    if (rec && rec.kind === 'part' && now >= rec.windowEnd + 0.03) finishPart();
+  }
+
+  /* ---- recording ---- */
+  function renderHits(hits, startSec, len) {
+    const buf = new Float32Array(len);
+    for (const h of hits) {
+      const idx = Math.round((h.t - startSec) * SR); if (idx < 0 || idx >= len) continue;
+      const s = synth(h.n.kind, h.n.f), m = Math.min(s.length, len - idx);
+      for (let i = 0; i < m; i++) buf[idx + i] += s[i];
+    }
+    return buf;
+  }
+  const preRollSamples = () => Math.round(S.settings.preRollMs / 1000 * SR);
+  function dispatch(a) { S = FT.reduce(S, a); if (['PART_TAKE', 'NUDGE', 'SET_OFFSET', 'UNDO', 'CONFIRM_BARS', 'MUTE', 'RESET'].includes(a.type) || (a.type === 'SET_SETTING' && a.key === 'loopMode')) { if (a.type === 'RESET') stopPlayback(); refreshAudio(); } draw(); }
+  function finishPart() {
+    const r = rec; rec = null;
+    const pre = r.pre, raw = renderHits(r.hits, r.windowStart, S.loopLen + pre);
+    dispatch({ type: 'PART_TAKE', track: r.track, raw, preRoll: pre });
+  }
+  function doRecord() {
+    ensureAudio(); const now = ctx.currentTime;
+    if (S.status === 'empty' && !rec) { rec = { kind: 'first', t0: now, hits: [] }; draw(); return; }
+    if (rec && rec.kind === 'first') {
+      const len = Math.round((now - rec.t0) * SR); const samples = renderHits(rec.hits, rec.t0, len); rec = null;
+      dispatch({ type: 'FIRST_TAKE', samples }); return;
+    }
+    if (S.status === 'confirmBars') { dispatch({ type: 'CONFIRM_BARS' }); startPlayback(ctx.currentTime + 0.1); draw(); return; }
+    if (S.status === 'ready' && !rec) {
+      const beat = 60 / S.bpm, pre = preRollSamples(); let T0;
+      if (T.playing && S.settings.loopMode === 'repeat') T0 = T.epoch + Math.ceil((now + 0.05 - T.epoch) / loopSec()) * loopSec;
+      else { T0 = now + 4 * beat + 0.1; for (let k = 4; k >= 1; k--) clickAt(T0 - k * beat, k === 4); startPlayback(T0); }
+      rec = { kind: 'part', track: S.selected, T0, windowStart: T0 - pre / SR, windowEnd: T0 + loopSec(), pre, hits: [] };
+      draw();
+    }
+  }
+  function cancelRec() { if (rec && rec.kind === 'part' && ctx.currentTime < rec.T0) { rec = null; stopPlayback(); draw(); } else if (rec && rec.kind === 'first') { rec = null; draw(); } }
+  function hit(n, t) { ensureAudio(); const when = t == null ? ctx.currentTime : t; playBuf(synth(n.kind, n.f), 0, 0.9); if (rec && (rec.kind === 'first' || (when >= rec.windowStart && when < rec.windowEnd))) rec.hits.push({ t: when, n }); }
+
+  /* ---- scripted performances for the walkthroughs ---- */
+  const PROG = [[220, 261.63, 329.63, 55], [174.61, 220, 261.63, 43.65], [261.63, 329.63, 392, 65.41], [196, 246.94, 293.66, 49]];
+  const jit = i => (((i * 37) % 11) - 5) / 1000;
+  function scriptedFirstTake() {
+    ensureAudio(); const beat = 60 / 92, lead = 0.35, hits = [];
+    for (let i = 0; i < 16; i++) { const c = PROG[Math.floor(i / 4) % 4]; hits.push({ t: lead + i * beat + jit(i), n: { kind: 'guitar', f: c[i % 3] } }); }
+    const len = Math.round((lead + 16 * beat + 0.04) * SR);
+    dispatch({ type: 'FIRST_TAKE', samples: renderHits(hits, 0, len) });
+  }
+  function scriptedPart(track, kind, shiftSec, startBar) {
+    const beat = 60 / S.bpm, bar = beat * 4, hits = [], nb = S.bars * 4;
+    for (let i = startBar * 4; i < nb; i++) {
+      const t0 = i * beat + shiftSec + jit(i + track);
+      if (kind === 'drums') {
+        const b = i % 4; hits.push({ t: t0, n: { kind: b % 2 === 0 ? 'kick' : 'snare', f: 0 } });
+        hits.push({ t: t0 + beat / 2 + jit(i * 3), n: { kind: 'chat', f: 0 } });
+      } else hits.push({ t: t0, n: { kind: 'bass', f: PROG[Math.floor(i / 4) % 4][3] } });
+    }
+    const pre = preRollSamples(), start = -pre / SR;
+    dispatch({ type: 'PART_TAKE', track, raw: renderHits(hits, start, S.loopLen + pre), preRoll: pre });
+  }
+  const sel = t => dispatch({ type: 'SELECT', track: t });
+  const confirm4 = () => dispatch({ type: 'SET_BARS', bars: 4 }) || dispatch({ type: 'CONFIRM_BARS' });
+  const play = () => { ensureAudio(); startPlayback(ctx.currentTime + 0.1); draw(); };
+  const SCEN = [
+    { name: 'First take sets the loop', desc: 'You record guitar for four bars. You started playing 0.35 s after pressing record and pressed stop 40 ms late. Watch the silence get cut and the BPM come out of the length you played.', setup: null,
+      steps: [['Record the guitar part (scripted)', () => scriptedFirstTake()], ['Choose 4 bars and confirm', () => { dispatch({ type: 'SET_BARS', bars: 4 }); dispatch({ type: 'CONFIRM_BARS' }); }], ['Play the loop', play]] },
+    { name: 'Drums 28 ms late', desc: 'The drummer hits the first kick 28 ms after the loop start. That is inside the window, so the whole part is moved earlier to sit exactly on the start.', setup: 'guitar',
+      steps: [['Select track 2', () => sel(1)], ['Record drums, first hit 28 ms late', () => scriptedPart(1, 'drums', 0.028, 0)], ['Play', play]] },
+    { name: 'Bass enters two bars late', desc: 'The bass sits out two bars on purpose. Its first note is far outside the window, so it must not be dragged back to bar 1.', setup: 'guitar',
+      steps: [['Select track 3', () => sel(2)], ['Record bass starting at bar 3', () => scriptedPart(2, 'bass', 0, 2)], ['Play', play]] },
+    { name: 'Early drums, fix with offset', desc: 'The drummer is 100 ms early. That is outside the ±60 ms window, so it is left alone, and you correct it by hand with an offset.', setup: 'guitar',
+      steps: [['Select track 2', () => sel(1)], ['Record drums, 100 ms early', () => scriptedPart(1, 'drums', -0.100, 0)], ['Set offset to +100 ms', () => dispatch({ type: 'SET_OFFSET', track: 1, offset: Math.round(0.1 * SR) })], ['Play', play]] },
+    { name: 'Offset by a bar', desc: 'Shift a part by whole bars. Up/Down on the keyboard does this when the bars field is selected; Shift moves by a beat.', setup: 'drums',
+      steps: [['Select track 2', () => sel(1)], ['Nudge +1 bar', () => dispatch({ type: 'NUDGE', track: 1, unit: 'bars', dir: 1, coarse: false })], ['Nudge -1 beat', () => dispatch({ type: 'NUDGE', track: 1, unit: 'bars', dir: -1, coarse: true })], ['Play', play]] },
+    { name: 'Play once instead of repeat', desc: 'With loop mode set to play once, the loop plays through a single time and stops.', setup: 'drums',
+      steps: [['Set loop mode to play once', () => { dispatch({ type: 'SET_SETTING', key: 'loopMode', value: 'once' }); $('sLoop').value = 'once'; }], ['Play', play]] }
+  ];
+  function setupScenario(i) {
+    stopPlayback(); rec = null; S = FT.init(SR); tabIdx = i; stepDone = 0; syncSettings();
+    const st = SCEN[i].setup;
+    if (st) { scriptedFirstTake(); dispatch({ type: 'SET_BARS', bars: 4 }); dispatch({ type: 'CONFIRM_BARS' }); if (st === 'drums') { scriptedPart(1, 'drums', 0.028, 0); } }
+    draw(); drawScen();
+  }
+  function drawScen() {
+    const tabs = $('tabs'); tabs.innerHTML = '';
+    SCEN.forEach((s, i) => { const b = document.createElement('button'); b.className = 'tab' + (i === tabIdx ? ' on' : ''); b.textContent = s.name; b.onclick = () => setupScenario(i); tabs.appendChild(b); });
+    $('tabDesc').textContent = SCEN[tabIdx].desc;
+    const box = $('steps'); box.innerHTML = '';
+    SCEN[tabIdx].steps.forEach((st, i) => {
+      const b = document.createElement('button'); b.textContent = (i + 1) + '. ' + st[0];
+      b.className = i < stepDone ? 'done' : i === stepDone ? 'next' : '';
+      b.onclick = () => { st[1](); stepDone = Math.max(stepDone, i + 1); drawScen(); };
+      box.appendChild(b);
+    });
+  }
+  function syncSettings() { $('sLoop').value = S.settings.loopMode; $('sWin').value = S.settings.windowMs; $('sPre').value = S.settings.preRollMs; $('sRound').value = S.settings.rounding; $('sClick').value = S.settings.click ? '1' : '0'; }
+
+  /* ---- screen ---- */
+  const lanesEl = $('lanes'), canv = [], infoEls = [], decEls = [], stEls = [], offEls = [];
+  for (let i = 0; i < 4; i++) {
+    const info = document.createElement('div'); info.className = 'lane-info'; info.onclick = () => { sel(i); $('stage').focus(); };
+    info.innerHTML = '<div class="tn">TRACK ' + (i + 1) + '</div><div class="tstate"></div><div class="off"></div>';
+    const wave = document.createElement('div'); wave.className = 'lane-wave';
+    const c = document.createElement('canvas'); const d = document.createElement('div'); d.className = 'decision'; wave.append(c, d);
+    lanesEl.append(info, wave); canv.push(c); infoEls.push(info); decEls.push(d); stEls.push(info.children[1]); offEls.push(info.children[2]);
+  }
+  const ph = document.createElement('div'); ph.className = 'playhead'; ph.innerHTML = '<i></i>'; lanesEl.appendChild(ph);
+  const phI = ph.firstChild;
+
+  function drawWave(i) {
+    const c = canv[i], dpr = window.devicePixelRatio || 1, w = Math.max(10, c.clientWidth), h = 64;
+    c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    const g = c.getContext('2d'); g.scale(dpr, dpr); g.fillStyle = '#12110e'; g.fillRect(0, 0, w, h);
+    const css = getComputedStyle(document.documentElement);
+    if (S.loopLen) {
+      g.strokeStyle = '#2a261d'; g.lineWidth = 1;
+      for (let b = 0; b <= S.bars * 4; b++) { const x = Math.round(b / (S.bars * 4) * (w - 1)) + .5; g.beginPath(); g.moveTo(x, b % 4 === 0 ? 0 : h - 6); g.lineTo(x, h); g.stroke(); }
+      g.strokeStyle = '#4a4333'; for (let b = 0; b <= S.bars; b++) { const x = Math.round(b / S.bars * (w - 1)) + .5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+    }
+    const p = S.tracks[i].part; if (!p) return;
+    const buf = FT.render(S, i), cols = Math.min(600, Math.floor(w)); let pk = 0.0001; for (let k = 0; k < buf.length; k += 7) pk = Math.max(pk, Math.abs(buf[k]));
+    g.fillStyle = S.tracks[i].mute ? '#6b6452' : css.getPropertyValue('--accent').trim() || '#e9a43a';
+    for (let x = 0; x < cols; x++) {
+      const a = Math.floor(x / cols * buf.length), b = Math.max(a + 1, Math.floor((x + 1) / cols * buf.length)); let mn = 0, mx = 0;
+      for (let k = a; k < b; k += 3) { const v = buf[k]; if (v < mn) mn = v; if (v > mx) mx = v; }
+      const y1 = h / 2 - mx / pk * (h / 2 - 4), y2 = h / 2 - mn / pk * (h / 2 - 4), xx = x / cols * w;
+      g.fillRect(xx, y1, Math.max(1, w / cols), Math.max(1, y2 - y1));
+    }
+    const ox = FT.onsetPos(S, i) / S.loopLen * w; g.fillStyle = '#86c47c'; g.beginPath(); g.moveTo(ox - 5, 0); g.lineTo(ox + 5, 0); g.lineTo(ox, 8); g.fill();
+  }
+  const human = n => { const ms = n / SR * 1000, a = Math.abs(ms); return (ms < 0 ? '-' : '+') + (a >= 1000 ? (a / 1000).toFixed(2) + ' s' : a.toFixed(0) + ' ms'); };
+  function draw() {
+    for (let i = 0; i < 4; i++) {
+      const t = S.tracks[i], p = t.part, armed = rec && rec.kind === 'part' && rec.track === i;
+      infoEls[i].classList.toggle('sel', S.selected === i);
+      const st = stEls[i]; st.className = 'tstate';
+      if (armed) { st.classList.add(ctx && ctx.currentTime >= rec.windowStart ? 'rec' : 'arm'); st.textContent = ctx && ctx.currentTime >= rec.windowStart ? 'RECORDING' : 'ARMED'; }
+      else if (rec && rec.kind === 'first' && i === 0) { st.classList.add('rec'); st.textContent = 'RECORDING'; }
+      else if (t.mute) { st.classList.add('mute'); st.textContent = 'MUTED'; }
+      else st.textContent = p ? 'PART' : 'EMPTY';
+      if (p && S.loopLen) {
+        const bs = FT.barSamples(S);
+        offEls[i].innerHTML = 'offset <span class="f ' + (field === 'ms' && S.selected === i ? 'on' : '') + '"><b>' + human(p.offset) + '</b></span><br><span class="f ' + (field === 'bars' && S.selected === i ? 'on' : '') + '"><b>' + (p.offset / bs >= 0 ? '+' : '') + (p.offset / bs).toFixed(2) + ' bar</b></span>';
+        decEls[i].textContent = p.reason; decEls[i].className = 'decision ' + (p.aligned && i > 0 ? 'ok' : (p.reason.indexOf('deliberate') >= 0 ? 'warn' : ''));
+      } else { offEls[i].textContent = ''; decEls[i].textContent = ''; decEls[i].className = 'decision'; }
+      drawWave(i);
+    }
+    $('kvLoop').textContent = S.loopLen ? S.bars + ' bars · ' + S.bpm.toFixed(2) + ' BPM · ' + (S.loopLen / SR).toFixed(2) + ' s' : 'not set';
+    $('kvMode').textContent = S.settings.loopMode === 'repeat' ? 'repeat' : 'play once';
+    const w = FT.windowSamples(S); $('kvWin').textContent = !S.loopLen ? 'after first part' : w > 0 ? '±' + (w / SR * 1000).toFixed(0) + ' ms' : 'off';
+    const bp = $('barsPrompt'); bp.classList.toggle('on', S.status === 'confirmBars');
+    if (S.status === 'confirmBars') {
+      const len = S.pending.trimmed.length; $('barsInfo').textContent = 'You played ' + (len / SR).toFixed(2) + ' s.';
+      const ch = $('barChips'); ch.innerHTML = '';
+      FT.BAR_CHOICES.forEach(b => { const x = document.createElement('button'); x.className = 'chip' + (S.pending.bars === b ? ' on' : ''); x.textContent = b + (b > 1 ? ' bars' : ' bar') + ' = ' + FT.bpmFor(len, b, SR).toFixed(1) + ' BPM'; x.onclick = () => { dispatch({ type: 'SET_BARS', bars: b }); }; ch.appendChild(x); });
+    }
+    const lg = $('log'); lg.innerHTML = ''; S.log.slice(0, 12).forEach(m => { const li = document.createElement('li'); li.textContent = m; lg.appendChild(li); });
+    if (!S.log.length) { const li = document.createElement('li'); li.textContent = 'Nothing yet. Click the screen and press Enter, then play some keys.'; lg.appendChild(li); }
+  }
+  function frame() {
+    requestAnimationFrame(frame);
+    const now = ctx.currentTime; let label = 'Empty', cls = 'mode', pos = '-';
+    if (rec && rec.kind === 'first') { label = 'Rec first take'; cls += ' rec'; pos = (now - rec.t0).toFixed(1) + ' s'; }
+    else if (S.status === 'confirmBars') label = 'How many bars?';
+    else if (rec && rec.kind === 'part') { if (now < rec.T0 - 0.0) { label = 'Armed'; cls += ' arm'; pos = 'starts in ' + (rec.T0 - now).toFixed(1) + ' s'; } else { label = 'Recording'; cls += ' rec'; } }
+    else if (S.status === 'ready') label = T.playing ? 'Playing' : 'Stopped';
+    if (S.loopLen && T.playing && now >= T.epoch) { const p = (S.settings.loopMode === 'repeat' ? (now - T.epoch) % loopSec() : Math.min(loopSec(), now - T.epoch)); pos = p.toFixed(2) + ' s'; phI.style.transform = 'translateX(' + Math.round(p / loopSec() * (ph.clientWidth - 2)) + 'px)'; }
+    else phI.style.transform = 'translateX(0)';
+    if (rec && rec.kind === 'part' && now >= rec.windowStart) draw();
+    if ($('mode').textContent !== label) $('mode').textContent = label; $('mode').className = cls; $('kvPos').textContent = pos;
+  }
+
+  /* ---- input ---- */
+  function nudge(dir, coarse) { if (S.status === 'ready') dispatch({ type: 'NUDGE', track: S.selected, unit: field, dir, coarse }); }
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (KEYMAP[k] && !e.repeat) { e.preventDefault(); hit(KEYMAP[k]); return; }
+    if (e.repeat && k !== 'ArrowUp' && k !== 'ArrowDown') return;
+    if (k === 'Enter') { e.preventDefault(); doRecord(); }
+    else if (k === ' ') { e.preventDefault(); if (S.status === 'ready') { if (T.playing) { stopPlayback(); rec = null; draw(); } else play(); } }
+    else if (k >= '1' && k <= '4') { sel(+k - 1); }
+    else if (k === 'ArrowLeft' || k === 'ArrowRight') {
+      e.preventDefault();
+      if (S.status === 'confirmBars') { const i = FT.BAR_CHOICES.indexOf(S.pending.bars); const j = Math.max(0, Math.min(FT.BAR_CHOICES.length - 1, i + (k === 'ArrowRight' ? 1 : -1))); dispatch({ type: 'SET_BARS', bars: FT.BAR_CHOICES[j] }); }
+      else { field = field === 'ms' ? 'bars' : 'ms'; draw(); }
+    }
+    else if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); nudge(k === 'ArrowUp' ? 1 : -1, e.shiftKey); }
+    else if (k === 'Backspace') { e.preventDefault(); dispatch({ type: 'UNDO', track: S.selected }); }
+    else if (k === 'Escape') cancelRec();
+  });
+  $('stage').addEventListener('pointerdown', () => $('stage').focus());
+  $('bRec').onclick = doRecord;
+  $('bPlay').onclick = () => { ensureAudio(); if (S.status === 'ready') { T.playing ? (stopPlayback(), draw()) : play(); } };
+  $('bUndo').onclick = () => dispatch({ type: 'UNDO', track: S.selected });
+  $('bMute').onclick = () => dispatch({ type: 'MUTE', track: S.selected });
+  $('bReset').onclick = () => { stopPlayback(); rec = null; dispatch({ type: 'RESET' }); syncSettings(); stepDone = 0; drawScen(); };
+  const bindSel = (id, key, conv) => $(id).onchange = e => { dispatch({ type: 'SET_SETTING', key, value: conv(e.target.value) }); e.target.blur(); };
+  bindSel('sLoop', 'loopMode', v => v); bindSel('sWin', 'windowMs', Number); bindSel('sPre', 'preRollMs', Number); bindSel('sRound', 'rounding', v => v); bindSel('sClick', 'click', v => v === '1');
+  window.addEventListener('resize', () => draw());
+  draw(); drawScen();
+  // a tiny frame loop before audio exists so the header never looks frozen
+  (function pre() { if (!ctx) requestAnimationFrame(pre); })();
+})();
+</script>

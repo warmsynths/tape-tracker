@@ -1,0 +1,23 @@
+---
+type: grilling
+status: closed
+blocked-by: []
+assignee: claude+user
+---
+# Core workflow, device and limits
+
+## Question
+What is this effort for, which device, and what is the shape of the workflow?
+
+## Resolution
+- Destination is a written v1 spec, not a build. Device is the Original Tracker (MK66, 180 MHz). UI is fully replaced (no Tracker screens kept); the stock audio engine is kept and trimmed, not rewritten.
+- Four mono tracks, ~30 s each, all in RAM, saved to SD. No synths, no pitch changes, no bounce in v1.
+- The first Part recorded sets the Loop (exact played length, trimmed to the first note). On stop the user chooses a bar count and a fractional BPM is derived. No audio is stretched.
+- Loop Mode is a setting (repeat or play once). Later Parts wait for the loop start, capture a short pre-roll, record exactly one loop, then stop. Re-record replaces the Part; one level of undo.
+- Alignment: a new Part's first note lands exactly on the loop start if it falls inside the Alignment Window; a later first note is left in place. Offset is set in time or bars.
+- Pads record as audio (sample hits in record mode; other behaviour in edit mode is TBD). Line-in is monitored by default with feedback protection (limiter, fade-in, mic monitoring off).
+- Jog wheel follows the stock model: arrows pick a field, the wheel edits it; scrub in playback, move points in edit; Shift for bars/coarse.
+- Use the printed button labels where they fit. Keep stock sample/pad playback, project save, WAV export, delay/reverb/limiter; drop pattern editor, song mode, sample editor, radio.
+- Lo-fi: master glue compressor plus saturation, wow/flutter, bit-crush; per-track effects only if the CPU allows.
+- Safety: never touch the bootloader or flash start address; keep a stock .ptf on the card; the user flashes and tests.
+- Prototype on a computer first (no firmware emulator exists).
