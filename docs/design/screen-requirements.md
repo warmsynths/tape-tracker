@@ -121,6 +121,7 @@ Shows: the length played in seconds; the choices; the tempo each choice gives; t
 Choices: 1, 2, 3, 4, 6, 8, and after a very long first take also 12, 16, 20, 24, 28, 32.
 Controls: jog or left/right chooses; B7 Cancel (discard the take); B8 OK.
 Rule: no audio is stretched. Only the tempo is calculated.
+Only offer bar choices whose tempo falls between 40 and 240 BPM (stock sequencer minimum is 40). Always keep at least the nearest choice, so the list is never empty. Hidden choices are simply not shown.
 
 ### 4.4 Part Editor
 Purpose: fix one Part. Edits the selected track's recording.
@@ -219,3 +220,12 @@ Each is a frame that appears over the current screen with no fade. Each says wha
 - A note of the colour roles and font slots used.
 - A list of anything you could not do within the limits, and what you did instead.
 - Do not add features that are not listed here. Ask first.
+
+---
+
+## 7. Accepted design proposals (round 4 reply)
+- Performance slot effect: Shift + jog chooses it.
+- Master: jog press turns the focused control on or off.
+- Pads: Shift + B2 opens Pad settings. Memory: Shift + B3.
+- Empty home screen: B2 reads Tempo (Stop has nothing to do).
+- Count-in: up/down moves between Tempo and Count-in; jog changes the highlighted one.
