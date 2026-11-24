@@ -8,6 +8,8 @@
 #include "mtAudioEngine.h"
 #include "mtPadBoard.h"
 #include "mtPadsBacklight.h"
+#include "mtConfig.h"
+#include "mtSequencer.h"
 #include "mtStructs.h"
 
 #include <cmath>
@@ -47,6 +49,12 @@ int16_t* regionStart(int track)
 static void functRec() { FT->pressRecord(); }
 static void functStop() { FT->pressStop(); }
 static void functPlay() { FT->pressPlay(); }
+static void functPadMode() { FT->togglePadMode(); }
+static void functPads(uint8_t pad, uint8_t state, int16_t velo)
+{
+    (void)velo;
+    FT->padEvent(pad, state);
+}
 static void functTrack1() { FT->selectTrack(0); }
 static void functTrack2() { FT->selectTrack(1); }
 static void functTrack3() { FT->selectTrack(2); }
@@ -147,6 +155,8 @@ void cFourTrack::setDefaultScreenFunct()
     ip->setButtonObj(interfaceButton0, buttonPress, functRec);
     ip->setButtonObj(interfaceButton1, buttonPress, functStop);
     ip->setButtonObj(interfaceButton2, buttonPress, functPlay);
+    ip->setButtonObj(interfaceButton3, buttonPress, functPadMode);
+    ip->setPadsGlobal(functPads);
     ip->setButtonObj(interfaceButton4, buttonPress, functTrack1);
     ip->setButtonObj(interfaceButton5, buttonPress, functTrack2);
     ip->setButtonObj(interfaceButton6, buttonPress, functTrack3);
@@ -157,6 +167,50 @@ void cFourTrack::setDefaultScreenFunct()
 
 //------------------------------------------------------------------------------------------------
 // Actions from the buttons
+
+void cFourTrack::togglePadMode()
+{
+    // Let go of anything still sounding from the old mode.
+    mtPadBoard.releaseAllInstruments();
+    padsKeysMode = !padsKeysMode;
+    display.setControlText(label[3], padsKeysMode ? "Pads: Keys" : "Pads: Pad");
+    display.refreshControl(label[3]);
+    display.synchronizeRefresh();
+}
+
+void cFourTrack::padEvent(uint8_t pad, uint8_t state)
+{
+    if (pad >= 48)
+    {
+        return;
+    }
+
+    if (state == buttonPress)
+    {
+        padsBacklight.setFrontLayer(1, mtConfig.values.padsLightFront, pad);
+
+        uint8_t note;
+        if (padsKeysMode)
+        {
+            const bool isBeatSlice =
+              mtProject.instrument[mtProject.values.lastUsedInstrument].playMode == playModeBeatSlice;
+            note = mtPadBoard.getNoteFromPad(pad, isBeatSlice);
+        }
+        else
+        {
+            // Pad N plays sample slot N at its own pitch (the preview note).
+            mtProject.values.lastUsedInstrument = pad;
+            note = Sequencer::STEP_NOTE_DEFAULT;
+        }
+        padNote[pad] = note;
+        sequencer.handleNoteOn(Sequencer::GRID_OUTSIDE_PATTERN, note, 127, pad);
+    }
+    else if (state == buttonRelease)
+    {
+        padsBacklight.setFrontLayer(0, 0, pad);
+        sequencer.handleNoteOff(Sequencer::GRID_OUTSIDE_PATTERN, padNote[pad], 0, pad);
+    }
+}
 
 void cFourTrack::selectTrack(int track)
 {

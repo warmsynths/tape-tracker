@@ -87,6 +87,7 @@ void cFourTrack::showScreen()
     display.setControlColors(label[0], display.getTheme().activeButtonLabelsColors);
     display.setControlText(label[1], "Stop");
     display.setControlText(label[2], "Play");
+    display.setControlText(label[3], padsKeysMode ? "Pads: Keys" : "Pads: Pad");
     display.setControlText(label[4], "Track 1");
     display.setControlText(label[5], "Track 2");
     display.setControlText(label[6], "Track 3");

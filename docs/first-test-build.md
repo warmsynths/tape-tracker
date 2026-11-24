@@ -42,3 +42,19 @@ The Sample Editor while testing this build. The recording is stored in the same 
 
 ## If something goes badly
 Put the official `.ptf` on the card as the only file in `Firmware`, then press the paperclip into the reset hole on the underside.
+
+## Test build FT6: pads and the memory guard
+New in this build:
+- **Pads play your samples on the Four-Track screen.** Press the fourth button under the screen (it says **Pads: Keys** or **Pads: Pad**) to switch between the two modes.
+  - **Keys:** the last sample you used is spread across the pads at different pitches, like the stock Tracker.
+  - **Pad:** pad N plays sample slot N at its own pitch, like drum pads.
+- **Loaded samples can no longer run into the track areas.** The sample memory limit is lowered, which leaves about 2.6 MB for samples while the tracks are in use.
+- **The Sample Editor will not open while a track holds a recording.** It shows "Tracks hold recordings". Clear the tracks (or restart) to use it.
+
+To try it:
+1. Load a few short samples with **Sample Load** (the stock screen). Put a drum hit in slot 1, for example.
+2. Press **Song** to open Four-Track.
+3. Hit the pads. Switch between Keys and Pad with the fourth button and say what you hear.
+4. Record a track, then play the pads over it.
+
+Tell me: do the pads sound in both modes, does the mode switch work without a hang, and does anything glitch while a loop plays and you play pads?

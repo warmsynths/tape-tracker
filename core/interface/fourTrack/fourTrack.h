@@ -25,6 +25,13 @@ class cFourTrack : public ModuleBase
     void pressPlay();
     void selectTrack(int track);
 
+    // Pads play loaded samples. Two modes:
+    //  Keys: the last used sample is spread across the pads at different pitches (stock behaviour).
+    //  Pad:  pad N plays sample slot N at its own pitch (like drum pads).
+    // The mode is not saved yet; it starts as Keys.
+    void padEvent(uint8_t pad, uint8_t state);
+    void togglePadMode();
+
     // True while any track holds a recorded Part. The Sample Editor uses the same memory as the
     // track regions, so it must not be opened then.
     bool hasParts() const { return session.partCount() > 0; }
@@ -59,6 +66,9 @@ class cFourTrack : public ModuleBase
     hControl statusLabel = -1;
     hControl hintLabel = -1;
     hControl levelLabel = -1;
+
+    bool padsKeysMode = true;
+    uint8_t padNote[48]{}; // the note each pad started, so its release matches
 
     char trackText[FourTrackSession::kTracks][40]{};
     char shownTrackText[FourTrackSession::kTracks][40]{};
