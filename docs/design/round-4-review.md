@@ -8,7 +8,11 @@ Checked frame by frame (32 frames, sections 4.1 to 4.13) against `screen-require
 - Waveforms are 120 columns per lane (360 on the main screen), inside the 100 to 150 guidance.
 - Bar choices respect 40 to 240 BPM.
 
-## Needs changing in the design
+## Fixed by Claude in the zip (owner asked)
+- Pads and Memory now say "7.3 of 11.3 MB" and "47 s free in total" (placeholder numbers, real total is about 11.3 MB of sample memory).
+- Input setup: the "aim between -18 and -6" text moved above the meter so it no longer overlaps the -18 label.
+
+## Was needing change in the design (now fixed)
 1. **Pads and Memory screens say "of 64 MB".** The device has 16 MB of memory, of which about 11.25 MB holds samples and recordings. Show "of 11.3 MB" or a plain bar with no total.
 2. **Input setup level meter:** the "-18" tick label overlaps the text "aim between -18 and -6". Move or shorten one.
 
