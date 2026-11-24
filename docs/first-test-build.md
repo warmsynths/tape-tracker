@@ -110,3 +110,8 @@ Your instrument (a Minichord through TRS cables) is stereo, so this build follow
 - **Mono Left or Mono Right:** that channel is used for both the monitor and the recording.
 
 Please check, with Config set to Stereo and then Mono Left: does the monitor sound as you expect, does the recording contain both sides of the Minichord (Stereo) or only the left (Mono Left), and is playback the same in both ears? If the left is still louder in Stereo, please also try the stock Sample Recorder screen with the Minichord. If it sounds the same there, the imbalance is in the signal or the cable, not in this firmware.
+
+## Test build FT13: shows the left and right input level
+Same as FT12, plus a small readout at the top right of the Four-Track screen: `L -20  R -26 dB`. It is the level arriving at the input, measured separately for the left and right jack, before anything else in the Tracker touches it.
+
+Use it to settle the left-louder question: play the Minichord with Config set to Stereo and read the two numbers. If R is several dB lower than L, the imbalance is in the signal or the cable. If they match but you still hear the left louder, the cause is after the input (the headphone output or the headphones).

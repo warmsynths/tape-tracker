@@ -679,6 +679,17 @@ void cFourTrack::fillView()
     std::snprintf(view.bars, sizeof(view.bars), "-");
     std::snprintf(view.input, sizeof(view.input), "%s", sourceName(trackSource[session.selected()]));
     view.monitor = (trackSource[session.selected()] == Source::Line);
+    // Left and right input level in dB, to see whether a stereo source arrives evenly.
+    {
+        static float levelL = 0.0f, levelR = 0.0f;
+        AudioAnalyzeRMS* rmsL = engine.getAudioInput()->getRecordingRmsI2s(0);
+        AudioAnalyzeRMS* rmsR = engine.getAudioInput()->getRecordingRmsI2s(1);
+        if (rmsL != nullptr && rmsL->available()) levelL = rmsL->read();
+        if (rmsR != nullptr && rmsR->available()) levelR = rmsR->read();
+        const int dbL = (levelL > 0.001f) ? (int)(20.0f * std::log10(levelL)) : -60;
+        const int dbR = (levelR > 0.001f) ? (int)(20.0f * std::log10(levelR)) : -60;
+        std::snprintf(view.inputLevels, sizeof(view.inputLevels), "L %d  R %d dB", dbL < -60 ? -60 : dbL, dbR < -60 ? -60 : dbR);
+    }
     view.barCount = 0; // bars are chosen in a later step (the "How many bars?" screen)
     view.loopFrames = loop;
 

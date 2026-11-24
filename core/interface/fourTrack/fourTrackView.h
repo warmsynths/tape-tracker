@@ -31,6 +31,7 @@ struct strFtView
     char bars[6];
     char pos[10];
     char input[12];
+    char inputLevels[20]; // left and right input level, for checking a stereo source
     bool monitor;
     char status[20];
     uint8_t statusKind; // 0 stopped, 1 playing, 2 recording, 3 armed

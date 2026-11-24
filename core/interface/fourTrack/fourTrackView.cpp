@@ -356,7 +356,7 @@ void cFourTrackView::drawDynamic()
 
     // position readout in the top bar
     drawText(358, 8, view->pos, kF17Bold, bright);
-    (void)dim;
+    drawText(640, 11, view->inputLevels, kF12, dim);
 
     // counters of the lanes being recorded or armed
     for (int i = 0; i < 4; i++)
