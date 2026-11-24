@@ -20,13 +20,13 @@ static cFourTrack* FT = &fourTrack;
 namespace
 {
 // Sample clock of the Original (see docs/research/record-path-and-latency.md): 44117.647 Hz.
-constexpr uint32_t kSampleRate = 44118;
+constexpr uint32_t kSampleRate = kFourTrackSampleRate;
 
 // Longest loop, and the room each track gets. The extra room holds the audio recorded just
 // before and after the loop, for aligning a Part later.
 constexpr uint32_t kMaxLoopFrames = kSampleRate * 24;
-constexpr uint32_t kRegionFrames = kSampleRate * 26;
-constexpr uint32_t kRegionBytes = kRegionFrames * sizeof(int16_t);
+constexpr uint32_t kRegionFrames = kFourTrackRegionFrames;
+constexpr uint32_t kRegionBytes = kFourTrackRegionBytes;
 
 // A Part starts recording when the loop is this close to its end (about 200 ms), and not if it
 // is closer than about 50 ms, so the start of the loop is never missed.

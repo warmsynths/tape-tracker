@@ -84,6 +84,21 @@ constexpr int SAMPLE_CHANNELS = 1;
 
 const uint32_t EDIT_BUFF_OFFSET = SAMPLE_MEMORY_SIZE - (2 * SAMPLE_CHANNELS * EDIT_BUFF_SIZE);
 
+#ifndef PLATFORM_IMX
+// Four-Track recorder: the four track regions sit at the very top of the sample memory. Loaded
+// samples must stay below them, so the project's memory limit is lowered by this amount.
+constexpr uint32_t kFourTrackSampleRate = 44118;
+constexpr uint32_t kFourTrackRegionFrames = kFourTrackSampleRate * 26;
+constexpr uint32_t kFourTrackRegionBytes = kFourTrackRegionFrames * 2; // 16-bit mono
+constexpr uint32_t kFourTrackTracks = 4;
+constexpr uint32_t kFourTrackReservedBytes = kFourTrackTracks * kFourTrackRegionBytes;
+// Memory that loaded samples may use (everything below the track regions).
+constexpr uint32_t kSampleMemoryLimit = SAMPLE_MEMORY_SIZE - kFourTrackReservedBytes;
+static_assert(kFourTrackReservedBytes < SAMPLE_MEMORY_SIZE, "track regions must fit in the sample memory");
+#else
+constexpr uint32_t kSampleMemoryLimit = SAMPLE_MEMORY_SIZE;
+#endif
+
 static constexpr int kSampleTracks = 8;
 static constexpr int kMidiTrackFirstIdx = kSampleTracks;
 static constexpr int kMidiTracks = 8;

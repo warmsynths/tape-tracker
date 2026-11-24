@@ -25,6 +25,10 @@ class cFourTrack : public ModuleBase
     void pressPlay();
     void selectTrack(int track);
 
+    // True while any track holds a recorded Part. The Sample Editor uses the same memory as the
+    // track regions, so it must not be opened then.
+    bool hasParts() const { return session.partCount() > 0; }
+
     // Set from the audio interrupt when the first block of a recording arrives.
     volatile uint32_t recordStartPosition = 0;
     volatile bool recordStartKnown = false;

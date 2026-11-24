@@ -184,7 +184,7 @@ void cFileManager::getDefaultProject(struct strMtProject* source)
 {
     source->instruments_count = 0;
     source->patterns_count = 0;
-    source->max_memory = SAMPLE_MEMORY_SIZE;
+    source->max_memory = kSampleMemoryLimit;
     source->used_memory = 0;
 
     for (uint32_t i = 0; i < kSampleInstrumentsCount; i++)

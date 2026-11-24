@@ -464,6 +464,16 @@ void Interface::switchModuleByButton(hModule module, uint8_t button, uint32_t op
     if (modules[modulesButtons[index][1]] == module)
         return;
 
+#ifndef PLATFORM_IMX
+    // The Sample Editor's work buffers sit on top of the Four-Track regions. Opening it while
+    // tracks hold recordings would overwrite them.
+    if (modules[modulesButtons[index][1]] == &sampleEditor && fourTrack.hasParts())
+    {
+        mtPopups.show(0, "Tracks hold recordings", "Sample Editor would erase them");
+        return;
+    }
+#endif
+
     uint32_t localOptions = options > 0 ? options : modulesButtons[index][2];
 
     deactivateModule(module);
