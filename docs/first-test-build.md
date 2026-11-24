@@ -100,3 +100,10 @@ From your photos of FT9:
 - **The jog wheel and the Up and Down arrows now move between tracks.** The design gives the jog wheel scrubbing later; for now it selects tracks. Pressing the same track's button again still changes its source.
 
 Please check: does the screen stay intact when a track has a recording, while arming a second track, and while recording it? Does track 1 still play together with track 2 after the second recording (in FT9 you heard track 2 only)? If track 1 goes silent again, tell me exactly what you pressed in what order.
+
+## Test build FT11: the monitor is the same in both ears
+You noticed the left ear was louder on the Config setting "Stereo" and balanced on "Mono Left". The cause: with a guitar in the left input jack, the live monitor played it in the left ear only, except while a take was recording (the stock Recorder briefly switches to the left channel for both ears, then puts your Config setting back after the take). The recorded tracks play equally in both ears.
+
+This screen now sends the left input to both ears whenever it is on Line or Mic, and puts your Config setting back when you leave the screen. It records the left input only, so what you hear matches what is recorded.
+
+Please check: with Config set to Stereo, is the live monitor now the same in both ears, before, during and after a take? Do the played-back tracks still sound the same in both ears?

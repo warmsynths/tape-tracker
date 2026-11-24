@@ -144,6 +144,7 @@ void cFourTrack::stop()
         micUnmutePending = false;
         platform->getCodecAudio()->setHeadphoneMuted(false);
     }
+    engine.setLineInOutType(mtConfig.general.lineInOutType); // back to the Config setting
     engine.refreshLineInStreamVolume(); // back to the normal project setting
     display.setControlHide(viewStatic);
     display.setControlHide(viewDynamic);
@@ -559,6 +560,15 @@ void cFourTrack::servicePartRecording()
 
 void cFourTrack::update()
 {
+    // Monitor the left input in both ears. The Config setting "Stereo" would play a guitar plugged
+    // into the left jack in the left ear only. This screen records the left input only, so it
+    // monitors it the same way. The Recorder puts the Config setting back after every take, so
+    // this is set again whenever no take is running. (1 = left channel to both outputs.)
+    if (!recorder.isRecordingActive() && appliedSource != (int)Source::Pads)
+    {
+        engine.setLineInOutType(1);
+    }
+
     if (micUnmutePending && micTimer > 200)
     {
         micUnmutePending = false;
