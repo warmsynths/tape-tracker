@@ -10,7 +10,9 @@ void cFourTrack::initDisplayControls()
     prop.style = controlStyleShow;
     prop.value = 1; // layer 1: playhead, position, level bars
     viewDynamic = display.createControl<cFourTrackView>(&prop);
-    prop.value = 0; // layer 0: everything that changes rarely
+    prop.value = 2; // layer 2: hint line and button row
+    viewFooter = display.createControl<cFourTrackView>(&prop);
+    prop.value = 0; // layer 0: top bar, status, ruler and lanes
     viewStatic = display.createControl<cFourTrackView>(&prop);
 }
 
@@ -20,7 +22,9 @@ void cFourTrack::showScreen()
 
     display.setControlShow(viewStatic);
     display.setControlShow(viewDynamic);
+    display.setControlShow(viewFooter);
     display.refreshControl(viewStatic);
     display.refreshControl(viewDynamic);
+    display.refreshControl(viewFooter);
     display.synchronizeRefresh();
 }

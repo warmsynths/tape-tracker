@@ -51,6 +51,15 @@ static void functRec() { FT->pressRecord(); }
 static void functStop() { FT->pressStop(); }
 static void functPlay() { FT->pressPlay(); }
 static void functPadMode() { FT->togglePadMode(); }
+static void functUp() { FT->moveSelection(-1); }
+static void functDown() { FT->moveSelection(1); }
+static void functEncoder(int16_t value)
+{
+    if (value != 0)
+    {
+        FT->moveSelection(value > 0 ? 1 : -1);
+    }
+}
 static void functPads(uint8_t pad, uint8_t state, int16_t velo)
 {
     (void)velo;
@@ -138,6 +147,7 @@ void cFourTrack::stop()
     engine.refreshLineInStreamVolume(); // back to the normal project setting
     display.setControlHide(viewStatic);
     display.setControlHide(viewDynamic);
+    display.setControlHide(viewFooter);
     mtPadBoard.releaseAllInstruments();
     padsBacklight.clearGlobalPads(1, 1, 1);
     songTimer.show();
@@ -153,6 +163,9 @@ void cFourTrack::setDefaultScreenFunct()
     ip->setButtonObj(interfaceButton2, buttonPress, functPlay);
     ip->setButtonObj(interfaceButton3, buttonPress, functPadMode);
     ip->setPadsGlobal(functPads);
+    ip->setButtonObj(interfaceButtonUp, buttonPress, functUp);
+    ip->setButtonObj(interfaceButtonDown, buttonPress, functDown);
+    ip->setPotObj(interfacePot0, functEncoder);
     ip->setButtonObj(interfaceButton4, buttonPress, functTrack1);
     ip->setButtonObj(interfaceButton5, buttonPress, functTrack2);
     ip->setButtonObj(interfaceButton6, buttonPress, functTrack3);
@@ -254,6 +267,22 @@ void cFourTrack::applySource(Source source)
             engine.forceLineInStreamVolume(0);
             break;
     }
+}
+
+void cFourTrack::moveSelection(int delta)
+{
+    int track = session.selected() + delta;
+    if (track < 0 || track >= FourTrackSession::kTracks)
+    {
+        return;
+    }
+    const bool idle = (session.mode() == FourTrackSession::Mode::Idle);
+    session.selectTrack(track);
+    if (idle)
+    {
+        applySource(trackSource[session.selected()]);
+    }
+    refreshTexts(true);
 }
 
 void cFourTrack::selectTrack(int track)
@@ -593,7 +622,7 @@ bool cFourTrack::updateTrackMeters()
     return true;
 }
 
-// Coarse waveform of a Part: 120 columns, each the peak of its share of the loop.
+// Coarse waveform of a Part: 100 columns, each the peak of its share of the loop.
 void cFourTrack::computeWave(int track)
 {
     strFtLane& lane = view.lane[track];
@@ -604,7 +633,7 @@ void cFourTrack::computeWave(int track)
         lane.waveCount = 0;
         return;
     }
-    const int columns = 120;
+    const int columns = 100;
     for (int c = 0; c < columns; c++)
     {
         const uint32_t from = (uint32_t)(((uint64_t)c * frames) / columns);
@@ -828,6 +857,7 @@ void cFourTrack::refreshTexts(bool force)
     {
         staticSignature = sig;
         display.refreshControl(viewStatic);
+        display.refreshControl(viewFooter);
         changed = true;
     }
     if (force || metersUpdated)

@@ -25,6 +25,8 @@ class cFourTrack : public ModuleBase
     void pressStop();
     void pressPlay();
     void selectTrack(int track);
+    // Moves the selection to the previous or next track (arrows and jog wheel).
+    void moveSelection(int delta);
 
     // Where a track records from. Each track has its own source. Pressing the button of the
     // track that is already selected cycles its source.
@@ -73,6 +75,7 @@ class cFourTrack : public ModuleBase
 
     hControl viewStatic = -1;
     hControl viewDynamic = -1;
+    hControl viewFooter = -1;
     strFtView view{};
     uint32_t staticSignature = 0;
     bool waveDirty[FourTrackSession::kTracks] = { true, true, true, true };

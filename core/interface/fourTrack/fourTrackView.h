@@ -47,10 +47,13 @@ struct strFtView
     strFtLane lane[4];
 };
 
-// Draws the main screen. Two copies are created: layer 0 holds everything that changes rarely
-// (rebuilt on events), layer 1 only the playhead, position and level bars (rebuilt often).
-// The layer is passed as `value`. Text is drawn the way the stock tracker grid does it, one
-// character at a time, so the drawing budget stays small.
+// Draws the main screen. Three copies are created, told apart by `value`:
+//   0: top bar, status, loop ruler and the four lanes (rebuilt on events). Five stages: the
+//      display chip's command buffer is only 4 KB and a stage must stay well below that.
+//   1: playhead, position, counters and level bars (rebuilt about 20 times a second).
+//   2: hint line and the button row (two stages).
+// Text is drawn the way the stock tracker grid does it, one character at a time, so the drawing
+// budget stays small.
 class cFourTrackView : public cDisplayControl
 {
   public:
@@ -58,6 +61,10 @@ class cFourTrackView : public cDisplayControl
     virtual ~cFourTrackView() {}
 
     virtual void update() override;
+    virtual void update2() override;
+    virtual void update3() override;
+    virtual void update4() override;
+    virtual void update5() override;
     virtual void setStyle(uint32_t style) override { this->style = style; }
     virtual void setText(const char* text) override { this->text = text; }
     virtual void setValue(int value) override { this->value = value; }
@@ -73,8 +80,9 @@ class cFourTrackView : public cDisplayControl
     int drawText(int x, int y, const char* s, int fontIndex, uint32_t color);
     int textWidth(const char* s, int fontIndex) const;
 
-    void drawStatic();
+    void drawTop();
     void drawLane(int index, int y0);
+    void drawHint();
     void drawButtons();
     void drawDynamic();
 

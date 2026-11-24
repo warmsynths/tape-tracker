@@ -27,7 +27,7 @@ constexpr int kF12 = 4;
 extern strFont fonts[];
 
 cFourTrackView::cFourTrackView(strControlProperties* properties)
-  : cDisplayControl(controlIdSimpleBox, 1)
+  : cDisplayControl(controlIdSimpleBox, properties->value == 0 ? 5 : (properties->value == 2 ? 2 : 1))
 {
     posX = 0;
     posY = 0;
@@ -78,7 +78,12 @@ void cFourTrackView::dot(int x, int y, int radius, uint32_t color)
 
 int cFourTrackView::textWidth(const char* s, int fontIndex) const
 {
-    return (int)strlen(s) * fonts[fontIndex].width;
+    int w = 0;
+    for (; *s != 0; s++)
+    {
+        w += fonts[fontIndex].data[(uint8_t)*s];
+    }
+    return w;
 }
 
 int cFourTrackView::drawText(int x, int y, const char* s, int fontIndex, uint32_t color)
@@ -89,7 +94,7 @@ int cFourTrackView::drawText(int x, int y, const char* s, int fontIndex, uint32_
     }
     font = &fonts[fontIndex];
     API_COLOR(color);
-    string2Bitmaps(x, y, s, (int8_t)strlen(s), true);
+    string2Bitmaps(x, y, s, (int8_t)strlen(s), false);
     return x + textWidth(s, fontIndex);
 }
 
@@ -102,15 +107,41 @@ void cFourTrackView::update()
     }
     if (value == 0)
     {
-        drawStatic();
+        drawTop();
     }
-    else
+    else if (value == 1)
     {
         drawDynamic();
     }
+    else
+    {
+        drawHint();
+    }
 }
 
-void cFourTrackView::drawStatic()
+void cFourTrackView::update2()
+{
+    if (view == nullptr) return;
+    if (value == 0) drawLane(0, kLanesY);
+    else if (value == 2) drawButtons();
+}
+
+void cFourTrackView::update3()
+{
+    if (view != nullptr && value == 0) drawLane(1, kLanesY + kLaneH);
+}
+
+void cFourTrackView::update4()
+{
+    if (view != nullptr && value == 0) drawLane(2, kLanesY + 2 * kLaneH);
+}
+
+void cFourTrackView::update5()
+{
+    if (view != nullptr && value == 0) drawLane(3, kLanesY + 3 * kLaneH);
+}
+
+void cFourTrackView::drawTop()
 {
     Theme& th = display.getTheme();
     const uint32_t text = th.activeLabelsColors[0];
@@ -174,13 +205,15 @@ void cFourTrackView::drawStatic()
         }
     }
 
-    // ---- Lanes ----------------------------------------------------------------------------
-    for (int i = 0; i < 4; i++)
-    {
-        drawLane(i, kLanesY + i * kLaneH);
-    }
+}
 
-    // ---- Hint row ---------------------------------------------------------------------------
+void cFourTrackView::drawHint()
+{
+    Theme& th = display.getTheme();
+    const uint32_t text = th.activeLabelsColors[0];
+    const uint32_t dim = th.inactiveLabelsColors[3];
+    const uint32_t hair = th.frameColors[1];
+
     rect(0, kHintY, 800, 1, hair);
     drawText(14, kHintY + 14, view->hint, kF14, text);
     int rx = 566;
@@ -189,8 +222,6 @@ void cFourTrackView::drawStatic()
     rx = drawText(rx + 18, kHintY + 15, "Pads", kF12, dim);
     frame(rx + 6, kHintY + 11, textWidth(view->padsMode, kF12) + 12, 18, text);
     drawText(rx + 12, kHintY + 15, view->padsMode, kF12, text);
-
-    drawButtons();
 }
 
 void cFourTrackView::drawLane(int i, int y0)
@@ -260,7 +291,7 @@ void cFourTrackView::drawLane(int i, int y0)
         for (int c = 0; c < L.waveCount; c++)
         {
             int h = 2 + (L.wave[c] * 68) / 255;
-            const int x = kWaveX + c * 5;
+            const int x = kWaveX + c * 6; // 100 columns of 6 px
             API_VERTEX2F(x, cy - h / 2);
             API_VERTEX2F(x + 3, cy - h / 2 + h - 1);
         }
