@@ -154,9 +154,9 @@ Rule: bypass must be instant and obvious.
 ### 4.7 Input setup
 Purpose: set where the sound comes from and how loud.
 Reached: from the main screen (a button or Shift plus B4), and shown in the top bar.
-Shows: source choice (Line, Mic low gain, Mic high gain); gain value; a live level meter with a peak marker; monitoring on or off; the feedback-protection state.
+Shows: source choice (Line, Mic low gain, Mic high gain, Pads). Pads records what is played on the pads from the loaded samples, not the audio input; gain, monitoring and the level meter are shown as unavailable for it. The owner chooses the source before arming; the track keeps it and shows it as its tag (LINE, MIC, PAD); gain value; a live level meter with a peak marker; monitoring on or off; the feedback-protection state.
 Gain ranges: line about 0 to +22 dB; mic low 0 to +25 dB; mic high 0 to +44 dB.
-Controls: B1 to B3 choose the source; jog changes gain; B4 Monitor on or off; B8 Done.
+Controls: B1 to B4 choose the source (Line, Mic low, Mic high, Pads); jog changes gain; B4 Monitor on or off; B8 Done.
 Rules: line monitoring starts on, mic monitoring starts off. Feedback protection is always on while monitoring is on and has no off switch; it only affects the monitored signal, never what is recorded. When it is acting, the top bar shows it, and returns to normal when it stops.
 
 ### 4.8 Project
