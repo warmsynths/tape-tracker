@@ -101,9 +101,12 @@ From your photos of FT9:
 
 Please check: does the screen stay intact when a track has a recording, while arming a second track, and while recording it? Does track 1 still play together with track 2 after the second recording (in FT9 you heard track 2 only)? If track 1 goes silent again, tell me exactly what you pressed in what order.
 
-## Test build FT11: the monitor is the same in both ears
-You noticed the left ear was louder on the Config setting "Stereo" and balanced on "Mono Left". The cause: with a guitar in the left input jack, the live monitor played it in the left ear only, except while a take was recording (the stock Recorder briefly switches to the left channel for both ears, then puts your Config setting back after the take). The recorded tracks play equally in both ears.
+## Test build FT11 (replaced by FT12)
+FT11 forced the left input into both ears and recorded the left input only. That was based on the guess that a mono instrument was in the left jack. It was wrong for a stereo instrument, so FT12 undoes it.
 
-This screen now sends the left input to both ears whenever it is on Line or Mic, and puts your Config setting back when you leave the screen. It records the left input only, so what you hear matches what is recorded.
+## Test build FT12: the input follows your Config setting
+Your instrument (a Minichord through TRS cables) is stereo, so this build follows the Config setting **Line input** instead of forcing the left channel:
+- **Stereo:** the live monitor is true stereo, and a recording is both channels added together into the mono track (this is how the stock Sample Recorder works).
+- **Mono Left or Mono Right:** that channel is used for both the monitor and the recording.
 
-Please check: with Config set to Stereo, is the live monitor now the same in both ears, before, during and after a take? Do the played-back tracks still sound the same in both ears?
+Please check, with Config set to Stereo and then Mono Left: does the monitor sound as you expect, does the recording contain both sides of the Minichord (Stereo) or only the left (Mono Left), and is playback the same in both ears? If the left is still louder in Stereo, please also try the stock Sample Recorder screen with the Minichord. If it sounds the same there, the imbalance is in the signal or the cable, not in this firmware.
