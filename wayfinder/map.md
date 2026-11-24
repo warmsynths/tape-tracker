@@ -32,6 +32,7 @@ A written v1 spec for a four-track recording firmware on the Original Polyend Tr
 (Open tickets are the files in `tickets/` with `status: open`; the frontier is those with no open `blocked-by`.)
 
 ## Not yet specified
+- Boot graphic (parked by owner): replace the Polyend logo (greyscale, about 30,000 pixels max, drawn once at power-on). Optional simple motion (fade, growing bar) is possible; boot time unmeasured. The bootloader's own screens are off-limits. A line about it is in `docs/design/round-4-brief.md` only if the owner chooses to send it.
 - Project save/load, naming and WAV export format.
 - Editing tools beyond one undo: trim, split, duplicate a Part, copy between tracks.
 - Per-track mix controls: level, pan, mute, solo.
