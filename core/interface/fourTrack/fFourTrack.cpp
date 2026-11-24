@@ -105,11 +105,10 @@ void cFourTrack::start(uint32_t options)
     appliedSource = -1;
     applySource(trackSource[session.selected()]);
 
-    shownLevelText[0] = 0;
-    shownStatusText[0] = 0;
+    staticSignature = 0;
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
-        shownTrackText[t][0] = 0;
+        waveDirty[t] = true;
     }
 
     showScreen();
@@ -137,13 +136,8 @@ void cFourTrack::stop()
         platform->getCodecAudio()->setHeadphoneMuted(false);
     }
     engine.refreshLineInStreamVolume(); // back to the normal project setting
-    for (int t = 0; t < FourTrackSession::kTracks; t++)
-    {
-        display.setControlHide(trackLabel[t]);
-    }
-    display.setControlHide(statusLabel);
-    display.setControlHide(hintLabel);
-    display.setControlHide(levelLabel);
+    display.setControlHide(viewStatic);
+    display.setControlHide(viewDynamic);
     mtPadBoard.releaseAllInstruments();
     padsBacklight.clearGlobalPads(1, 1, 1);
     songTimer.show();
@@ -175,9 +169,7 @@ void cFourTrack::togglePadMode()
     // Let go of anything still sounding from the old mode.
     mtPadBoard.releaseAllInstruments();
     padsKeysMode = !padsKeysMode;
-    display.setControlText(label[3], padsKeysMode ? "Pads: Keys" : "Pads: Pad");
-    display.refreshControl(label[3]);
-    display.synchronizeRefresh();
+    refreshTexts(true);
 }
 
 void cFourTrack::padEvent(uint8_t pad, uint8_t state)
@@ -421,6 +413,10 @@ void cFourTrack::onFirstTakeFinished()
     {
         partData[session.selected()] = regionStart(session.selected());
     }
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+    {
+        waveDirty[t] = true;
+    }
 
     AudioPlayLoops* player = engine.getLoopPlayer();
     player->stop(); // so syncPlayer starts it again from the top with the new Parts
@@ -493,6 +489,7 @@ void cFourTrack::finishPartEarly()
     }
 
     partData[track] = regionStart(track) + firstSample;
+    waveDirty[track] = true;
     engine.getLoopPlayer()->setTrack(track, partData[track]);
     session.partRecorded();
 }
@@ -523,6 +520,7 @@ void cFourTrack::servicePartRecording()
         recorder.stop();
         const int track = session.recordingTrack();
         partData[track] = regionStart(track) + firstSample;
+        waveDirty[track] = true;
         engine.getLoopPlayer()->setTrack(track, partData[track]);
         session.partRecorded();
     }
@@ -546,16 +544,16 @@ void cFourTrack::update()
     }
 
     refreshTexts(false);
-    refreshLevel();
 }
 
-// Level of each track as a short text bar: a playing Part shows what it plays, the track being
-// recorded shows what has just been recorded (from any source). Updated about 20 times a second.
-void cFourTrack::updateTrackMeters()
+// Level of each track: a playing Part shows what it plays, the track being recorded shows what
+// has just been recorded (from any source). Returns true when the levels were updated (about 20
+// times a second).
+bool cFourTrack::updateTrackMeters()
 {
-    if (meterTimer < 50 && trackBar[0][0] != 0)
+    if (meterTimer < 50)
     {
-        return;
+        return false;
     }
     meterTimer = 0;
 
@@ -587,117 +585,258 @@ void cFourTrack::updateTrackMeters()
         }
         // Fall back slowly, jump up at once.
         trackDb[t] = (db > trackDb[t]) ? db : (trackDb[t] - 3 > db ? trackDb[t] - 3 : db);
-
-        int filled = (trackDb[t] + 50) / 5; // -50 dB to 0 dB in ten steps
-        if (filled < 0) filled = 0;
-        if (filled > 10) filled = 10;
-        for (int i = 0; i < 10; i++)
-        {
-            trackBar[t][i] = (i < filled) ? '|' : '.';
-        }
-        trackBar[t][10] = 0;
+        int level = (trackDb[t] + 50) * 2; // -50 dB to 0 dB as 0 to 100
+        if (level < 0) level = 0;
+        if (level > 100) level = 100;
+        view.lane[t].meter = (uint8_t)level;
     }
+    return true;
+}
+
+// Coarse waveform of a Part: 120 columns, each the peak of its share of the loop.
+void cFourTrack::computeWave(int track)
+{
+    strFtLane& lane = view.lane[track];
+    const int16_t* data = partData[track];
+    const uint32_t frames = session.loopFrames();
+    if (data == nullptr || frames == 0)
+    {
+        lane.waveCount = 0;
+        return;
+    }
+    const int columns = 120;
+    for (int c = 0; c < columns; c++)
+    {
+        const uint32_t from = (uint32_t)(((uint64_t)c * frames) / columns);
+        const uint32_t to = (uint32_t)(((uint64_t)(c + 1) * frames) / columns);
+        uint16_t peak = loopPeakBlock(data + from, to - from, 0, (int)(to - from));
+        // Square-root scaling so quiet parts are still visible.
+        const float norm = std::sqrt((float)peak / 32767.0f);
+        int h = (int)(norm * 255.0f);
+        lane.wave[c] = (uint8_t)(h > 255 ? 255 : h);
+    }
+    lane.waveCount = columns;
+}
+
+static uint32_t hashBytes(uint32_t h, const void* data, size_t n)
+{
+    const uint8_t* p = (const uint8_t*)data;
+    for (size_t i = 0; i < n; i++)
+    {
+        h = (h ^ p[i]) * 16777619u;
+    }
+    return h;
+}
+
+static void formatTime(char* out, size_t size, uint32_t frames, uint32_t rate)
+{
+    const uint32_t tenths = frames * 10 / rate;
+    std::snprintf(out, size, "%u:%02u.%u", (unsigned)(tenths / 600), (unsigned)((tenths / 10) % 60), (unsigned)(tenths % 10));
+}
+
+// Builds everything the screen shows from the current state.
+void cFourTrack::fillView()
+{
+    const FourTrackSession::Mode mode = session.mode();
+    const int recTrack = session.recordingTrack();
+    const uint32_t loop = session.loopFrames();
+
+    std::snprintf(view.project, sizeof(view.project), "Four-Track");
+    view.unsaved = false;
+    std::snprintf(view.tempo, sizeof(view.tempo), "Free");
+    std::snprintf(view.bars, sizeof(view.bars), "-");
+    std::snprintf(view.input, sizeof(view.input), "%s", sourceName(trackSource[session.selected()]));
+    view.monitor = (trackSource[session.selected()] == Source::Line);
+    view.barCount = 0; // bars are chosen in a later step (the "How many bars?" screen)
+    view.loopFrames = loop;
+
+    // status line
+    view.statusNote[0] = 0;
+    if (mode == FourTrackSession::Mode::RecordingFirst)
+    {
+        view.statusKind = 2;
+        std::snprintf(view.status, sizeof(view.status), "Recording");
+        std::snprintf(view.statusNote, sizeof(view.statusNote), "No Loop yet");
+    }
+    else if (mode == FourTrackSession::Mode::RecordingPart)
+    {
+        view.statusKind = 2;
+        std::snprintf(view.status, sizeof(view.status), "Recording");
+    }
+    else if (mode == FourTrackSession::Mode::Armed)
+    {
+        view.statusKind = 3;
+        std::snprintf(view.status, sizeof(view.status), "Armed");
+    }
+    else if (session.playing())
+    {
+        view.statusKind = 1;
+        std::snprintf(view.status, sizeof(view.status), "Playing");
+    }
+    else
+    {
+        view.statusKind = 0;
+        std::snprintf(view.status, sizeof(view.status), "Stopped");
+        if (loop == 0)
+        {
+            std::snprintf(view.statusNote, sizeof(view.statusNote), "No Loop yet");
+        }
+    }
+
+    // position readout
+    if (mode == FourTrackSession::Mode::RecordingFirst)
+    {
+        formatTime(view.pos, sizeof(view.pos), recorder.getLength(), kSampleRate);
+        view.posFrames = 0;
+    }
+    else if (loop > 0)
+    {
+        view.posFrames = engine.getLoopPlayer()->position();
+        formatTime(view.pos, sizeof(view.pos), view.posFrames, kSampleRate);
+    }
+    else
+    {
+        view.posFrames = 0;
+        std::snprintf(view.pos, sizeof(view.pos), "-");
+    }
+
+    // lanes
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+    {
+        strFtLane& L = view.lane[t];
+        std::snprintf(L.name, sizeof(L.name), "Track %d", t + 1);
+        std::snprintf(L.tag, sizeof(L.tag), "%s", sourceName(trackSource[t]));
+        L.info[0] = 0;
+        L.msg1[0] = 0;
+        L.msg2[0] = 0;
+        L.hasPart = session.hasPart(t);
+        L.muted = false;
+        L.glitch = false;
+        L.selected = (t == session.selected());
+        L.active = (t == recTrack && mode != FourTrackSession::Mode::Idle);
+
+        if (waveDirty[t])
+        {
+            waveDirty[t] = false;
+            computeWave(t);
+            waveVersion[t]++;
+        }
+        if (!L.hasPart)
+        {
+            L.waveCount = 0;
+        }
+
+        if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
+        {
+            std::snprintf(L.msg1, sizeof(L.msg1), "First take - elapsed");
+            formatTime(L.msg2, sizeof(L.msg2), recorder.getLength(), kSampleRate);
+        }
+        else if (L.active && mode == FourTrackSession::Mode::Armed)
+        {
+            std::snprintf(L.msg1, sizeof(L.msg1), "Waits for the loop start");
+            const uint32_t pos = engine.getLoopPlayer()->position();
+            const uint32_t toEnd = (loop > pos) ? (loop - pos) : 0;
+            const uint32_t tenths = toEnd * 10 / kSampleRate;
+            std::snprintf(L.msg2, sizeof(L.msg2), "Starts in %u.%u s", (unsigned)(tenths / 10), (unsigned)(tenths % 10));
+        }
+        else if (L.active && mode == FourTrackSession::Mode::RecordingPart)
+        {
+            std::snprintf(L.msg1, sizeof(L.msg1), "Recording one Loop");
+            const uint32_t pos = engine.getLoopPlayer()->position();
+            formatTime(L.msg2, sizeof(L.msg2), pos, kSampleRate);
+        }
+        else if (!L.hasPart)
+        {
+            std::snprintf(L.msg2, sizeof(L.msg2), "Empty");
+        }
+    }
+
+    // hint line and mode texts
+    if (mode == FourTrackSession::Mode::RecordingFirst)
+    {
+        std::snprintf(view.hint, sizeof(view.hint), "Stop ends the take and keeps it.");
+    }
+    else if (mode == FourTrackSession::Mode::Armed)
+    {
+        std::snprintf(view.hint, sizeof(view.hint), "Records one Loop from the loop start. Rec disarms.");
+    }
+    else if (mode == FourTrackSession::Mode::RecordingPart)
+    {
+        std::snprintf(view.hint, sizeof(view.hint), "Stop keeps what was recorded, the rest is silence.");
+    }
+    else if (loop == 0)
+    {
+        std::snprintf(view.hint, sizeof(view.hint), "Rec records the first Part, which sets the Loop.");
+    }
+    else
+    {
+        std::snprintf(view.hint, sizeof(view.hint), "Rec arms Track %d. Press it again to change its source.", session.selected() + 1);
+    }
+    std::snprintf(view.loopMode, sizeof(view.loopMode), "Repeat");
+    std::snprintf(view.padsMode, sizeof(view.padsMode), "%s", padsKeysMode ? "KEYS" : "PAD");
+
+    // buttons
+    static const char* const names[8] = { "Rec", "Stop", "Play", "", "Track 1", "Track 2", "Track 3", "Track 4" };
+    for (int b = 0; b < 8; b++)
+    {
+        std::snprintf(view.btn[b], sizeof(view.btn[b]), "%s", names[b]);
+        view.btnKind[b] = (b == 0) ? 1 : (b == 1) ? 2 : (b == 2) ? 3 : 0;
+    }
+    std::snprintf(view.btn[3], sizeof(view.btn[3]), "%s", padsKeysMode ? "Pads:Keys" : "Pads:Pad");
+    view.btnSelected = (int8_t)(4 + session.selected());
 }
 
 void cFourTrack::refreshTexts(bool force)
 {
-    updateTrackMeters();
-    bool changed = force;
-    const int recTrack = session.recordingTrack();
+    const bool metersUpdated = updateTrackMeters();
+    fillView();
+
+    // Rebuild the rarely changing layer only when something it shows has changed.
+    uint32_t sig = 2166136261u;
+    sig = hashBytes(sig, view.project, sizeof(view.project));
+    sig = hashBytes(sig, view.tempo, sizeof(view.tempo));
+    sig = hashBytes(sig, view.input, sizeof(view.input));
+    sig = hashBytes(sig, view.status, sizeof(view.status));
+    sig = hashBytes(sig, view.statusNote, sizeof(view.statusNote));
+    sig = hashBytes(sig, view.hint, sizeof(view.hint));
+    sig = hashBytes(sig, view.padsMode, sizeof(view.padsMode));
+    sig = hashBytes(sig, view.btn, sizeof(view.btn));
+    sig = hashBytes(sig, &view.btnSelected, sizeof(view.btnSelected));
+    sig = hashBytes(sig, &view.statusKind, sizeof(view.statusKind));
+    sig = hashBytes(sig, &view.monitor, sizeof(view.monitor));
+    sig = hashBytes(sig, &view.loopFrames, sizeof(view.loopFrames));
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
-        const char* state = session.hasPart(t) ? "PART" : "EMPTY";
-        if (t == recTrack)
+        const strFtLane& L = view.lane[t];
+        sig = hashBytes(sig, L.name, sizeof(L.name));
+        sig = hashBytes(sig, L.tag, sizeof(L.tag));
+        sig = hashBytes(sig, L.msg1, sizeof(L.msg1));
+        if (!L.active)
         {
-            switch (session.mode())
-            {
-                case FourTrackSession::Mode::RecordingFirst:
-                case FourTrackSession::Mode::RecordingPart: state = "RECORDING"; break;
-                case FourTrackSession::Mode::Armed: state = "ARMED, waiting for the loop"; break;
-                case FourTrackSession::Mode::Idle: break;
-            }
+            sig = hashBytes(sig, L.msg2, sizeof(L.msg2));
         }
-        std::snprintf(trackText[t],
-                      sizeof(trackText[t]),
-                      "%s Track %d [%s] %s  %s",
-                      (t == session.selected()) ? ">" : " ",
-                      t + 1,
-                      sourceName(trackSource[t]),
-                      trackBar[t],
-                      state);
-        if (force || std::strcmp(trackText[t], shownTrackText[t]) != 0)
-        {
-            std::strcpy(shownTrackText[t], trackText[t]);
-            display.setControlText(trackLabel[t], shownTrackText[t]);
-            display.setControlColors(trackLabel[t],
-                                     (t == session.selected())
-                                       ? display.getTheme().activeButtonLabelsColors
-                                       : display.getTheme().activeLabelsColors);
-            display.refreshControl(trackLabel[t]);
-            changed = true;
-        }
+        sig = hashBytes(sig, &L.hasPart, sizeof(L.hasPart));
+        sig = hashBytes(sig, &L.selected, sizeof(L.selected));
+        sig = hashBytes(sig, &L.active, sizeof(L.active));
+        sig = hashBytes(sig, &L.muted, sizeof(L.muted));
+        sig = hashBytes(sig, &L.glitch, sizeof(L.glitch));
+        sig = hashBytes(sig, &waveVersion[t], sizeof(waveVersion[t]));
     }
 
-    const uint32_t frames = (session.mode() == FourTrackSession::Mode::RecordingFirst)
-                              ? recorder.getLength()
-                              : session.loopFrames();
-    const uint32_t tenths = frames * 10 / kSampleRate;
-    if (frames == 0)
+    bool changed = false;
+    if (force || sig != staticSignature)
     {
-        std::snprintf(statusText, sizeof(statusText), "No loop yet");
+        staticSignature = sig;
+        display.refreshControl(viewStatic);
+        changed = true;
     }
-    else
+    if (force || metersUpdated)
     {
-        std::snprintf(statusText,
-                      sizeof(statusText),
-                      "%s %u.%u s  %s",
-                      (session.mode() == FourTrackSession::Mode::RecordingFirst) ? "RECORDING" : "LOOP",
-                      (unsigned)(tenths / 10),
-                      (unsigned)(tenths % 10),
-                      session.playing() ? "PLAYING" : "STOPPED");
-    }
-    if (force || std::strcmp(statusText, shownStatusText) != 0)
-    {
-        std::strcpy(shownStatusText, statusText);
-        display.setControlText(statusLabel, shownStatusText);
-        display.refreshControl(statusLabel);
+        display.refreshControl(viewDynamic);
         changed = true;
     }
     if (changed)
     {
-        display.synchronizeRefresh();
-    }
-}
-
-void cFourTrack::refreshLevel()
-{
-    // Input level as a text bar from -60 dB to 0 dB. Integer formatting only.
-    AudioAnalyzeRMS* rms = engine.getAudioInput()->getRecordingRmsI2s(0);
-    static float level = 0.0f;
-    if (rms != nullptr && rms->available())
-    {
-        level = rms->read();
-    }
-    int db = -60;
-    if (level > 0.001f)
-    {
-        db = (int)(20.0f * std::log10(level));
-        if (db < -60) db = -60;
-        if (db > 0) db = 0;
-    }
-    const int filled = (db + 60) / 3; // 0..20
-    char bar[24];
-    for (int i = 0; i < 20; i++)
-    {
-        bar[i] = (i < filled) ? '|' : '.';
-    }
-    bar[20] = 0;
-    std::snprintf(levelText, sizeof(levelText), "IN  %s  %d dB", bar, db);
-    if (std::strcmp(levelText, shownLevelText) != 0)
-    {
-        std::strcpy(shownLevelText, levelText);
-        display.setControlText(levelLabel, shownLevelText);
-        display.refreshControl(levelLabel);
         display.synchronizeRefresh();
     }
 }

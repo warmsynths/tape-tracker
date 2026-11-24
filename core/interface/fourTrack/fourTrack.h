@@ -3,6 +3,7 @@
 
 #include "FourTrackSession.h"
 #include "core/modulesBase.h"
+#include "fourTrackView.h"
 
 // Four-track test screen, opened with the Song button in this build.
 // Buttons under the screen: 1 Rec, 2 Stop, 3 Play, 5 to 8 select track 1 to 4.
@@ -70,34 +71,29 @@ class cFourTrack : public ModuleBase
     FourTrackSession session;
     const int16_t* partData[FourTrackSession::kTracks]{};
 
-    hControl label[8]{};
-    hControl bgLabel = -1;
-    hControl trackLabel[FourTrackSession::kTracks]{};
-    hControl statusLabel = -1;
-    hControl hintLabel = -1;
-    hControl levelLabel = -1;
+    hControl viewStatic = -1;
+    hControl viewDynamic = -1;
+    strFtView view{};
+    uint32_t staticSignature = 0;
+    bool waveDirty[FourTrackSession::kTracks] = { true, true, true, true };
+    uint8_t waveVersion[FourTrackSession::kTracks]{};
 
     void applySource(Source source);
-    void updateTrackMeters();
+    bool updateTrackMeters();
+    void computeWave(int track);
+    void fillView();
     static const char* sourceName(Source source);
 
     Source trackSource[FourTrackSession::kTracks] = { Source::Line, Source::Line, Source::Line, Source::Line };
     int appliedSource = -1; // -1: nothing applied yet
     elapsedMillis meterTimer = 0;
     int trackDb[FourTrackSession::kTracks] = { -60, -60, -60, -60 };
-    char trackBar[FourTrackSession::kTracks][12] = {};
     bool micUnmutePending = false;
     elapsedMillis micTimer = 0;
 
     bool padsKeysMode = true;
     uint8_t padNote[48]{}; // the note each pad started, so its release matches
 
-    char trackText[FourTrackSession::kTracks][64]{};
-    char shownTrackText[FourTrackSession::kTracks][64]{};
-    char statusText[64]{};
-    char shownStatusText[64]{};
-    char levelText[64]{};
-    char shownLevelText[64]{};
 };
 
 extern cFourTrack fourTrack;
