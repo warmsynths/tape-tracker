@@ -13,7 +13,8 @@ class Recorder
         enum Source
         {
             kUsb,
-            kI2s
+            kI2s,
+            kPadBus // the pads and MIDI voices (stereo, averaged to mono)
         };
         int16_t* destinationBufferAddress;
         uint32_t destinationBufferSize;

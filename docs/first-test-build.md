@@ -58,3 +58,19 @@ To try it:
 4. Record a track, then play the pads over it.
 
 Tell me: do the pads sound in both modes, does the mode switch work without a hang, and does anything glitch while a loop plays and you play pads?
+
+## Test build FT7: a source for each track, and recording the pads
+Includes everything in FT6 (pads, Keys and Pad modes, memory guard).
+
+New:
+- **Each track has its own source.** The track lines show it in brackets, for example `> Track 1  [LINE]  EMPTY`. Press the button of the track that is **already selected** to go to its next source: LINE, MIC LOW, MIC HIGH, PADS, then LINE again. Pressing a different track's button just selects it.
+- **PADS records what you play on the pads** (the samples you loaded), not the audio input. Select a track, press it again until it says PADS, press Rec, play the pads, press Stop (first take) or let it run one loop (later tracks).
+- Mic sources use the same gain as the Sample Recorder screen. Mic monitoring is off.
+- Headphones go quiet for a fraction of a second when you switch to a mic. That is on purpose, to avoid a pop.
+
+Please try:
+1. Record a guitar on track 1 with LINE.
+2. Select track 2, press it again until it says PADS, load a drum sample, record a drum pattern from the pads.
+3. Check the pads recording lines up with the loop, and say whether it sounds clean or has clicks, gaps or delay.
+
+Known limits: the level meter line only shows the audio input, so it does not move for PADS. Sources are not saved with the project yet.

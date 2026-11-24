@@ -25,6 +25,16 @@ class cFourTrack : public ModuleBase
     void pressPlay();
     void selectTrack(int track);
 
+    // Where a track records from. Each track has its own source. Pressing the button of the
+    // track that is already selected cycles its source.
+    enum class Source : uint8_t
+    {
+        Line,
+        MicLow,
+        MicHigh,
+        Pads
+    };
+
     // Pads play loaded samples. Two modes:
     //  Keys: the last used sample is spread across the pads at different pitches (stock behaviour).
     //  Pad:  pad N plays sample slot N at its own pitch (like drum pads).
@@ -67,11 +77,19 @@ class cFourTrack : public ModuleBase
     hControl hintLabel = -1;
     hControl levelLabel = -1;
 
+    void applySource(Source source);
+    static const char* sourceName(Source source);
+
+    Source trackSource[FourTrackSession::kTracks] = { Source::Line, Source::Line, Source::Line, Source::Line };
+    int appliedSource = -1; // -1: nothing applied yet
+    bool micUnmutePending = false;
+    elapsedMillis micTimer = 0;
+
     bool padsKeysMode = true;
     uint8_t padNote[48]{}; // the note each pad started, so its release matches
 
-    char trackText[FourTrackSession::kTracks][40]{};
-    char shownTrackText[FourTrackSession::kTracks][40]{};
+    char trackText[FourTrackSession::kTracks][64]{};
+    char shownTrackText[FourTrackSession::kTracks][64]{};
     char statusText[64]{};
     char shownStatusText[64]{};
     char levelText[64]{};

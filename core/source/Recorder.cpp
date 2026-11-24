@@ -58,6 +58,11 @@ void Recorder::record()
         recordingQueue[AudioInput::InputChannels::kRight] =
           engine.getAudioInput()->getRecordingQueueUsb(AudioInput::InputChannels::kRight);
     }
+    else if (config.source == Config::Source::kPadBus)
+    {
+        recordingQueue[AudioInput::InputChannels::kLeft] = engine.getPadBusQueue(0);
+        recordingQueue[AudioInput::InputChannels::kRight] = engine.getPadBusQueue(1);
+    }
     else if (config.source == Config::Source::kI2s)
     {
         recordingQueue[AudioInput::InputChannels::kLeft] =
@@ -138,6 +143,10 @@ void Recorder::update()
 
                 if (areChannelsAvailable)
                 {
+                    if (recordingHeadIdx == 0 && firstBlockCallback != nullptr)
+                    {
+                        firstBlockCallback();
+                    }
 
                     int16_t* dataLeft =
                       recordingQueue[AudioInput::InputChannels::kLeft]->readBuffer();

@@ -90,11 +90,6 @@ void cFourTrack::start(uint32_t options)
     ip->setButtonObj(interfaceButtonSong, buttonPress, functSwitchModule);
     ip->setButtonObj(interfaceButtonPattern, buttonPress, functSwitchModule);
 
-    // Line input, as the stock Sample Recorder sets it up.
-    Sgtl5000* codec = platform->getCodecAudio();
-    codec->setInputType(Sgtl5000::InputType::kLineIn);
-    // Same input gain as the Sample Recorder screen (set it there; 0 to 100 percent).
-    codec->setLineInLevel(mtProject.values.gainLineIn * 15 / 100);
 #ifndef TRACKER_MINI
     platform->getRadio()->enableLineInput(false);
 #endif
@@ -105,8 +100,9 @@ void cFourTrack::start(uint32_t options)
         FT->recordStartKnown = true;
     });
 
-    // Hear the input while recording, as the stock Sample Recorder does.
-    engine.forceLineInStreamVolume(DEFAULT_LINE_IN_VOLUME);
+    // Set up the input for the selected track's source (line, mic, or none for pads).
+    appliedSource = -1;
+    applySource(trackSource[session.selected()]);
 
     shownLevelText[0] = 0;
     shownStatusText[0] = 0;
@@ -134,6 +130,11 @@ void cFourTrack::stop()
     engine.getLoopPlayer()->stop();
 
     moduleRefresh = 0;
+    if (micUnmutePending)
+    {
+        micUnmutePending = false;
+        platform->getCodecAudio()->setHeadphoneMuted(false);
+    }
     engine.refreshLineInStreamVolume(); // back to the normal project setting
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
@@ -212,10 +213,73 @@ void cFourTrack::padEvent(uint8_t pad, uint8_t state)
     }
 }
 
+const char* cFourTrack::sourceName(Source source)
+{
+    switch (source)
+    {
+        case Source::Line: return "LINE";
+        case Source::MicLow: return "MIC LOW";
+        case Source::MicHigh: return "MIC HIGH";
+        case Source::Pads: return "PADS";
+    }
+    return "";
+}
+
+// Sets up the audio input for a source. Does nothing if it is already set up.
+void cFourTrack::applySource(Source source)
+{
+    if (appliedSource == (int)source)
+    {
+        return;
+    }
+    appliedSource = (int)source;
+
+    Sgtl5000* codec = platform->getCodecAudio();
+    switch (source)
+    {
+        case Source::Line:
+            codec->setInputType(Sgtl5000::InputType::kLineIn);
+            // Same input gain as the Sample Recorder screen (set it there; 0 to 100 percent).
+            codec->setLineInLevel(mtProject.values.gainLineIn * 15 / 100);
+            // Hear the input while recording, as the stock Sample Recorder does.
+            engine.forceLineInStreamVolume(DEFAULT_LINE_IN_VOLUME);
+            break;
+        case Source::MicLow:
+        case Source::MicHigh:
+            // Mute the headphones briefly while switching, so there is no pop (as the stock
+            // Sample Recorder does). Mic monitoring starts off.
+            codec->setHeadphoneMuted(true);
+            codec->setInputType(Sgtl5000::InputType::kMic);
+            codec->setMicGain(source == Source::MicLow ? mtProject.values.gainMicLow * 25.0f / 100.0f
+                                                       : mtProject.values.gainMicHigh * 44.0f / 100.0f);
+            micTimer = 0;
+            micUnmutePending = true;
+            engine.forceLineInStreamVolume(0);
+            break;
+        case Source::Pads:
+            // Records the pads, not the input: do not hear the line input meanwhile.
+            engine.forceLineInStreamVolume(0);
+            break;
+    }
+}
+
 void cFourTrack::selectTrack(int track)
 {
-    session.selectTrack(track);
-    refreshTexts(false);
+    const bool idle = (session.mode() == FourTrackSession::Mode::Idle);
+    if (idle && track >= 0 && track < FourTrackSession::kTracks && track == session.selected())
+    {
+        // Same track again: next source.
+        trackSource[track] = (Source)(((int)trackSource[track] + 1) % 4);
+    }
+    else
+    {
+        session.selectTrack(track);
+    }
+    if (idle)
+    {
+        applySource(trackSource[session.selected()]);
+    }
+    refreshTexts(true);
 }
 
 void cFourTrack::pressRecord()
@@ -290,8 +354,17 @@ void cFourTrack::configureRecorder(int track)
     config.destinationBufferAddress = regionStart(track);
     config.destinationBufferSize = kRegionBytes;
     config.destinationChannels = 1;
-    config.sourceChannels = 1;
-    config.source = Recorder::Config::Source::kI2s;
+    if (trackSource[track] == Source::Pads)
+    {
+        config.sourceChannels = 2;
+        config.source = Recorder::Config::Source::kPadBus;
+    }
+    else
+    {
+        config.sourceChannels = 1;
+        config.source = Recorder::Config::Source::kI2s;
+    }
+    applySource(trackSource[track]);
     recorder.setConfig(config);
 }
 
@@ -458,6 +531,11 @@ void cFourTrack::servicePartRecording()
 
 void cFourTrack::update()
 {
+    if (micUnmutePending && micTimer > 200)
+    {
+        micUnmutePending = false;
+        platform->getCodecAudio()->setHeadphoneMuted(false);
+    }
     switch (session.mode())
     {
         case FourTrackSession::Mode::RecordingFirst: serviceFirstTake(); break;
@@ -489,9 +567,10 @@ void cFourTrack::refreshTexts(bool force)
         }
         std::snprintf(trackText[t],
                       sizeof(trackText[t]),
-                      "%s Track %d   %s",
+                      "%s Track %d  [%s]  %s",
                       (t == session.selected()) ? ">" : " ",
                       t + 1,
+                      sourceName(trackSource[t]),
                       state);
         if (force || std::strcmp(trackText[t], shownTrackText[t]) != 0)
         {

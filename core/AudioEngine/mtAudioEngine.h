@@ -193,6 +193,9 @@ class audioEngine
     MixerAndFxs<kVoices>* getMixerAndFx();
     AudioPlaySdWav* getSdPlayer();
     AudioPlayLoops* getLoopPlayer();
+    // Records the sound of the pads and MIDI voices only: the dry sum of the 8 voices, before the
+    // delay and reverb sends and without the looped Parts (Four-Track recording source "Pads").
+    AudioRecordQueue* getPadBusQueue(int channel);
 
     friend class playerEngine;
 
@@ -249,6 +252,7 @@ class audioEngine
     std::optional<uint8_t> lastSynthFxId[kSynthParts][2];
 #endif
     ExportQueues exportQueues;
+    AudioRecordQueue padBusQueue[2]; // declared after mixerAndFxs so it updates after the mixer
     AudioOutput output;
     AudioAnalyzeRMS* delayRms[(int)MixerAndFxChannelType::kChannelCount];
     AudioAnalyzeRMS* polyverbRms[(int)MixerAndFxChannelType::kChannelCount];

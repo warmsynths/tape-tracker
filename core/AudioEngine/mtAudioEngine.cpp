@@ -133,6 +133,11 @@ AudioPlayLoops* audioEngine::getLoopPlayer()
     return &loopPlayer;
 }
 
+AudioRecordQueue* audioEngine::getPadBusQueue(int channel)
+{
+    return &padBusQueue[channel];
+}
+
 audioEngine::audioEngine()
 {
     for (int voiceIdx = 0; voiceIdx < kVoices; voiceIdx++)
@@ -157,6 +162,11 @@ audioEngine::audioEngine()
           0,
           mixerAndFxs.getTracksAndSendsMixer((MixerAndFxChannelType)channel),
           MixerAndFxs<kVoices>::TrackAndFxsChannels::kLoopChannel));
+    }
+    for (int channel = 0; channel < 2; channel++)
+    {
+        connections.push_back(new AudioConnection(
+          mixerAndFxs.getTracksMixer((MixerAndFxChannelType)channel), 0, &padBusQueue[channel], 0));
     }
     connectMixerToOutput(&mixerAndFxs, &output);
     connectMixerToExportQueue(&mixerAndFxs, &exportQueues);

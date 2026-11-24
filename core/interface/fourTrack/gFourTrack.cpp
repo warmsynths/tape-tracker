@@ -97,7 +97,7 @@ void cFourTrack::showScreen()
     titleBar->showRightLabel(false);
     titleBar->setTitle("Four-Track");
 
-    display.setControlText(hintLabel, "Pick a track, press Rec. The first Part sets the loop.");
+    display.setControlText(hintLabel, "Pick a track (press it again to change its source), then Rec.");
 
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
