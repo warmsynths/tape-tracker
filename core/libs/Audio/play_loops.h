@@ -29,6 +29,15 @@ class AudioPlayLoops : public AudioStream
     uint32_t position() const { return currentPosition; }
     uint32_t length() const { return loopLength; }
 
+    // Largest sample of each track since the last call (0 to 32767), then cleared.
+    uint16_t takePeak(int track)
+    {
+        if (track < 0 || track >= kTracks) return 0;
+        const uint16_t p = levelPeak[track];
+        levelPeak[track] = 0;
+        return p;
+    }
+
     virtual void update(void) override;
 
   private:
@@ -37,6 +46,7 @@ class AudioPlayLoops : public AudioStream
     volatile uint32_t loopLength = 0;
     volatile uint32_t currentPosition = 0;
     volatile bool playing = false;
+    volatile uint16_t levelPeak[kTracks] = {};
 };
 
 #endif

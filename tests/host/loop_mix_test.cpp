@@ -71,6 +71,17 @@ int main()
         loopMixBlock(tracks, 1, 3, 100, out, 2); // 100 % 3 == 1
         CHECK(out[0] == 2 && out[1] == 3, "out of range position wraps");
     }
+    // Peak of a block: largest absolute value, wraps at the loop end, empty track is 0.
+    {
+        const int16_t a[4] = { 10, -300, 20, 5 };
+        CHECK(loopPeakBlock(a, 4, 0, 4) == 300, "peak sees the negative sample");
+        CHECK(loopPeakBlock(a, 4, 2, 2) == 20, "peak of part of the block");
+        CHECK(loopPeakBlock(a, 4, 3, 3) == 300, "peak wraps at the loop end");
+        CHECK(loopPeakBlock(nullptr, 4, 0, 4) == 0, "missing track has no peak");
+        CHECK(loopPeakBlock(a, 0, 0, 4) == 0, "zero length has no peak");
+        const int16_t m[1] = { -32768 };
+        CHECK(loopPeakBlock(m, 1, 0, 1) == 32767, "most negative sample is clamped");
+    }
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
     return failures ? 1 : 0;
 }

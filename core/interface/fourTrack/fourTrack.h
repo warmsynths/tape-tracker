@@ -78,10 +78,14 @@ class cFourTrack : public ModuleBase
     hControl levelLabel = -1;
 
     void applySource(Source source);
+    void updateTrackMeters();
     static const char* sourceName(Source source);
 
     Source trackSource[FourTrackSession::kTracks] = { Source::Line, Source::Line, Source::Line, Source::Line };
     int appliedSource = -1; // -1: nothing applied yet
+    elapsedMillis meterTimer = 0;
+    int trackDb[FourTrackSession::kTracks] = { -60, -60, -60, -60 };
+    char trackBar[FourTrackSession::kTracks][12] = {};
     bool micUnmutePending = false;
     elapsedMillis micTimer = 0;
 

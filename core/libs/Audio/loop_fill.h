@@ -74,4 +74,25 @@ inline void loopMixBlock(const int16_t* const* tracks,
     }
 }
 
+// Largest absolute sample value in `count` samples of one looping region, starting at `position`.
+// Returns 0 for an empty or missing track. Used for the level meters.
+inline uint16_t loopPeakBlock(const int16_t* data, uint32_t length, uint32_t position, int count)
+{
+    if (length == 0 || data == nullptr)
+    {
+        return 0;
+    }
+    uint32_t pos = position % length;
+    uint16_t peak = 0;
+    for (int i = 0; i < count; i++)
+    {
+        int32_t v = data[pos];
+        if (v < 0) v = -v;
+        if (v > 32767) v = 32767;
+        if ((uint16_t)v > peak) peak = (uint16_t)v;
+        if (++pos >= length) pos = 0;
+    }
+    return peak;
+}
+
 #endif /* LOOP_FILL_H_ */

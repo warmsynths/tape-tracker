@@ -58,6 +58,14 @@ void AudioPlayLoops::update(void)
     }
 
     const uint32_t length = loopLength;
+    for (int t = 0; t < kTracks; t++)
+    {
+        const uint16_t p = loopPeakBlock(active[t], length, currentPosition, AUDIO_BLOCK_SAMPLES);
+        if (p > levelPeak[t])
+        {
+            levelPeak[t] = p;
+        }
+    }
     loopMixBlock(active, kTracks, length, currentPosition, block->data, AUDIO_BLOCK_SAMPLES);
 
     if (length > 0)

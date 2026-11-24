@@ -8,6 +8,7 @@
 #include "mtAudioEngine.h"
 #include "mtPadBoard.h"
 #include "mtPadsBacklight.h"
+#include "loop_fill.h"
 #include "mtConfig.h"
 #include "mtSequencer.h"
 #include "mtStructs.h"
@@ -548,8 +549,59 @@ void cFourTrack::update()
     refreshLevel();
 }
 
+// Level of each track as a short text bar: a playing Part shows what it plays, the track being
+// recorded shows what has just been recorded (from any source). Updated about 20 times a second.
+void cFourTrack::updateTrackMeters()
+{
+    if (meterTimer < 50 && trackBar[0][0] != 0)
+    {
+        return;
+    }
+    meterTimer = 0;
+
+    const FourTrackSession::Mode mode = session.mode();
+    const bool recordingNow = (mode == FourTrackSession::Mode::RecordingFirst ||
+                               mode == FourTrackSession::Mode::RecordingPart);
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+    {
+        uint16_t peak = 0;
+        if (recordingNow && t == session.recordingTrack())
+        {
+            const uint32_t length = recorder.getLength();
+            if (length >= AUDIO_BLOCK_SAMPLES)
+            {
+                const int16_t* last = regionStart(t) + (length - AUDIO_BLOCK_SAMPLES);
+                peak = loopPeakBlock(last, AUDIO_BLOCK_SAMPLES, 0, AUDIO_BLOCK_SAMPLES);
+            }
+        }
+        else
+        {
+            peak = engine.getLoopPlayer()->takePeak(t);
+        }
+
+        int db = -60;
+        if (peak > 32)
+        {
+            db = (int)(20.0f * std::log10((float)peak / 32768.0f));
+            if (db < -60) db = -60;
+        }
+        // Fall back slowly, jump up at once.
+        trackDb[t] = (db > trackDb[t]) ? db : (trackDb[t] - 3 > db ? trackDb[t] - 3 : db);
+
+        int filled = (trackDb[t] + 50) / 5; // -50 dB to 0 dB in ten steps
+        if (filled < 0) filled = 0;
+        if (filled > 10) filled = 10;
+        for (int i = 0; i < 10; i++)
+        {
+            trackBar[t][i] = (i < filled) ? '|' : '.';
+        }
+        trackBar[t][10] = 0;
+    }
+}
+
 void cFourTrack::refreshTexts(bool force)
 {
+    updateTrackMeters();
     bool changed = force;
     const int recTrack = session.recordingTrack();
     for (int t = 0; t < FourTrackSession::kTracks; t++)
@@ -567,10 +619,11 @@ void cFourTrack::refreshTexts(bool force)
         }
         std::snprintf(trackText[t],
                       sizeof(trackText[t]),
-                      "%s Track %d  [%s]  %s",
+                      "%s Track %d [%s] %s  %s",
                       (t == session.selected()) ? ">" : " ",
                       t + 1,
                       sourceName(trackSource[t]),
+                      trackBar[t],
                       state);
         if (force || std::strcmp(trackText[t], shownTrackText[t]) != 0)
         {

@@ -74,3 +74,14 @@ Please try:
 3. Check the pads recording lines up with the loop, and say whether it sounds clean or has clicks, gaps or delay.
 
 Known limits: the level meter line only shows the audio input, so it does not move for PADS. Sources are not saved with the project yet.
+
+## Test build FT8: a level meter on each track
+Includes everything in FT7.
+
+New: each track line now shows a ten-step level bar, for example `> Track 1 [LINE] ||||||....  PART`.
+- A track that is playing shows the level of its own recording.
+- The track being recorded shows the level of what is being recorded, whatever the source (line, mic or pads). So the bar now moves for PADS too.
+- The bar jumps up at once and falls back slowly. It covers about -50 dB to 0 dB.
+The separate input level line at the bottom is still there; it only shows the audio input.
+
+Please check: does each bar match what you hear, and is the track line still fully readable on the screen (it is longer now, so tell me if it is cut off)?
