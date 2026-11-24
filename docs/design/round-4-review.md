@@ -16,9 +16,12 @@ Checked frame by frame (32 frames, sections 4.1 to 4.13) against `screen-require
 1. **Pads and Memory screens say "of 64 MB".** The device has 16 MB of memory, of which about 11.25 MB holds samples and recordings. Show "of 11.3 MB" or a plain bar with no total.
 2. **Input setup level meter:** the "-18" tick label overlaps the text "aim between -18 and -6". Move or shorten one.
 
-## Open risk, needs a device test before the design is final
-- **Control count and drawing budget.** The firmware allows 65 controls on the whole screen, about 43 free after the shared ones, and 8,172 bytes of drawing for the whole screen. The design reports 94 to 149 elements per screen. An element is not the same as a control, because we can write one custom control that draws a whole lane, but the byte budget still applies. Estimate for the main screen: about 2,900 bytes of waveform plus texts and boxes; Performance has 149 elements and no waveform. Both may be close to the cap. If the cap is hit, the top bar and button labels disappear first.
-- Proposed check: a test build that draws the busiest screens (main with three lanes, Performance) with fixed content, and reports whether anything vanishes. Needs the owner to flash it.
+## Drawing budget: checked, fits if built the stock way
+- Limits (from source): 8,172 bytes of drawing per screen (display list size of the screen chip), 65 controls, 8 bytes per waveform column (`display.cpp:640`, `displayStructs.h:21`, `spectrum.cpp:199-204`).
+- Stock text drawing (`cTracker`, `cArrangement`, `cHorizontalTracker`) puts one 4-byte word per character plus a colour or font word when they change. A generic label control (`CMD_TEXT`) costs more per string (estimate, not verified).
+- All 32 frames priced both ways. Built stock-style (our own controls that draw a whole lane or row), the heaviest frame is about 5,050 bytes (main screen while recording). Built with one generic label per text it would be up to about 8,100, at the limit.
+- For comparison, the stock Pattern grid is about 15 rows x 8 tracks x roughly 13 characters, about 6,200 bytes of characters alone (rough count of the code, not measured).
+- Conclusion: the design is not heavier than the stock screens. The rule for the build is: draw text and boxes inside our own controls the way the stock tracker control does, never as one label per piece. No cuts to the design are needed. A debug readout of bytes per screen will confirm it on the device.
 
 ## Firmware work the design implies (not design problems)
 - Rename project has no stock support in v1.0.0 (needs new code).
