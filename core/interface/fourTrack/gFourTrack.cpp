@@ -6,7 +6,9 @@ void cFourTrack::initDisplayControls()
     // Created first = lowest handle = drawn last, so on top: popup, then the question, then the
     // playhead and level bars above the footer, then the page or the lanes underneath.
     strControlProperties prop{};
-    prop.data = app;
+    // The controls are made again every time the screen opens, so the application has to exist
+    // by now (it used to be missing the first time, which left the screen blank)
+    prop.data = &application();
     prop.style = controlStyleShow;
     const int order[6] = { 5, 3, 1, 2, 4, 0 };
     for (int layer : order)

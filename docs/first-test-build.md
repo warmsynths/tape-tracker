@@ -128,7 +128,7 @@ New: after you stop the first take (or it stops by itself at 24 s), the Tracker 
 Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.
 
 ## Test build FT16: the whole design, one build
-`firmware/PolyendTracker_FT21_full.ptf` (FT16 plus the fixes below; FT21 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
+`firmware/PolyendTracker_FT22_full.ptf` (FT16 plus the fixes below; FT22 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
 
 What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-requirements.md` for each screen):
 - **Main screen:** starting tempo and count-in, click, source per track (line, mic low, mic high, pads), alignment of each Part to the loop (first-note detection and snap, window in Settings), offset, mute, Loop Mode, undo of a replaced take, How many bars.
@@ -154,3 +154,5 @@ FT20: editing.
 - Beat lines are not drawn through the lanes on the main screen.
 
 FT21: fixes buttons B1 to B4 doing nothing in FT16 to FT20. The Tracker's button handler keeps one function per button, so registering the release (for the Glitch hold) replaced the press. B1 to B4 and Shift now use one handler that gets both press and release. Shift did not work on the device before this either.
+
+FT22: fixes the blank screen the first time the Four-Track screen opens after power-up. The screen's drawing parts were created before the application existed, so they had nothing to draw until the screen was opened a second time.
