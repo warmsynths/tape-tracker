@@ -253,14 +253,12 @@ void App::drawGlitch(Pen& p)
         }
     }
     char b[96];
-    fmt(b, sizeof b, "Track %d, slot %d. Left/Right: track. Jog: chance. Insert: latch on or off. Hold B1-B4: now.", gTrack + 1, gSlot + 1);
+    fmt(b, sizeof b, "Track %d, slot %d. B5-B8 track. Jog chance. Insert latch. Hold B1-B4 now. Shift+B1/2/3: clear, all, pitch.", gTrack + 1, gSlot + 1);
     p.hint(b);
-    char clearT[12];
-    fmt(clearT, sizeof clearT, "Clear T%d", gTrack + 1);
-    const char* l[8] = { "Slot 1", "Slot 2", "Slot 3", "Slot 4", clearT, "Clear all", hal.bank().cfg[gTrack].granular ? "Grain" : "Tape", "Back" };
-    uint8_t held = 0;
-    for (int s = 0; s < 4; s++) if (hal.bank().cfg[gTrack].held[s]) held |= (uint8_t)(1u << s);
-    p.buttons(l, held);
+    const char* l[8] = { "Slot 1", "Slot 2", "Slot 3", "Slot 4", "Track 1", "Track 2", "Track 3", "Track 4" };
+    uint8_t on = (uint8_t)(1u << (4 + gTrack));
+    for (int s = 0; s < 4; s++) if (hal.bank().cfg[gTrack].held[s]) on |= (uint8_t)(1u << s);
+    p.buttons(l, on);
 }
 
 //--------------------------------------------------------------------------------------------

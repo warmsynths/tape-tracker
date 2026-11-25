@@ -128,7 +128,7 @@ New: after you stop the first take (or it stops by itself at 24 s), the Tracker 
 Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.
 
 ## Test build FT16: the whole design, one build
-`firmware/PolyendTracker_FT24_full.ptf` (FT16 plus the fixes below; FT24 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
+`firmware/PolyendTracker_FT25_full.ptf` (FT16 plus the fixes below; FT25 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
 
 What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-requirements.md` for each screen):
 - **Main screen:** starting tempo and count-in, click, source per track (line, mic low, mic high, pads), alignment of each Part to the loop (first-note detection and snap, window in Settings), offset, mute, Loop Mode, undo of a replaced take, How many bars.
@@ -170,3 +170,5 @@ Changes you will notice:
 - Settings: Grid and Snap cuts to zero are added to the project block; the rows are a little closer together to fit.
 - The Project list shows bars and tempo of each saved project; the date column is not shown because the Tracker has no clock set.
 Where the design uses a different font, letters differ in width; positions are the design's.
+
+FT25: Glitch keeps the design's look, with the track buttons back: B5 to B8 pick Track 1 to 4, Shift+B1 clears the track, Shift+B2 clears all, Shift+B3 switches the pitch style (tape or grain). Left/Right still pick the track too.
