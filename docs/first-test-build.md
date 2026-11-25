@@ -115,3 +115,14 @@ Please check, with Config set to Stereo and then Mono Left: does the monitor sou
 Same as FT12, plus a small readout at the top right of the Four-Track screen: `L -20  R -26 dB`. It is the level arriving at the input, measured separately for the left and right jack, before anything else in the Tracker touches it.
 
 Use it to settle the left-louder question: play the Minichord with Config set to Stereo and read the two numbers. If R is several dB lower than L, the imbalance is in the signal or the cable. If they match but you still hear the left louder, the cause is after the input (the headphone output or the headphones).
+
+## Test build FT14: "How many bars?"
+Includes FT13 (the left and right input readout).
+
+New: after you stop the first take (or it stops by itself at 24 s), the Tracker asks **How many bars?** instead of starting the loop straight away.
+- The choices are the bar counts that give a tempo between 40 and 240 BPM, each with the tempo it would give. The one nearest 120 BPM is highlighted to start.
+- **Jog wheel** or **Left/Right arrows** choose. The button under the screen labelled **OK** (the 8th) sets the loop and the tempo and starts it playing. **Cancel** (the 7th) throws the take away.
+- After OK the top bar shows the tempo and the number of bars, the loop line is split into bars with numbers, and the position reads as bar.beat.sixteenth.
+- No audio is stretched. Only the tempo is calculated from the length you played.
+
+Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.

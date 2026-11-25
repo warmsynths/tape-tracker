@@ -4,6 +4,7 @@
 #include "FourTrackSession.h"
 #include "core/modulesBase.h"
 #include "fourTrackView.h"
+#include "loop_bars.h"
 
 // Four-track test screen, opened with the Song button in this build.
 // Buttons under the screen: 1 Rec, 2 Stop, 3 Play, 5 to 8 select track 1 to 4.
@@ -27,6 +28,10 @@ class cFourTrack : public ModuleBase
     void selectTrack(int track);
     // Moves the selection to the previous or next track (arrows and jog wheel).
     void moveSelection(int delta);
+    // "How many bars?": move the highlight, accept, or throw the take away.
+    void promptMove(int delta);
+    void promptConfirm();
+    void promptCancel();
 
     // Where a track records from. Each track has its own source. Pressing the button of the
     // track that is already selected cycles its source.
@@ -76,6 +81,11 @@ class cFourTrack : public ModuleBase
     hControl viewStatic = -1;
     hControl viewDynamic = -1;
     hControl viewFooter = -1;
+    hControl viewPrompt = -1;
+    bool promptShown = false;
+    int promptBars[kBarChoiceMax]{};
+    int promptCount = 0;
+    int promptSelected = 0;
     strFtView view{};
     uint32_t staticSignature = 0;
     bool waveDirty[FourTrackSession::kTracks] = { true, true, true, true };

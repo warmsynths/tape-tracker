@@ -8,6 +8,9 @@ void cFourTrack::initDisplayControls()
     strControlProperties prop{};
     prop.data = &view;
     prop.style = controlStyleShow;
+    prop.value = 3; // layer 3: the "How many bars?" question, on top of everything
+    viewPrompt = display.createControl<cFourTrackView>(&prop);
+    display.setControlHide(viewPrompt);
     prop.value = 1; // layer 1: playhead, position, level bars
     viewDynamic = display.createControl<cFourTrackView>(&prop);
     prop.value = 2; // layer 2: hint line and button row

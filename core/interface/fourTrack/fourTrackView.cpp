@@ -1,6 +1,7 @@
 #include "fourTrackView.h"
 #include "FT812.h"
 #include "display.h"
+#include <stdio.h>
 #include <string.h>
 
 namespace
@@ -27,7 +28,7 @@ constexpr int kF12 = 4;
 extern strFont fonts[];
 
 cFourTrackView::cFourTrackView(strControlProperties* properties)
-  : cDisplayControl(controlIdSimpleBox, properties->value == 0 ? 5 : (properties->value == 2 ? 2 : 1))
+  : cDisplayControl(controlIdSimpleBox, properties->value == 0 ? 5 : ((properties->value == 2 || properties->value == 3) ? 2 : 1))
 {
     posX = 0;
     posY = 0;
@@ -113,9 +114,13 @@ void cFourTrackView::update()
     {
         drawDynamic();
     }
-    else
+    else if (value == 2)
     {
         drawHint();
+    }
+    else
+    {
+        drawPrompt();
     }
 }
 
@@ -124,6 +129,7 @@ void cFourTrackView::update2()
     if (view == nullptr) return;
     if (value == 0) drawLane(0, kLanesY);
     else if (value == 2) drawButtons();
+    else if (value == 3) drawPromptChoices();
 }
 
 void cFourTrackView::update3()
@@ -388,5 +394,91 @@ void cFourTrackView::drawDynamic()
         const int px = kWaveX + (int)(((uint64_t)pos * kWaveW) / view->loopFrames);
         rect(px, kRulerY + 4, 1, kHintY - kRulerY - 4, bright);
         rect(px - 1, kRulerY + 2, 3, 4, bright);
+    }
+}
+
+//--------------------------------------------------------------------------------------------
+// "How many bars?" (design 4.3): a panel over the lower part of the screen
+namespace
+{
+constexpr int kPromptY = 160;
+constexpr int kCellsY = 232;
+constexpr int kCellH = 76;
+constexpr int kCellsPerRow = 6;
+} // namespace
+
+void cFourTrackView::drawPrompt()
+{
+    Theme& th = display.getTheme();
+    const strFtPrompt& P = view->prompt;
+    const uint32_t text = th.activeLabelsColors[0];
+    const uint32_t bright = th.white;
+    const uint32_t dim = th.inactiveLabelsColors[3];
+    const uint32_t panel = th.grey_22;
+    const uint32_t hair = th.frameColors[1];
+
+    rect(0, kPromptY, 800, 480 - kPromptY, th.backgroundColor);
+    rect(0, kPromptY, 800, 2, bright);
+
+    int x = drawText(14, kPromptY + 16, "How many bars?", kF17Bold, bright);
+    if (P.memoryFull)
+    {
+        rect(x + 16, kPromptY + 17, textWidth("MEMORY FULL", kF12) + 12, 18, th.orange);
+        x = drawText(x + 22, kPromptY + 21, "MEMORY FULL", kF12, th.backgroundColor);
+        drawText(x + 22, kPromptY + 20, P.note, kF14, th.orange);
+    }
+    drawText(14, kPromptY + 44, P.played, kF14, text);
+
+    // result box on the right
+    const uint32_t bpm = P.bpm10[P.selected];
+    char big[16];
+    snprintf(big, sizeof(big), "%u.%u BPM", (unsigned)(bpm / 10), (unsigned)(bpm % 10));
+    drawText(616, kCellsY + 4, "Result", kF12, dim);
+    drawText(616, kCellsY + 22, big, kF17Bold, bright);
+    char line[24];
+    snprintf(line, sizeof(line), "%u bars of 4/4", (unsigned)P.bars[P.selected]);
+    drawText(616, kCellsY + 48, line, kF12, dim);
+    drawText(616, kCellsY + 64, view->loopMode, kF12, dim);
+    drawText(616, kCellsY + 80, P.suggestion, kF12, dim);
+
+    drawText(14, kHintY + 14, "Jog or Left/Right chooses. B8 OK sets the Loop and tempo. B7 Cancel discards the take.", kF12, dim);
+
+    // button row: only Cancel and OK do anything
+    rect(0, kButtonsY, 800, 1, hair);
+    for (int b = 0; b < 8; b++)
+    {
+        rect(b * 100 + 1, kButtonsY + 1, 97, 38, panel);
+    }
+    drawText(600 + 1 + (97 - textWidth("Cancel", kF14)) / 2, kButtonsY + 12, "Cancel", kF14, text);
+    drawText(700 + 1 + (97 - textWidth("OK", kF14)) / 2, kButtonsY + 12, "OK", kF14, bright);
+}
+
+void cFourTrackView::drawPromptChoices()
+{
+    Theme& th = display.getTheme();
+    const strFtPrompt& P = view->prompt;
+    const uint32_t text = th.activeLabelsColors[0];
+    const uint32_t bright = th.white;
+    const uint32_t dim = th.inactiveLabelsColors[3];
+    const uint32_t panel = th.grey_22;
+
+    for (int i = 0; i < P.count; i++)
+    {
+        const int x0 = (i % kCellsPerRow) * 100;
+        const int y0 = kCellsY + (i / kCellsPerRow) * (kCellH + 4);
+        const bool selected = (i == P.selected);
+        rect(x0 + 1, y0, 97, kCellH, selected ? th.frameColors[1] : panel);
+        if (selected)
+        {
+            rect(x0 + 1, y0, 97, 2, bright);
+        }
+        char n[8];
+        snprintf(n, sizeof(n), "%u", (unsigned)P.bars[i]);
+        int x = drawText(x0 + 12, y0 + 12, n, kF17Bold, bright);
+        drawText(x + 8, y0 + 16, "bars", kF12, dim);
+        char t[12];
+        snprintf(t, sizeof(t), "%u.%u", (unsigned)(P.bpm10[i] / 10), (unsigned)(P.bpm10[i] % 10));
+        drawText(x0 + 12, y0 + 38, t, kF17Light, selected ? bright : text);
+        drawText(x0 + 12, y0 + 58, "BPM", kF12, dim);
     }
 }

@@ -51,6 +51,8 @@ static void functRec() { FT->pressRecord(); }
 static void functStop() { FT->pressStop(); }
 static void functPlay() { FT->pressPlay(); }
 static void functPadMode() { FT->togglePadMode(); }
+static void functLeft() { FT->promptMove(-1); }
+static void functRight() { FT->promptMove(1); }
 static void functUp() { FT->moveSelection(-1); }
 static void functDown() { FT->moveSelection(1); }
 static void functEncoder(int16_t value)
@@ -148,6 +150,8 @@ void cFourTrack::stop()
     display.setControlHide(viewStatic);
     display.setControlHide(viewDynamic);
     display.setControlHide(viewFooter);
+    display.setControlHide(viewPrompt);
+    promptShown = false;
     mtPadBoard.releaseAllInstruments();
     padsBacklight.clearGlobalPads(1, 1, 1);
     songTimer.show();
@@ -163,6 +167,8 @@ void cFourTrack::setDefaultScreenFunct()
     ip->setButtonObj(interfaceButton2, buttonPress, functPlay);
     ip->setButtonObj(interfaceButton3, buttonPress, functPadMode);
     ip->setPadsGlobal(functPads);
+    ip->setButtonObj(interfaceButtonLeft, buttonPress, functLeft);
+    ip->setButtonObj(interfaceButtonRight, buttonPress, functRight);
     ip->setButtonObj(interfaceButtonUp, buttonPress, functUp);
     ip->setButtonObj(interfaceButtonDown, buttonPress, functDown);
     ip->setPotObj(interfacePot0, functEncoder);
@@ -269,8 +275,64 @@ void cFourTrack::applySource(Source source)
     }
 }
 
+void cFourTrack::promptMove(int delta)
+{
+    if (session.mode() != FourTrackSession::Mode::ChoosingBars || promptCount == 0)
+    {
+        return;
+    }
+    int next = promptSelected + delta;
+    if (next < 0) next = 0;
+    if (next >= promptCount) next = promptCount - 1;
+    promptSelected = next;
+    refreshTexts(true);
+}
+
+void cFourTrack::promptConfirm()
+{
+    if (session.mode() != FourTrackSession::Mode::ChoosingBars || promptCount == 0)
+    {
+        return;
+    }
+    session.confirmBars(promptBars[promptSelected]);
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+    {
+        waveDirty[t] = true;
+    }
+    syncPlayer(); // the loop starts playing
+    refreshTexts(true);
+}
+
+void cFourTrack::promptCancel()
+{
+    if (session.mode() != FourTrackSession::Mode::ChoosingBars)
+    {
+        return;
+    }
+    session.cancelBars();
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+    {
+        partData[t] = nullptr;
+        waveDirty[t] = true;
+    }
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+    {
+        if (session.hasPart(t))
+        {
+            partData[t] = regionStart(t); // other Parts stay as they were
+        }
+    }
+    syncPlayer();
+    refreshTexts(true);
+}
+
 void cFourTrack::moveSelection(int delta)
 {
+    if (session.mode() == FourTrackSession::Mode::ChoosingBars)
+    {
+        promptMove(delta); // the jog wheel chooses the bars while the question is open
+        return;
+    }
     int track = session.selected() + delta;
     if (track < 0 || track >= FourTrackSession::kTracks)
     {
@@ -287,6 +349,13 @@ void cFourTrack::moveSelection(int delta)
 
 void cFourTrack::selectTrack(int track)
 {
+    if (session.mode() == FourTrackSession::Mode::ChoosingBars)
+    {
+        // The buttons under the screen are Cancel (7th) and OK (8th) while the question is open.
+        if (track == 2) promptCancel();
+        else if (track == 3) promptConfirm();
+        return;
+    }
     const bool idle = (session.mode() == FourTrackSession::Mode::Idle);
     if (idle && track >= 0 && track < FourTrackSession::kTracks && track == session.selected())
     {
@@ -441,7 +510,12 @@ void cFourTrack::onFirstTakeFinished()
     {
         partData[t] = nullptr;
     }
-    if (session.hasPart(session.selected()))
+    if (session.mode() == FourTrackSession::Mode::ChoosingBars && session.recordingTrack() >= 0)
+    {
+        // The take is done but its Part only counts once the bars are chosen.
+        partData[session.recordingTrack()] = regionStart(session.recordingTrack());
+    }
+    else if (session.hasPart(session.selected()))
     {
         partData[session.selected()] = regionStart(session.selected());
     }
@@ -675,8 +749,17 @@ void cFourTrack::fillView()
 
     std::snprintf(view.project, sizeof(view.project), "Four-Track");
     view.unsaved = false;
-    std::snprintf(view.tempo, sizeof(view.tempo), "Free");
-    std::snprintf(view.bars, sizeof(view.bars), "-");
+    if (session.bars() > 0 && session.loopFrames() > 0)
+    {
+        const uint32_t tempo = loopTempoTenths(session.loopFrames(), kSampleRate, session.bars());
+        std::snprintf(view.tempo, sizeof(view.tempo), "%u.%u", (unsigned)(tempo / 10), (unsigned)(tempo % 10));
+        std::snprintf(view.bars, sizeof(view.bars), "%d", session.bars());
+    }
+    else
+    {
+        std::snprintf(view.tempo, sizeof(view.tempo), "Free");
+        std::snprintf(view.bars, sizeof(view.bars), "-");
+    }
     std::snprintf(view.input, sizeof(view.input), "%s", sourceName(trackSource[session.selected()]));
     view.monitor = (trackSource[session.selected()] == Source::Line);
     // Left and right input level in dB, to see whether a stereo source arrives evenly.
@@ -690,7 +773,7 @@ void cFourTrack::fillView()
         const int dbR = (levelR > 0.001f) ? (int)(20.0f * std::log10(levelR)) : -60;
         std::snprintf(view.inputLevels, sizeof(view.inputLevels), "L %d  R %d dB", dbL < -60 ? -60 : dbL, dbR < -60 ? -60 : dbR);
     }
-    view.barCount = 0; // bars are chosen in a later step (the "How many bars?" screen)
+    view.barCount = (uint8_t)session.bars();
     view.loopFrames = loop;
 
     // status line
@@ -735,7 +818,16 @@ void cFourTrack::fillView()
     else if (loop > 0)
     {
         view.posFrames = engine.getLoopPlayer()->position();
-        formatTime(view.pos, sizeof(view.pos), view.posFrames, kSampleRate);
+        if (session.bars() > 0)
+        {
+            // bar.beat.sixteenth, 4/4
+            const uint32_t sixteenths = (uint32_t)(((uint64_t)view.posFrames * session.bars() * 16) / loop);
+            std::snprintf(view.pos, sizeof(view.pos), "%u.%u.%02u", (unsigned)(sixteenths / 16 + 1), (unsigned)((sixteenths % 16) / 4 + 1), (unsigned)(sixteenths % 4 + 1));
+        }
+        else
+        {
+            formatTime(view.pos, sizeof(view.pos), view.posFrames, kSampleRate);
+        }
     }
     else
     {
@@ -791,6 +883,34 @@ void cFourTrack::fillView()
         else if (!L.hasPart)
         {
             std::snprintf(L.msg2, sizeof(L.msg2), "Empty");
+        }
+    }
+
+    // the "How many bars?" question
+    {
+        strFtPrompt& P = view.prompt;
+        P.active = (mode == FourTrackSession::Mode::ChoosingBars);
+        if (P.active)
+        {
+            if (!promptShown)
+            {
+                promptCount = loopBarChoices(session.pendingFrames(), kSampleRate, promptBars);
+                promptSelected = loopBarSuggestion(session.pendingFrames(), kSampleRate, promptBars, promptCount);
+            }
+            const uint32_t played = session.pendingFrames();
+            const uint32_t hundredths = (uint32_t)(((uint64_t)played * 100) / kSampleRate);
+            P.memoryFull = session.memoryFull();
+            P.count = (uint8_t)promptCount;
+            P.selected = (uint8_t)promptSelected;
+            for (int i = 0; i < promptCount; i++)
+            {
+                P.bars[i] = (uint8_t)promptBars[i];
+                P.bpm10[i] = (uint16_t)loopTempoTenths(played, kSampleRate, promptBars[i]);
+            }
+            std::snprintf(P.played, sizeof(P.played), "You played %u.%02u s. No audio is stretched; only the tempo is worked out.", (unsigned)(hundredths / 100), (unsigned)(hundredths % 100));
+            std::snprintf(P.note, sizeof(P.note), "Stopped at %u.%u s. Everything recorded is kept.", (unsigned)(hundredths / 100), (unsigned)((hundredths % 100) / 10));
+            const int suggested = loopBarSuggestion(played, kSampleRate, promptBars, promptCount);
+            std::snprintf(P.suggestion, sizeof(P.suggestion), "%s", (promptSelected == suggested) ? "Suggested: nearest 120 BPM" : "");
         }
     }
 
@@ -867,6 +987,25 @@ void cFourTrack::refreshTexts(bool force)
     }
 
     bool changed = false;
+    const bool wantPrompt = (session.mode() == FourTrackSession::Mode::ChoosingBars);
+    if (wantPrompt && !promptShown)
+    {
+        promptShown = true;
+        display.setControlShow(viewPrompt);
+        display.refreshControl(viewPrompt);
+        changed = true;
+    }
+    else if (!wantPrompt && promptShown)
+    {
+        promptShown = false;
+        display.setControlHide(viewPrompt);
+        changed = true;
+    }
+    else if (wantPrompt && force)
+    {
+        display.refreshControl(viewPrompt);
+        changed = true;
+    }
     if (force || sig != staticSignature)
     {
         staticSignature = sig;

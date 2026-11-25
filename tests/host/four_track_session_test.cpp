@@ -21,6 +21,7 @@ static FourTrackSession withLoop(uint32_t maxFrames, uint32_t loopFrames)
     s.pressRecord();
     s.firstRecordedFrames(loopFrames, false);
     s.pressStop();
+    s.confirmBars(4);
     return s;
 }
 
@@ -43,7 +44,12 @@ int main()
         CHECK(s.mode() == Mode::RecordingFirst && s.recordingTrack() == 0, "rec with no loop records the first Part");
         s.firstRecordedFrames(400, false);
         s.pressStop();
-        CHECK(s.mode() == Mode::Idle && s.loopFrames() == 400 && s.hasPart(0), "stop keeps the first Part and sets the loop");
+        CHECK(s.mode() == Mode::ChoosingBars && s.pendingFrames() == 400 && s.loopFrames() == 0, "stop asks how many bars before the loop is set");
+        CHECK(!s.playing(), "nothing plays while the bars are asked");
+        s.pressRecord(); s.pressPlay(); s.pressStop(); s.selectTrack(1);
+        CHECK(s.mode() == Mode::ChoosingBars && s.selected() == 0, "other buttons are ignored while the bars are asked");
+        s.confirmBars(4);
+        CHECK(s.mode() == Mode::Idle && s.loopFrames() == 400 && s.hasPart(0) && s.bars() == 4, "choosing the bars keeps the first Part and sets the loop");
         CHECK(s.playing(), "loop plays right after the first Part");
         CHECK(!s.memoryFull(), "not full");
     }
@@ -59,17 +65,20 @@ int main()
         s.pressRecord();
         s.firstRecordedFrames(300, false);
         s.pressStop();
+        s.confirmBars(2);
         CHECK(s.hasPart(2) && !s.hasPart(0) && s.loopFrames() == 300, "first Part on track 3");
     }
     {   // memory cap stops the first take by itself and keeps it
         FourTrackSession s(kMax);
         s.pressRecord();
         s.firstRecordedFrames(kMax + 50, false);
-        CHECK(s.mode() == Mode::Idle && s.loopFrames() == kMax && s.memoryFull(), "cap stops and clamps the first Part");
+        CHECK(s.mode() == Mode::ChoosingBars && s.pendingFrames() == kMax && s.memoryFull(), "cap stops and clamps the first Part");
         FourTrackSession t(kMax);
         t.pressRecord();
         t.firstRecordedFrames(700, true);
-        CHECK(t.mode() == Mode::Idle && t.loopFrames() == 700 && t.memoryFull(), "memory full below the cap keeps the take");
+        CHECK(t.mode() == Mode::ChoosingBars && t.pendingFrames() == 700 && t.memoryFull(), "memory full below the cap keeps the take");
+        t.confirmBars(3);
+        CHECK(t.mode() == Mode::Idle && t.loopFrames() == 700, "bars chosen after memory full");
     }
     {   // a later Part: arm, window, record, done
         FourTrackSession s = withLoop(kMax, 500);
@@ -125,7 +134,8 @@ int main()
         s.pressRecord();
         s.firstRecordedFrames(250, false);
         s.pressStop();
-        CHECK(s.loopFrames() == 250, "a new first take redefines the loop");
+        s.confirmBars(2);
+        CHECK(s.loopFrames() == 250 && s.bars() == 2, "a new first take redefines the loop and the bars");
     }
     {   // with two Parts, re-recording the first is a normal later take
         FourTrackSession s = withLoop(kMax, 500);
@@ -151,6 +161,22 @@ int main()
         CHECK(s.mode() == Mode::RecordingPart, "rec while recording is ignored");
         s.pressPlay();
         CHECK(s.mode() == Mode::RecordingPart, "play while recording is ignored");
+    }
+    {   // cancelling the bars throws the take away
+        FourTrackSession s(kMax);
+        s.pressRecord();
+        s.firstRecordedFrames(400, false);
+        s.pressStop();
+        s.cancelBars();
+        CHECK(s.mode() == Mode::Idle && s.loopFrames() == 0 && !s.hasPart(0) && !s.playing() && s.bars() == 0, "cancel leaves no loop and no Part");
+        FourTrackSession t = withLoop(kMax, 500);
+        t.pressRecord(); // new first take over the only Part
+        t.firstRecordedFrames(250, false);
+        t.pressStop();
+        t.cancelBars();
+        CHECK(t.loopFrames() == 0 && !t.hasPart(0), "cancelling a re-recorded first take leaves nothing");
+        s.confirmBars(4);
+        CHECK(s.loopFrames() == 0, "confirm outside the question does nothing");
     }
     {   // events in the wrong mode are ignored
         FourTrackSession s(kMax);

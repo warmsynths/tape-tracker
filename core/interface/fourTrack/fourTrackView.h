@@ -23,6 +23,20 @@ struct strFtLane
     uint8_t meter;     // 0..100, filled width of the level bar
 };
 
+// The "How many bars?" question shown over the main screen after a first take.
+struct strFtPrompt
+{
+    bool active;
+    bool memoryFull;
+    uint8_t count;    // number of choices
+    uint8_t selected; // index of the highlighted choice
+    uint8_t bars[12];
+    uint16_t bpm10[12]; // tempo of each choice in tenths of a BPM
+    char played[80];    // "You played 8.35 s. No audio is stretched; only the tempo is worked out."
+    char note[48];      // "Stopped at 24.0 s. Everything recorded is kept."
+    char suggestion[32];
+};
+
 struct strFtView
 {
     char project[20];
@@ -46,6 +60,7 @@ struct strFtView
     uint8_t btnKind[8]; // 0 text, 1 Rec dot, 2 Stop square, 3 Play glyph
     int8_t btnSelected; // -1 none
     strFtLane lane[4];
+    strFtPrompt prompt;
 };
 
 // Draws the main screen. Three copies are created, told apart by `value`:
@@ -86,6 +101,8 @@ class cFourTrackView : public cDisplayControl
     void drawHint();
     void drawButtons();
     void drawDynamic();
+    void drawPrompt();
+    void drawPromptChoices();
 
     const strFtView* view = nullptr;
 };

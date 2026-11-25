@@ -16,7 +16,8 @@ class FourTrackSession
         Idle,
         RecordingFirst, // free length; its length becomes the loop
         Armed,          // waiting for the loop to come round
-        RecordingPart   // recording exactly one loop
+        RecordingPart,  // recording exactly one loop
+        ChoosingBars    // the first take is done; the person picks how many bars it is
     };
 
     explicit FourTrackSession(uint32_t maxLoopFrames)
@@ -29,6 +30,9 @@ class FourTrackSession
     int selected() const { return selectedTrack; }
     uint32_t loopFrames() const { return loop; }
     bool memoryFull() const { return full; }
+    // Bars of the loop once chosen (0 until then), and the length of a take waiting for its bars.
+    int bars() const { return barCount; }
+    uint32_t pendingFrames() const { return pending; }
     bool hasPart(int track) const { return track >= 0 && track < kTracks && parts[track]; }
     int partCount() const;
     // The track being recorded or armed, or -1.
@@ -51,12 +55,19 @@ class FourTrackSession
     void armWindowReached();                                    // Armed -> RecordingPart
     void partRecorded();                                        // RecordingPart -> Idle
 
+    // After a first take: the loop is set to the take and the bars are recorded, and it plays.
+    void confirmBars(int bars);
+    // Throws the first take away. With no other Part there is no loop again.
+    void cancelBars();
+
   private:
     void finishFirst(uint32_t frames);
 
     uint32_t maxFrames;
     uint32_t loop = 0;
     uint32_t firstFrames = 0;
+    uint32_t pending = 0;
+    int barCount = 0;
     bool full = false;
     bool isPlaying = false;
     bool parts[kTracks] = { false, false, false, false };

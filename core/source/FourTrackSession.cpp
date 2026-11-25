@@ -52,6 +52,7 @@ void FourTrackSession::pressStop()
         case Mode::RecordingFirst: finishFirst(firstFrames); break;
         case Mode::Armed:
         case Mode::RecordingPart: currentMode = Mode::Idle; break;
+        case Mode::ChoosingBars: break; // answer the question first
         case Mode::Idle: isPlaying = false; break;
     }
 }
@@ -115,10 +116,40 @@ void FourTrackSession::finishFirst(uint32_t frames)
         return;
     }
 
-    loop = frames;
+    // Wait for the person to say how many bars this is before the loop is set.
+    pending = frames;
+    currentMode = Mode::ChoosingBars;
+    isPlaying = false;
+}
+
+void FourTrackSession::confirmBars(int bars)
+{
+    if (currentMode != Mode::ChoosingBars || bars <= 0)
+    {
+        return;
+    }
+    loop = pending;
+    barCount = bars;
     for (int i = 0; i < kTracks; i++)
     {
         parts[i] = (i == activeTrack);
     }
+    currentMode = Mode::Idle;
     isPlaying = true;
+}
+
+void FourTrackSession::cancelBars()
+{
+    if (currentMode != Mode::ChoosingBars)
+    {
+        return;
+    }
+    parts[activeTrack] = false;
+    if (partCount() == 0)
+    {
+        loop = 0;
+        barCount = 0;
+    }
+    currentMode = Mode::Idle;
+    isPlaying = (loop > 0);
 }
