@@ -159,7 +159,7 @@ audioEngine::audioEngine()
     {
         connections.push_back(new AudioConnection(
           &loopPlayer,
-          0,
+          channel == 0 ? 0 : 1, // left and right of the loop player
           mixerAndFxs.getTracksAndSendsMixer((MixerAndFxChannelType)channel),
           MixerAndFxs<kVoices>::TrackAndFxsChannels::kLoopChannel));
     }

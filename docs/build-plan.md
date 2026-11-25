@@ -35,25 +35,25 @@ tests               tests/host/ (the same core with a fake Hal, scenario tests)
 6. **Later (not in this build):** chord screen, synths.
 
 ## Feature checklist (design section numbers)
-Tick when done in both firmware and emulator.
-- [ ] 4.1 Main screen: states stopped, armed, recording first, recording part, playing, memory warning
-- [ ] 4.2 Starting tempo and count-in
-- [ ] 4.3 How many bars (40 to 240 BPM rule)
-- [ ] 4.4 Part Editor: trim, fades, normalize, offset, undo, redo, audition
-- [ ] 4.5 Glitch and live effects
-- [ ] 4.6 Lo-fi master with bypass
-- [ ] 4.7 Input setup: source per track, gain, level, monitor, feedback protection
-- [ ] 4.8 Project: new, open, save, save as, rename
-- [ ] 4.9 Four-Track settings (project and device)
-- [ ] 4.10 Export WAV, 1 to 16 repeats
-- [ ] 4.11 Pads and sample settings, Keys and Pad modes
-- [ ] 4.12 Memory
-- [ ] 4.13 Popups: replace, no sound, memory full (first take and later part), SD missing, unsaved changes, feedback protection indicator
-- [ ] Alignment: first-note detection, window, snap
-- [ ] Click and count-in
-- [ ] Undo with the previous take kept on the SD card
-- [ ] Per-track source, pads recorded onto a track
-- [ ] Stock features kept: Sample Load, Sample Rec, Sample Play, Instrument editor, Config (not redesigned)
+Status (2026-11-25): every item below is built in the shared core, runs in the emulator and is in firmware build FT16. The device itself has not been tested yet; see `docs/first-test-build.md`.
+- [x] 4.1 Main screen: states stopped, armed, recording first, recording part, playing, memory warning
+- [x] 4.2 Starting tempo and count-in
+- [x] 4.3 How many bars (40 to 240 BPM rule)
+- [x] 4.4 Part Editor: trim, fades, normalize, offset, undo, redo, audition
+- [x] 4.5 Glitch and live effects
+- [x] 4.6 Lo-fi master with bypass
+- [x] 4.7 Input setup: source per track, gain, level, monitor, feedback protection
+- [x] 4.8 Project: new, open, save, save as, rename
+- [x] 4.9 Four-Track settings (project and device)
+- [x] 4.10 Export WAV, 1 to 16 repeats
+- [x] 4.11 Pads and sample settings, Keys and Pad modes
+- [x] 4.12 Memory
+- [x] 4.13 Popups: replace, no sound, memory full (first take and later part), SD missing, unsaved changes, feedback protection indicator
+- [x] Alignment: first-note detection, window, snap
+- [x] Click and count-in
+- [x] Undo with the previous take kept on the SD card
+- [x] Per-track source, pads recorded onto a track
+- [x] Stock features kept: Sample Load, Sample Rec, Sample Play, Instrument editor, Config (not redesigned)
 
 ## Rules for this build
 - Build only from the official v1.0.0 release. Never touch the bootloader or the flash start address.

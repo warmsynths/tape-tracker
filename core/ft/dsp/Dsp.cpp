@@ -65,22 +65,22 @@ int findFirstOnset(const int16_t* x, uint32_t from, uint32_t to, uint32_t rate)
     };
 
     // The noise floor is the 10th percentile of the cell peaks (a histogram, no sorting).
-    static uint32_t histogram[4096];
-    for (int i = 0; i < 4096; i++) histogram[i] = 0;
+    static uint32_t histogram[1024];
+    for (int i = 0; i < 1024; i++) histogram[i] = 0;
     int32_t maxPeak = 0;
     for (uint32_t i = 0; i < n; i++)
     {
         const int32_t cp = cellPeak(i);
         if (cp > maxPeak) maxPeak = cp;
-        histogram[cp >> 3]++;
+        histogram[cp >> 5]++;
     }
     uint32_t cumulative = 0, floorPeak = 0;
-    for (int b = 0; b < 4096; b++)
+    for (int b = 0; b < 1024; b++)
     {
         cumulative += histogram[b];
         if (cumulative * 10 >= n)
         {
-            floorPeak = (uint32_t)b << 3;
+            floorPeak = (uint32_t)b << 5;
             break;
         }
     }

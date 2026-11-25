@@ -35,12 +35,10 @@ class cFourTrack : public ModuleBase
     FourTrackHal hal;
     ft::App* app = nullptr;
 
-    // One display control per layer (see core/ft/View.h)
-    hControl viewStatic = -1;
-    hControl viewDynamic = -1;
-    hControl viewFooter = -1;
-    hControl viewPrompt = -1;
-    bool promptOnScreen = false;
+    // One display control per layer (see core/ft/App.h): 0 top bar and lanes, 1 playhead and
+    // levels, 2 hint and buttons, 3 the bars question, 4 a page, 5 a popup
+    hControl view[6] = { -1, -1, -1, -1, -1, -1 };
+    bool shown[6] = {};
 };
 
 extern cFourTrack fourTrack;

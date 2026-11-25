@@ -33,4 +33,6 @@ class cFourTrackView : public cDisplayControl
     const ft::App* app = nullptr;
 };
 
+ft::Gfx* fourTrackTextMeter();
+
 #endif /* INTERFACE_FOURTRACK_FOURTRACKVIEW_H_ */

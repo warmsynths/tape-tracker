@@ -6,6 +6,8 @@
 #include "mtAudioEngine.h"
 #include "mtConfig.h"
 #include "mtStructs.h"
+#include "fourTrackView.h"
+#include <new>
 
 cFourTrack fourTrack;
 static cFourTrack* FT = &fourTrack;
@@ -28,6 +30,17 @@ static void functLeft() { functKey(ft::kLeft); }
 static void functRight() { functKey(ft::kRight); }
 static void functRec() { functKey(ft::kRec); }
 static void functPlay() { functKey(ft::kPlay); }
+static void functB1Up() { FT->application().keyUp(ft::kB1); }
+static void functB2Up() { FT->application().keyUp(ft::kB2); }
+static void functB3Up() { FT->application().keyUp(ft::kB3); }
+static void functB4Up() { FT->application().keyUp(ft::kB4); }
+static void functShiftDown() { FT->application().setShift(true); }
+static void functShiftUp() { FT->application().setShift(false); }
+static void functJogPress() { functKey(ft::kJogPress); }
+static void functSampleEdit() { functKey(ft::kSampleEdit); }
+static void functPerformance() { functKey(ft::kPerformance); }
+static void functMaster() { functKey(ft::kMaster); }
+static void functFile() { functKey(ft::kFile); }
 static void functEncoder(int16_t value) { FT->application().jog(value); }
 static void functPads(uint8_t pad, uint8_t state, int16_t velo)
 {
@@ -45,31 +58,19 @@ cFourTrack::cFourTrack()
 {
 }
 
-// Colours come from the Tracker's theme, so a custom theme recolours this screen too.
-ft::Palette cFourTrack::paletteFromTheme() const
-{
-    Theme& th = display.getTheme();
-    ft::Palette p;
-    p.background = th.backgroundColor;
-    p.text = th.activeLabelsColors[0];
-    p.bright = th.white;
-    p.dim = th.inactiveLabelsColors[3];
-    p.panel = th.grey_22;
-    p.hairline = th.frameColors[1];
-    p.selected = th.frameColors[1];
-    p.meterBack = th.inactiveBarColors[0];
-    p.wave = th.waveformColors[1];
-    p.record = th.red;
-    p.marker = th.orange;
-    p.good = th.green;
-    return p;
-}
+extern int16_t externalRamSampleMemory[];
+
+// The colours are the design's own (docs/design/); the emulator uses the same ones.
+ft::Palette cFourTrack::paletteFromTheme() const { return ft::designPalette(); }
 
 ft::App& cFourTrack::application()
 {
     if (app == nullptr)
     {
-        app = new ft::App(hal, paletteFromTheme());
+        static_assert(sizeof(ft::App) <= kFourTrackAppBytes, "the application must fit its reserved memory");
+        void* where = (uint8_t*)externalRamSampleMemory + (SAMPLE_MEMORY_SIZE - kFourTrackReservedBytes);
+        app = new (where) ft::App(hal, paletteFromTheme());
+        app->setMeasure(fourTrackTextMeter());
     }
     return *app;
 }
@@ -83,13 +84,14 @@ void cFourTrack::start(uint32_t options)
 
     songTimer.hide();
 
-    ip->setButtonObj(interfaceButtonPerformance, buttonPress, functSwitchModule);
     ip->setButtonObj(interfaceButtonParams, buttonPress, functSwitchModule);
-    ip->setButtonObj(interfaceButtonFile, buttonPress, functSwitchModule);
     ip->setButtonObj(interfaceButtonConfig, buttonPress, functSwitchModule);
-    ip->setButtonObj(interfaceButtonMaster, buttonPress, functSwitchModule);
     ip->setButtonObj(interfaceButtonSamplePlay, buttonPress, functSwitchModule);
-    ip->setButtonObj(interfaceButtonSampleEdit, buttonPress, functSwitchModule);
+    // These four open pages of this screen: Part Editor, Glitch, Lo-fi master, Project
+    ip->setButtonObj(interfaceButtonSampleEdit, buttonPress, functSampleEdit);
+    ip->setButtonObj(interfaceButtonPerformance, buttonPress, functPerformance);
+    ip->setButtonObj(interfaceButtonMaster, buttonPress, functMaster);
+    ip->setButtonObj(interfaceButtonFile, buttonPress, functFile);
     ip->setButtonObj(interfaceButtonSampleRec, buttonPress, functSwitchModule);
     ip->setButtonObj(interfaceButtonSampleLoad, buttonPress, functSwitchModule);
     ip->setButtonObj(interfaceButtonSong, buttonPress, functSwitchModule);
@@ -101,7 +103,6 @@ void cFourTrack::start(uint32_t options)
 
     showScreen();
     setDefaultScreenFunct();
-    promptOnScreen = false;
     application().enter();
 }
 
@@ -110,11 +111,11 @@ void cFourTrack::stop()
     application().leave();
     moduleRefresh = 0;
     hal.restoreAudio();
-    display.setControlHide(viewStatic);
-    display.setControlHide(viewDynamic);
-    display.setControlHide(viewFooter);
-    display.setControlHide(viewPrompt);
-    promptOnScreen = false;
+    for (int l = 0; l < 6; l++)
+    {
+        display.setControlHide(view[l]);
+        shown[l] = false;
+    }
     songTimer.show();
 }
 
@@ -127,6 +128,13 @@ void cFourTrack::setDefaultScreenFunct()
     ip->setButtonObj(interfaceButton1, buttonPress, functB2);
     ip->setButtonObj(interfaceButton2, buttonPress, functB3);
     ip->setButtonObj(interfaceButton3, buttonPress, functB4);
+    ip->setButtonObj(interfaceButton0, buttonRelease, functB1Up);
+    ip->setButtonObj(interfaceButton1, buttonRelease, functB2Up);
+    ip->setButtonObj(interfaceButton2, buttonRelease, functB3Up);
+    ip->setButtonObj(interfaceButton3, buttonRelease, functB4Up);
+    ip->setButtonObj(interfaceButtonShift, buttonPress, functShiftDown);
+    ip->setButtonObj(interfaceButtonShift, buttonRelease, functShiftUp);
+    ip->setButtonObj(interfaceButtonInsert, buttonPress, functJogPress); // the Original has no push on the wheel
     ip->setButtonObj(interfaceButton4, buttonPress, functB5);
     ip->setButtonObj(interfaceButton5, buttonPress, functB6);
     ip->setButtonObj(interfaceButton6, buttonPress, functB7);
@@ -147,27 +155,29 @@ void cFourTrack::update()
     a.tick();
 
     bool changed = false;
-    if (a.takeRedraw(0)) { display.refreshControl(viewStatic); changed = true; }
-    if (a.takeRedraw(2)) { display.refreshControl(viewFooter); changed = true; }
-    if (a.takeRedraw(1)) { display.refreshControl(viewDynamic); changed = true; }
-
-    const bool wantPrompt = a.layerVisible(3);
-    if (wantPrompt && !promptOnScreen)
+    // A layer is shown while the application says so, and redrawn when it asks to be
+    for (int layer = 0; layer < 6; layer++)
     {
-        promptOnScreen = true;
-        display.setControlShow(viewPrompt);
-        changed = true;
-    }
-    else if (!wantPrompt && promptOnScreen)
-    {
-        promptOnScreen = false;
-        display.setControlHide(viewPrompt);
-        changed = true;
-    }
-    if (a.takeRedraw(3))
-    {
-        display.refreshControl(viewPrompt);
-        changed = true;
+        const bool want = a.layerVisible(layer);
+        const bool redraw = a.takeRedraw(layer);
+        if (want && !shown[layer])
+        {
+            shown[layer] = true;
+            display.setControlShow(view[layer]);
+            display.refreshControl(view[layer]);
+            changed = true;
+        }
+        else if (!want && shown[layer])
+        {
+            shown[layer] = false;
+            display.setControlHide(view[layer]);
+            changed = true;
+        }
+        else if (want && redraw)
+        {
+            display.refreshControl(view[layer]);
+            changed = true;
+        }
     }
     if (changed)
     {

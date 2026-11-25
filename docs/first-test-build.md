@@ -126,3 +126,17 @@ New: after you stop the first take (or it stops by itself at 24 s), the Tracker 
 - No audio is stretched. Only the tempo is calculated from the length you played.
 
 Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.
+
+## Test build FT16: the whole design, one build
+`firmware/PolyendTracker_FT16_full.ptf`. Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
+
+What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-requirements.md` for each screen):
+- **Main screen:** starting tempo and count-in, click, source per track (line, mic low, mic high, pads), alignment of each Part to the loop (first-note detection and snap, window in Settings), offset, mute, Loop Mode, undo of a replaced take, How many bars.
+- **Pages:** Part Editor, Glitch, Master lo-fi, Input setup, Project (new, open, save, save as, rename), Settings, Export WAV (1 to 16 repeats), Pads, Memory, and the popups.
+- **Buttons:** Pattern stays the main screen. Sample Edit opens the Part Editor, Performance opens Glitch, Master opens the lo-fi master, File opens Project. Shift+B1 Loop Mode, Shift+B2 Pads, Shift+B3 Memory, Shift+B4 Input setup, Shift+B5 to B8 mute, Shift+Up undo take, Shift+Down Settings. **Insert** does what pressing the jog wheel does in the emulator (the Original's wheel does not push).
+- **Files:** everything is written to a `FourTrack` folder on the SD card (`Projects`, `Exports`, `undo`).
+- **Memory:** the application lives in the sample memory next to the four tracks, so the memory for samples is about 128 KB smaller than FT15.
+
+Not verified on a device (only in the emulator and by PC tests): CPU load with glitch and lo-fi running on four tracks, speed of saving and exporting to the SD card, the feedback-protection readout (always off on the Tracker for now), and pan (the loop player is now stereo).
+
+Please check first: record a loop, record a second track, open Glitch and hold B1 to B4, open Master, save a project from File, export a WAV. If the audio crackles with Glitch or Master on, tell me which one.

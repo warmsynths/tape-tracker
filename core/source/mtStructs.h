@@ -91,7 +91,10 @@ constexpr uint32_t kFourTrackSampleRate = 44118;
 constexpr uint32_t kFourTrackRegionFrames = kFourTrackSampleRate * 26;
 constexpr uint32_t kFourTrackRegionBytes = kFourTrackRegionFrames * 2; // 16-bit mono
 constexpr uint32_t kFourTrackTracks = 4;
-constexpr uint32_t kFourTrackReservedBytes = kFourTrackTracks * kFourTrackRegionBytes;
+// The Four-Track application itself (screens, project jobs) also lives in the sample memory,
+// just below the track regions, to keep the Tracker's small internal RAM free.
+constexpr uint32_t kFourTrackAppBytes = 128 * 1024;
+constexpr uint32_t kFourTrackReservedBytes = kFourTrackTracks * kFourTrackRegionBytes + kFourTrackAppBytes;
 // Memory that loaded samples may use (everything below the track regions).
 constexpr uint32_t kSampleMemoryLimit = SAMPLE_MEMORY_SIZE - kFourTrackReservedBytes;
 static_assert(kFourTrackReservedBytes < SAMPLE_MEMORY_SIZE, "track regions must fit in the sample memory");

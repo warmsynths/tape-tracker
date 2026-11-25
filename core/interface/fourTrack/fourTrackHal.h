@@ -3,6 +3,7 @@
 
 #include "Hal.h"
 #include "elapsedMillis.h"
+#include <stddef.h>
 
 class Platform;
 
@@ -42,6 +43,29 @@ class FourTrackHal : public ft::Hal
     uint32_t playerPosition() override;
     uint16_t playerTakePeak(int track) override;
 
+    ft::TrackBank& bank() override;
+    ft::Lofi& lofi() override;
+
+    int gain(ft::Source source) override;
+    void setGain(ft::Source source, int percent) override;
+    void setMonitor(bool on) override;
+    int monitorReductionDb() override { return 0; }
+
+    void click(bool accent) override;
+
+    bool sdPresent() override;
+    bool fileWrite(const char* path, const void* data, uint32_t len, bool append) override;
+    uint32_t fileRead(const char* path, uint32_t offset, void* buf, uint32_t len) override;
+    uint32_t fileSize(const char* path) override;
+    bool fileRemove(const char* path) override;
+    int fileList(const char* dir, char (*names)[24], int maxNames) override;
+
+    int sampleCount() override;
+    bool sampleName(int slot, char* out, int size) override;
+    int currentSample() override;
+    void setCurrentSample(int slot) override;
+    void sampleMemory(uint32_t& usedBytes, uint32_t& totalBytes) override;
+
     void padOn(int pad, bool keysMode) override;
     void padOff(int pad) override;
     void padsReleaseAll() override;
@@ -56,7 +80,22 @@ class FourTrackHal : public ft::Hal
     volatile bool memoryFull = false;
 
   private:
+    void applyGain(ft::Source source);
+    void closeFiles();
+    void ensureFolders();
+    static void fullPath(const char* path, char* out, size_t size);
+
     Platform*& platform;
+    ft::Source current = ft::Source::Line;
+    bool monitorOn = true;
+    // The file being written or read stays open between calls, because a project is saved and
+    // loaded in many small pieces.
+    void* writeHandle = nullptr;
+    void* readHandle = nullptr;
+    char openPath[48] = {};
+    uint32_t readPosition = 0;
+    elapsedMillis fileIdle;
+    bool foldersReady = false;
     elapsedMillis clock;
     elapsedMillis micTimer;
     bool micUnmutePending = false;

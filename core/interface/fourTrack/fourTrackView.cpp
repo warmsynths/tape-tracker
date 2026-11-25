@@ -67,7 +67,7 @@ class DisplayGfx : public ft::Gfx
 } // namespace
 
 cFourTrackView::cFourTrackView(strControlProperties* properties)
-  : cDisplayControl(controlIdSimpleBox, ft::layerStages(properties->value))
+  : cDisplayControl(controlIdSimpleBox, properties->value >= 4 ? 5 : ft::layerStages(properties->value))
 {
     posX = 0;
     posY = 0;
@@ -92,5 +92,29 @@ void cFourTrackView::stage(int n)
         return;
     }
     DisplayGfx gfx(*this);
+    if (value >= 4 && n >= app->stagesOf(value)) return; // a page uses as many of its five stages as it needs
     app->draw(value, n, gfx);
+}
+
+// Measures text for the application (page layout needs text widths) without drawing.
+ft::Gfx* fourTrackTextMeter()
+{
+    class Meter : public ft::Gfx
+    {
+      public:
+        void color(uint32_t) override {}
+        void rect(int, int, int, int) override {}
+        void line(int, int, int, int) override {}
+        void dot(int, int, int) override {}
+        void text(int, int, const char*, int) override {}
+        int textWidth(const char* s, int font) override
+        {
+            int w = 0;
+            for (; *s != 0; s++) w += fonts[font].data[(uint8_t)*s];
+            return w;
+        }
+        void bars(int, int, int, int, const uint8_t*, int) override {}
+    };
+    static Meter meter;
+    return &meter;
 }
