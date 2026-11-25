@@ -128,7 +128,7 @@ New: after you stop the first take (or it stops by itself at 24 s), the Tracker 
 Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.
 
 ## Test build FT16: the whole design, one build
-`firmware/PolyendTracker_FT23_full.ptf` (FT16 plus the fixes below; FT23 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
+`firmware/PolyendTracker_FT24_full.ptf` (FT16 plus the fixes below; FT24 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
 
 What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-requirements.md` for each screen):
 - **Main screen:** starting tempo and count-in, click, source per track (line, mic low, mic high, pads), alignment of each Part to the loop (first-note detection and snap, window in Settings), offset, mute, Loop Mode, undo of a replaced take, How many bars.
@@ -158,3 +158,15 @@ FT21: fixes buttons B1 to B4 doing nothing in FT16 to FT20. The Tracker's button
 FT22: fixes the blank screen the first time the Four-Track screen opens after power-up. The screen's drawing parts were created before the application existed, so they had nothing to draw until the screen was opened a second time.
 
 FT23: easier to find what you can do to a track. With a recorded track selected, the hint line says what Insert and Shift+Insert do, and the selected track's waveform has a frame around it. **Insert** (the jog press in the emulator) opens an action menu on the buttons: Move, Edit, Glitch, Mute, Source, Undo take, Close. The shortcuts (Shift+Insert move, Sample Edit, Performance, Shift+B5 to B8 mute, Shift+Up undo take) still work.
+
+FT24: the screens now follow the design frame by frame. Every position, size and colour was read from the design file and compared with the screen: main screen (top bar with dividers, lane headers, 120-column waveforms, level bar on the right, playhead, Rec/Stop/Play drawn shapes, button row), Starting tempo and How many bars? as panels over the main screen, Part Editor, Glitch, Lo-fi master, Input setup, Project list and Rename, Settings, Export, Pads, Memory and the popups.
+Changes you will notice:
+- **B4 is Monitor** (as in the design). The pad mode (Keys or Pad) is chosen on the Pads page (Shift+B2), B1 and B2.
+- The top bar no longer shows the L/R input level readout (it is on Input setup).
+- The selected Part no longer has a frame around its waveform (the design marks the selected track by its header only).
+- Pads page: shows the sample on the pads; Up/Down chooses the sample.
+- Part Editor: the Level field is now the design's Normalize field (B2 applies it). The extras kept from earlier requests: B5 Snap 0, B6 Trim silence, and a small grid/snap/zoom note beside the track name.
+- Glitch: B5 Clear track, B6 Clear all, B7 pitch style, B8 Back as in the design; Left/Right pick the track.
+- Settings: Grid and Snap cuts to zero are added to the project block; the rows are a little closer together to fit.
+- The Project list shows bars and tempo of each saved project; the date column is not shown because the Tracker has no clock set.
+Where the design uses a different font, letters differ in width; positions are the design's.

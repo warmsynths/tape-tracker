@@ -168,7 +168,7 @@ void App::key(int k)
             break;
         case kPlay:
         case kB3: pressPlay(); break;
-        case kB4: togglePadMode(); break;
+        case kB4: set.monitorLine = !set.monitorLine; hal.setMonitor(set.monitorLine); refresh(true); break;
         case kB5: selectTrack(0); break;
         case kB6: selectTrack(1); break;
         case kB7: selectTrack(2); break;
@@ -730,7 +730,7 @@ void App::computeWave(int track)
         lane.waveCount = 0;
         return;
     }
-    const int columns = 100;
+    const int columns = 120;
     const int32_t off = alignShift[track] + userOffset[track];
     for (int c = 0; c < columns; c++)
     {
@@ -781,6 +781,11 @@ void App::fillView()
         fmt(v.tempo, sizeof(v.tempo), "Free");
         fmt(v.bars, sizeof(v.bars), "-");
     }
+    if (mode == FourTrackSession::Mode::ChoosingBars)
+    {
+        fmt(v.tempo, sizeof(v.tempo), "?");
+        fmt(v.bars, sizeof(v.bars), "?");
+    }
     fmt(v.input, sizeof(v.input), "%s", sourceName(trackSource[session.selected()]));
     v.monitor = (trackSource[session.selected()] == Source::Line) && set.monitorLine;
     {
@@ -830,7 +835,7 @@ void App::fillView()
 
     if (mode == FourTrackSession::Mode::RecordingFirst)
     {
-        formatTime(v.pos, sizeof(v.pos), hal.recordLength(), rate);
+        fmt(v.pos, sizeof(v.pos), "-"); // the elapsed time is in the lane
         v.posFrames = 0;
     }
     else if (loop > 0)
@@ -853,8 +858,11 @@ void App::fillView()
     {
         Lane& L = v.lane[t];
         fmt(L.name, sizeof(L.name), "Track %d", t + 1);
-        fmt(L.tag, sizeof(L.tag), "%s", sourceName(trackSource[t]));
         L.info[0] = 0;
+        L.side1[0] = 0;
+        L.side2[0] = 0;
+        L.progress = 255;
+        L.warn = false;
         L.msg1[0] = 0;
         L.msg2[0] = 0;
         L.hasPart = session.hasPart(t);
@@ -878,10 +886,19 @@ void App::fillView()
         }
         if (!L.hasPart) L.waveCount = 0;
 
+        if (L.hasPart || L.active) fmt(L.tag, sizeof(L.tag), "%s", sourceName(trackSource[t]));
+        else L.tag[0] = 0;
         if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
         {
             fmt(L.msg1, sizeof(L.msg1), "First take - elapsed");
             formatTime(L.msg2, sizeof(L.msg2), hal.recordLength(), rate);
+            const uint32_t maxFrames = rate * 24;
+            const uint32_t got = hal.recordLength() < maxFrames ? hal.recordLength() : maxFrames;
+            const uint32_t leftTenths = (maxFrames - got) * 10 / rate;
+            L.progress = (uint8_t)(got * 100 / maxFrames);
+            L.warn = leftTenths <= 30;
+            fmt(L.side1, sizeof(L.side1), "%s", L.warn ? "Memory nearly full" : "Up to 24 s per Part");
+            fmt(L.side2, sizeof(L.side2), "%u.%u s left", (unsigned)(leftTenths / 10), (unsigned)(leftTenths % 10));
         }
         else if (L.active && mode == FourTrackSession::Mode::Armed)
         {
@@ -894,15 +911,25 @@ void App::fillView()
         else if (L.active && mode == FourTrackSession::Mode::RecordingPart)
         {
             fmt(L.msg1, sizeof(L.msg1), "Recording one Loop");
-            formatTime(L.msg2, sizeof(L.msg2), hal.playerPosition(), rate);
+            const uint32_t pos = hal.playerPosition();
+            const int bars = session.bars() > 0 ? session.bars() : 1;
+            const uint32_t sixteenths = loop > 0 ? (uint32_t)(((uint64_t)pos * bars * 16) / loop) : 0;
+            fmt(L.msg2, sizeof(L.msg2), "Bar %u.%u of %d", (unsigned)(sixteenths / 16 + 1), (unsigned)((sixteenths % 16) / 4 + 1), bars);
         }
         else if (countingIn && t == session.selected())
         {
             fmt(L.msg1, sizeof(L.msg1), "Count-in");
             fmt(L.msg2, sizeof(L.msg2), "Beat %d of 4", countInBeats > 4 ? 4 : (countInBeats < 1 ? 1 : countInBeats));
         }
-        else if (!L.hasPart) fmt(L.msg2, sizeof(L.msg2), "Empty");
+        else if (!L.hasPart)
+        {
+            if (loop == 0 && t == session.selected() && mode == FourTrackSession::Mode::Idle && !countingIn && current == Screen::Main) fmt(L.msg1, sizeof(L.msg1), "Press Rec to record the first Part");
+            else fmt(L.msg2, sizeof(L.msg2), "Empty");
+        }
     }
+
+    v.master = 0;
+    for (int t = 0; t < FourTrackSession::kTracks; t++) if (v.lane[t].meter > v.master) v.master = v.lane[t].meter;
 
     {
         Prompt& P = v.prompt;
@@ -937,16 +964,21 @@ void App::fillView()
             }
             fmt(P.played, sizeof(P.played), "You played %u.%02u s. No audio is stretched; only the tempo is worked out.", (unsigned)(hundredths / 100), (unsigned)(hundredths % 100));
             fmt(P.note, sizeof(P.note), "Stopped at %u.%u s. Everything recorded is kept.", (unsigned)(hundredths / 100), (unsigned)((hundredths % 100) / 10));
-            fmt(P.suggestion, sizeof(P.suggestion), "%s", set.tempoTenths > 0 ? "Grid at the tempo you set" : "");
+            fmt(P.suggestion, sizeof(P.suggestion), "%s", set.tempoTenths > 0 ? "Grid at the tempo you set" : "Suggested: nearest 120 BPM");
         }
     }
 
     if (countingIn) fmt(v.hint, sizeof(v.hint), "Count-in, then the first take starts. Stop cancels.");
-    else if (mode == FourTrackSession::Mode::RecordingFirst) fmt(v.hint, sizeof(v.hint), "Stop ends the take and keeps it.");
-    else if (mode == FourTrackSession::Mode::Armed) fmt(v.hint, sizeof(v.hint), "Records one Loop from the loop start. Rec disarms.");
-    else if (mode == FourTrackSession::Mode::RecordingPart) fmt(v.hint, sizeof(v.hint), "Stop keeps what was recorded, the rest is silence.");
-    else if (loop == 0) fmt(v.hint, sizeof(v.hint), "Rec records the first Part, which sets the Loop.");
-    else fmt(v.hint, sizeof(v.hint), "Rec arms Track %d. Again: source. Shift+Insert: move its Part.", session.selected() + 1);
+    else if (mode == FourTrackSession::Mode::RecordingFirst)
+    {
+        if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 24 s the take stops by itself and keeps everything.");
+        else fmt(v.hint, sizeof(v.hint), "B2 or Stop ends the take. Then: How many bars?");
+    }
+    else if (mode == FourTrackSession::Mode::Armed) fmt(v.hint, sizeof(v.hint), "Records one Loop from the loop start, then stops. B1 again disarms.");
+    else if (mode == FourTrackSession::Mode::RecordingPart) fmt(v.hint, sizeof(v.hint), "Stop keeps what was recorded and fills the rest of the Loop with silence.");
+    else if (loop == 0) fmt(v.hint, sizeof(v.hint), "B1 records the first Part. B2 sets a starting tempo first.");
+    else if (session.playing()) fmt(v.hint, sizeof(v.hint), "B2 stops. Jog or Up/Down select a track. Insert opens actions.");
+    else fmt(v.hint, sizeof(v.hint), "B1 arms Track %d. It records %s from the next loop start.", session.selected() + 1, sourceName(trackSource[session.selected()]));
     if (mode == FourTrackSession::Mode::Idle && loop > 0 && session.hasPart(session.selected()))
         fmt(v.hint, sizeof(v.hint), "Track %d: Insert for actions. Shift+Insert move. Shift+B%d mute.", session.selected() + 1, session.selected() + 5);
     if (actionMenu) fmt(v.hint, sizeof(v.hint), "Track %d: choose an action. Insert or B8 closes.", session.selected() + 1);
@@ -965,14 +997,24 @@ void App::fillView()
         fmt(v.btn[1], sizeof(v.btn[1]), "Tempo");
         v.btnKind[1] = 0;
     }
-    fmt(v.btn[3], sizeof(v.btn[3]), "%s", padsKeysMode ? "Pads:Keys" : "Pads:Pad");
+    fmt(v.btn[3], sizeof(v.btn[3]), "Monitor");
     v.btnSelected = (int8_t)(4 + session.selected());
+    v.btnMask = (uint8_t)((v.monitor ? 8 : 0) | ((session.playing() || mode == FourTrackSession::Mode::RecordingPart || mode == FourTrackSession::Mode::Armed) ? 4 : 0) | ((mode != FourTrackSession::Mode::Idle && mode != FourTrackSession::Mode::ChoosingBars) ? 1 : 0));
+    if (current == Screen::Tempo)
+    {
+        static const char* const tp[8] = { "Free", "Set", "", "", "", "", "OK", "Cancel" };
+        for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", tp[b]); v.btnKind[b] = 0; }
+        v.btnSelected = -1;
+        v.btnMask = (uint8_t)(set.tempoTenths > 0 ? 2 : 1);
+        v.hint[0] = 0;
+    }
     if (actionMenu)
     {
         static const char* const am[8] = { "Move", "Edit", "Glitch", "Mute", "Source", "Undo take", "", "Close" };
         for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", am[b]); v.btnKind[b] = 0; }
         fmt(v.btn[3], sizeof(v.btn[3]), "%s", hal.bank().cfg[session.selected()].mute ? "Unmute" : "Mute");
         v.btnSelected = -1;
+        v.btnMask = 0;
     }
     if (moveMode)
     {
@@ -981,6 +1023,7 @@ void App::fillView()
         fmt(v.btn[2], sizeof(v.btn[2]), "%s", gridName(set.gridIdx));
         fmt(v.btn[3], sizeof(v.btn[3]), "All %s", moveAll ? "on" : "off");
         v.btnSelected = -1;
+        v.btnMask = 0;
     }
 }
 
@@ -1030,7 +1073,7 @@ void App::refresh(bool force)
     else if (!wantPrompt && promptShown) { promptShown = false; redraw[3] = false; }
     else if (wantPrompt && force) redraw[3] = true;
 
-    if (current == Screen::Main)
+    if (current == Screen::Main || current == Screen::Tempo)
     {
         if (force || sig != staticSignature)
         {
@@ -1040,7 +1083,7 @@ void App::refresh(bool force)
         }
         if (force || metersUpdated) redraw[1] = true;
     }
-    else
+    if (current != Screen::Main)
     {
         // Pages are rebuilt when something they show changes (live readouts about 10 times a second)
         const uint32_t now = hal.millis();
@@ -1061,7 +1104,7 @@ bool App::layerVisible(int layer) const
 {
     if (!visibleNow) return false;
     if (layer == 3) return promptShown && current == Screen::Main;
-    if (layer <= 2) return current == Screen::Main;
+    if (layer <= 2) return current == Screen::Main || current == Screen::Tempo;
     if (layer == 4) return current != Screen::Main;
     return popupKind != Popup::None;
 }

@@ -47,6 +47,15 @@ struct Palette
     uint32_t warn;     // memory and feedback warnings, unsaved mark, bypass
 };
 
+// The design places text by the top of its line box; the Tracker's font bitmaps have their own
+// space above the capitals. Add this to the design's y to draw a font so the letters land on the
+// same rows as in the design (fonts: 14 Regular, 17 Regular, 14 Bold, 17 Bold, 12 Regular).
+inline int textDy(int font)
+{
+    static const int dy[5] = { -3, -4, -3, -4, -1 };
+    return dy[font < 0 || font > 4 ? 0 : font];
+}
+
 // The design's "Original" palette (docs/design/four-track-recorder-design-r4.zip).
 inline Palette designPalette()
 {

@@ -74,6 +74,7 @@ void slotValue(const FxSlot& s, char* out, size_t n)
 
 void App::open(Screen s)
 {
+    if (s == Screen::Tempo) { tempoEntry = set.tempoTenths; countEntry = set.countIn; sRow = 0; }
     current = s;
     promptShown = false;
     redraw[4] = true;
@@ -161,12 +162,14 @@ void App::keyScreen(int k)
     switch (current)
     {
         case Screen::Tempo:
-            if (k == kUp || k == kDown) sRow = (sRow + 1) % 2;
-            else if (k == kB1) { set.tempoTenths = 0; unsaved = true; back(); return; }
-            else if (k == kB8) { unsaved = true; back(); return; }
-            else if (k == kLeft) jogScreen(-1);
-            else if (k == kRight) jogScreen(1);
-            else if (k == kJogPress && sRow == 1) set.countIn = !set.countIn;
+            if (k == kB1) { set.tempoTenths = 0; unsaved = true; back(); return; }
+            else if (k == kB2) { if (set.tempoTenths == 0) set.tempoTenths = 1200; sRow = 0; }
+            else if (k == kB7) { unsaved = true; back(); return; }
+            else if (k == kB8) { set.tempoTenths = tempoEntry; set.countIn = countEntry; back(); return; }
+            else if (k == kLeft || k == kRight) { if (set.tempoTenths > 0) sRow = k == kLeft ? 0 : 1; }
+            else if (k == kUp) jogScreen(1);
+            else if (k == kDown) jogScreen(-1);
+            else if (k == kJogPress) set.countIn = !set.countIn;
             break;
         case Screen::Editor:
         {
@@ -238,13 +241,15 @@ void App::keyScreen(int k)
             else if (k == kRight) exportRepeats = clampi(exportRepeats + 1, 1, 16);
             break;
         case Screen::Pads:
-            if (k == kUp) padsSel = clampi(padsSel - 1, 0, 47);
-            else if (k == kDown) padsSel = clampi(padsSel + 1, 0, 47);
-            else if (k == kB1) padModeKeys[padsSel] = true;
-            else if (k == kB2) padModeKeys[padsSel] = false;
+            if (k == kUp || k == kDown)
+            {
+                int slot = hal.currentSample() + (k == kDown ? 1 : -1);
+                hal.setCurrentSample(clampi(slot, 0, 47));
+            }
+            else if (k == kB1) padsKeysMode = true;
+            else if (k == kB2) padsKeysMode = false;
             else if (k == kB8) back();
-            if (k == kUp || k == kDown) hal.setCurrentSample(padsSel);
-            padsKeysMode = padModeKeys[padsSel];
+            for (int i = 0; i < 48; i++) padModeKeys[i] = padsKeysMode;
             break;
         case Screen::Memory:
             if (k == kB8) back();
@@ -335,7 +340,7 @@ void App::jogScreen(int delta)
         }
         case Screen::Settings: settingsJog(delta > 0 ? 1 : -1); break;
         case Screen::Export: exportRepeats = clampi(exportRepeats + (delta > 0 ? 1 : -1), 1, 16); break;
-        case Screen::Pads: padsSel = clampi(padsSel + (delta > 0 ? 1 : -1), 0, 47); hal.setCurrentSample(padsSel); padsKeysMode = padModeKeys[padsSel]; break;
+        case Screen::Pads: hal.setCurrentSample(clampi(hal.currentSample() + (delta > 0 ? 1 : -1), 0, 47)); break;
         case Screen::Project: listSel = clampi(listSel + (delta > 0 ? 1 : -1), 0, listCount > 0 ? listCount - 1 : 0); break;
         case Screen::NameEntry: nameJog(delta); break;
         default: break;
@@ -423,13 +428,13 @@ void App::computeEditWave()
     const int16_t* d = partData[editTrack];
     const uint32_t frames = session.loopFrames();
     const uint32_t ws = zoomStart(), span = zoomSpan();
-    for (int c = 0; c < 100; c++)
+    for (int c = 0; c < 150; c++)
     {
         uint16_t peak = 0;
         if (d != nullptr && frames > 0)
         {
-            const uint32_t from = ws + (uint32_t)(((uint64_t)c * span) / 100);
-            const uint32_t to = ws + (uint32_t)(((uint64_t)(c + 1) * span) / 100);
+            const uint32_t from = ws + (uint32_t)(((uint64_t)c * span) / 150);
+            const uint32_t to = ws + (uint32_t)(((uint64_t)(c + 1) * span) / 150);
             if (to > from) peak = loopPeakBlock(d + from, to - from, 0, (int)(to - from));
         }
         const float norm = __builtin_sqrtf((float)peak / 32767.0f);
@@ -465,24 +470,19 @@ void App::editTrim()
 void App::glitchKey(int k)
 {
     TrackCfg& c = hal.bank().cfg[gTrack];
-    if (shift && k >= kB1 && k <= kB3)
-    {
-        if (k == kB1) for (int s = 0; s < 4; s++) { c.slot[s].on = false; c.held[s] = false; }
-        else if (k == kB2) for (int t = 0; t < 4; t++) for (int s = 0; s < 4; s++) { hal.bank().cfg[t].slot[s].on = false; hal.bank().cfg[t].held[s] = false; }
-        else { c.granular = !c.granular; unsaved = true; }
-        return;
-    }
     if (k >= kB1 && k <= kB4) { c.held[k - kB1] = true; return; }
     switch (k)
     {
-        case kB5: case kB6: case kB7: case kB8: gTrack = k - kB5; break;
+        case kB5: for (int s = 0; s < 4; s++) { c.slot[s].on = false; c.held[s] = false; } break;
+        case kB6: for (int t = 0; t < 4; t++) for (int s = 0; s < 4; s++) { hal.bank().cfg[t].slot[s].on = false; hal.bank().cfg[t].held[s] = false; } break;
+        case kB7: c.granular = !c.granular; unsaved = true; break;
+        case kB8: back(); return;
         case kLeft: gTrack = clampi(gTrack - 1, 0, 3); break;
         case kRight: gTrack = clampi(gTrack + 1, 0, 3); break;
         case kUp: case kDown:
         {
             const int d = k == kDown ? 1 : -1;
             if (!shift) { gSlot = clampi(gSlot + d, 0, 3); break; }
-            // Shift+Up/Down: the effect's own setting (interval, set of intervals, how hard)
             FxSlot& s = c.slot[gSlot];
             if (s.type == FxType::Pitch) s.semis = (int8_t)stepInterval(s.semis, -d);
             else if (s.type == FxType::PitchSteps) s.semis = (int8_t)clampi(s.semis - d, 0, 4);
@@ -573,6 +573,16 @@ void App::refreshProjectList()
         {
             for (int k = 0; k < len - 4 && k < 23; k++) list[listCount][k] = names[i][k];
             list[listCount][len - 4 < 23 ? len - 4 : 23] = 0;
+            char path[48];
+            fmt(path, sizeof path, "Projects/%s.ftp", list[listCount]);
+            uint8_t hh[16] = {};
+            listBars[listCount] = 0;
+            listTempo[listCount] = 0;
+            if (hal.fileRead(path, 0, hh, 16) == 16 && hh[0] == 'F' && hh[1] == 'T')
+            {
+                listBars[listCount] = hh[8];
+                listTempo[listCount] = (uint16_t)(hh[12] | (hh[13] << 8));
+            }
             listCount++;
         }
     }

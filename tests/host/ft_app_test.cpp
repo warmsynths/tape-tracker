@@ -173,6 +173,7 @@ static void pagesAndProjects()
             app.key(k);
             CHECK(app.screen() != Screen::Main, "a screen key opens a page");
             CHECK(app.layerVisible(4) && app.stagesOf(4) >= 1 && app.stagesOf(4) <= 5, "a page has 1 to 5 stages");
+            CHECK(!app.pageOverflowed(), "a page fits the drawing budget");
             for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
             app.key(k == kPerformance ? kPerformance : kB8);
             CHECK(app.screen() == Screen::Main, "the page closes");
@@ -182,6 +183,7 @@ static void pagesAndProjects()
         {
             app.setShift(true); app.key(b); app.setShift(false);
             CHECK(app.screen() != Screen::Main, "a Shift button opens a page");
+            CHECK(!app.pageOverflowed(), "a Shift page fits the drawing budget");
             for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
             app.key(kB8);
         }
@@ -395,7 +397,7 @@ int main()
         CHECK(app.state().mode() == Mode::Idle && hal.playing, "OK sets the loop and plays it");
         CHECK(app.state().bars() > 0 && std::strcmp(app.view().tempo, "Free") != 0, "tempo and bars are shown");
         CHECK(!app.layerVisible(3), "the question goes away");
-        CHECK(app.view().lane[0].hasPart && app.view().lane[0].waveCount == 100, "a waveform is shown for the Part");
+        CHECK(app.view().lane[0].hasPart && app.view().lane[0].waveCount == 120, "a waveform is shown for the Part");
 
         // A later Part on track 2: arm, wait for the loop start, record one loop.
         app.key(kB6);
@@ -464,7 +466,7 @@ int main()
         app.pad(3, false);
         CHECK(hal.padsOn == 0, "a pad release reaches the machine");
         app.key(kB4);
-        CHECK(std::strcmp(app.view().padsMode, "PAD") == 0, "B4 switches the pad mode");
+        CHECK(!app.view().monitor, "B4 switches the monitor off");
     }
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
     return failures ? 1 : 0;

@@ -13,7 +13,7 @@ struct Lane
     char name[12];
     char tag[10];  // source: LINE, MIC LOW, ...
     char info[20]; // second line, for example "Offset +522 ms"
-    char msg1[32]; // shown in the waveform area when there is no Part
+    char msg1[48]; // shown in the waveform area when there is no Part
     char msg2[24]; // bigger second line in that area
     bool hasPart;
     bool muted;
@@ -23,6 +23,10 @@ struct Lane
     uint8_t waveCount;
     uint8_t wave[120]; // 0..255 height of each waveform column
     uint8_t meter;     // 0..100
+    char side1[24];    // first take: note at the right of the counter
+    char side2[16];    // first take: time left
+    uint8_t progress;  // first take: 0..100, 255 when not shown
+    bool warn;         // memory warning on the side notes
 };
 
 // The "How many bars?" question shown over the main screen after a first take.
@@ -56,12 +60,14 @@ struct View
     uint32_t loopFrames; // 0: no loop yet
     uint32_t posFrames;
     uint8_t barCount;
-    char hint[72];
+    char hint[96];
     char loopMode[8];
     char padsMode[6];
     char btn[8][10];
     uint8_t btnKind[8]; // 0 text, 1 Rec dot, 2 Stop square, 3 Play glyph
     int8_t btnSelected; // -1 none
+    uint8_t btnMask;    // buttons shown as on (bit per button), besides the selected one
+    uint8_t master;     // overall level, 0..100
     Lane lane[4];
     Prompt prompt;
 };

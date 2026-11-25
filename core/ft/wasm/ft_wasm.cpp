@@ -428,7 +428,7 @@ int ft_frame()
     g_cmdCount = 0;
     g_poolUsed = 0;
     BufferGfx gfx;
-    static const int order[6] = { 0, 2, 1, 3, 4, 5 };
+    static const int order[6] = { 0, 4, 2, 1, 3, 5 };
     for (int i = 0; i < 6; i++)
     {
         const int layer = order[i];

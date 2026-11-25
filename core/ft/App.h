@@ -86,6 +86,8 @@ class App
     Screen screen() const { return current; }
     Popup popup() const { return popupKind; }
     const Settings& settings() const { return set; }
+    bool pageOverflowed() const { return page.overflowed() || popupPage.overflowed(); }
+    int pageStages() const { return page.stageCount(); }
 
   private:
     // ---- main screen
@@ -180,7 +182,7 @@ class App
     EditParams editStack[16];
     EditParams editEntry{};
     bool auditioning = false;
-    uint8_t editWave[100];
+    uint8_t editWave[150];
     bool editWaveDirty = true;
     void computeEditWave();
 
@@ -212,6 +214,11 @@ class App
     bool loadHeader(const char* path);
     char list[16][24] = {};
     int listCount = 0, listSel = 0;
+    uint8_t listBars[16] = {};
+    uint16_t listTempo[16] = {};
+    int inputPeakDb = -48;
+    uint16_t tempoEntry = 0;
+    bool countEntry = true;
     char projectName[20] = "Untitled";
     bool unsaved = false;
     char nameEdit[17] = {};
