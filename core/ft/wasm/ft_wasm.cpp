@@ -25,8 +25,12 @@ constexpr int kBlock = 128;
 
 int16_t g_mem[4][kMaxRate * kRegionSeconds];
 
+float frac(float x) { return x - (float)(int)x; }
+float saw(float ph) { return frac(ph) * 2.0f - 1.0f; }
+float triangle(float ph) { const float f = frac(ph); return f < 0.5f ? f * 4.0f - 1.0f : 3.0f - f * 4.0f; }
+
 float g_inL[kBlock], g_inR[kBlock], g_outL[kBlock], g_outR[kBlock];
-uint32_t g_palette[12];
+uint32_t g_palette[17];
 uint8_t g_adv[5][128];
 
 //------------------------------------------------------------------------------------------
@@ -83,6 +87,24 @@ class BufferGfx : public Gfx
 };
 
 //------------------------------------------------------------------------------------------
+// Files: kept by the page (browser memory, saved to browser storage), reached through imports
+extern "C"
+{
+__attribute__((import_module("host"), import_name("file_write"))) int host_file_write(const char* path, const void* data, uint32_t len, int append);
+__attribute__((import_module("host"), import_name("file_read"))) uint32_t host_file_read(const char* path, uint32_t offset, void* buf, uint32_t len);
+__attribute__((import_module("host"), import_name("file_size"))) uint32_t host_file_size(const char* path);
+__attribute__((import_module("host"), import_name("file_remove"))) int host_file_remove(const char* path);
+__attribute__((import_module("host"), import_name("file_list"))) int host_file_list(const char* dir, char* out, int maxNames);
+}
+
+constexpr int kSampleSlots = 48;
+constexpr uint32_t kSamplePool = 1300000; // frames: about 2.6 MB, like the Tracker's sample memory
+int16_t g_samples[kSamplePool];
+struct SampleSlot { uint32_t start, length; char name[24]; };
+SampleSlot g_slot[kSampleSlots];
+uint32_t g_samplesUsed = 0;
+
+//------------------------------------------------------------------------------------------
 // The machine
 class EmuHal : public Hal
 {
@@ -91,6 +113,11 @@ class EmuHal : public Hal
     uint32_t nowMs = 0;
     bool monitor = true;
     Source source = Source::Line;
+    int gains[4] = { 50, 50, 50, 50 };
+    int currentSampleSlot = 0;
+
+    TrackBank trackBank;
+    Lofi lofiMaster;
 
     // recording
     bool recActive = false, full = false, captured = false;
@@ -99,12 +126,12 @@ class EmuHal : public Hal
     // player
     bool playing = false;
     uint32_t loop = 0, pos = 0;
-    const int16_t* data[4] = {};
-    volatile uint16_t peaks[4] = {};
     // input level
     float levelL = 0, levelR = 0;
-    // pad voices
-    struct Voice { bool on; int pad; float phase; float inc; float amp; bool held; };
+    // click
+    float clickPhase = 0, clickEnv = 0, clickInc = 0;
+    // pad voices: a sample, or a plucked tone when the slot is empty
+    struct Voice { bool on; int pad; float phase; float inc; float amp; bool held; int slot; float rate; };
     Voice voices[8] = {};
 
     uint32_t sampleRate() const override { return rate; }
@@ -124,37 +151,77 @@ class EmuHal : public Hal
     bool recordFull() override { return full; }
     bool recordStartCaptured() override { return captured; }
     uint32_t recordStartPosition() override { return startPos; }
-    void playerSetTrack(int t, const int16_t* d) override { data[t] = d; }
-    void playerStart(uint32_t f) override { loop = f; pos = 0; playing = f > 0; }
+
+    void playerSetTrack(int t, const int16_t* d) override { trackBank.data[t] = d; }
+    void playerStart(uint32_t f) override { loop = f; trackBank.loop = f; pos = 0; playing = f > 0; }
     void playerStop() override { playing = false; }
     bool playerPlaying() override { return playing; }
     uint32_t playerPosition() override { return pos; }
-    uint16_t playerTakePeak(int t) override { const uint16_t p = peaks[t]; peaks[t] = 0; return p; }
+    uint16_t playerTakePeak(int t) override { const uint16_t p = trackBank.peak[t]; trackBank.peak[t] = 0; return p; }
+    TrackBank& bank() override { return trackBank; }
+    Lofi& lofi() override { return lofiMaster; }
+
+    int gain(Source s) override { return gains[(int)s]; }
+    void setGain(Source s, int p) override { gains[(int)s] = p; }
+    void setMonitor(bool on) override { monitor = on; }
+    int monitorReductionDb() override { return reduction; }
+    int reduction = 0;
+
+    void click(bool accent) override { clickInc = (accent ? 1800.0f : 1200.0f) / (float)rate; clickEnv = 0.5f; clickPhase = 0; }
+
+    bool sdPresent() override { return true; }
+    bool fileWrite(const char* path, const void* data, uint32_t len, bool append) override { return host_file_write(path, data, len, append ? 1 : 0) != 0; }
+    uint32_t fileRead(const char* path, uint32_t offset, void* buf, uint32_t len) override { return host_file_read(path, offset, buf, len); }
+    uint32_t fileSize(const char* path) override { return host_file_size(path); }
+    bool fileRemove(const char* path) override { return host_file_remove(path) != 0; }
+    int fileList(const char* dir, char (*names)[24], int maxNames) override { return host_file_list(dir, &names[0][0], maxNames); }
+
+    int sampleCount() override { int n = 0; for (auto& s : g_slot) if (s.length > 0) n++; return n; }
+    bool sampleName(int slot, char* out, int size) override
+    {
+        if (slot < 0 || slot >= kSampleSlots || g_slot[slot].length == 0) return false;
+        int i = 0;
+        for (; i < size - 1 && g_slot[slot].name[i] != 0; i++) out[i] = g_slot[slot].name[i];
+        out[i] = 0;
+        return true;
+    }
+    int currentSample() override { return currentSampleSlot; }
+    void setCurrentSample(int slot) override { currentSampleSlot = slot; }
+    void sampleMemory(uint32_t& used, uint32_t& total) override { used = g_samplesUsed * 2; total = kSamplePool * 2; }
 
     void padOn(int pad, bool keysMode) override
     {
-        // Until real samples are loaded, a pad plays a plucked tone: in Keys mode the pitch
-        // follows the pad like a keyboard, in Pad mode each pad has its own fixed tone.
         int slot = 0;
         for (int i = 0; i < 8; i++) if (!voices[i].on) { slot = i; break; }
-        const int semis = keysMode ? (pad % 12) + 12 * ((pad / 12) % 4) : (pad * 5) % 24;
-        float f = 110.0f;
-        for (int i = 0; i < semis; i++) f *= 1.05946309f;
-        voices[slot] = Voice{ true, pad, 0.0f, f / (float)rate, 0.35f, true };
+        const int semis = keysMode ? (pad % 12) + 12 * ((pad / 12) % 4) - 12 : 0;
+        float r = 1.0f;
+        if (semis > 0) for (int i = 0; i < semis; i++) r *= 1.05946309f;
+        if (semis < 0) for (int i = 0; i < -semis; i++) r /= 1.05946309f;
+        const int smp = keysMode ? currentSampleSlot : pad;
+        if (smp >= 0 && smp < kSampleSlots && g_slot[smp].length > 0)
+        {
+            voices[slot] = Voice{ true, pad, 0.0f, 0.0f, 0.8f, true, smp, r };
+        }
+        else
+        {
+            float f = 110.0f * r * 2.0f;
+            voices[slot] = Voice{ true, pad, 0.0f, f / (float)rate, 0.3f, true, -1, 1.0f };
+        }
     }
-    void padOff(int pad) override
-    {
-        for (auto& v : voices) if (v.on && v.pad == pad) v.held = false;
-    }
+    void padOff(int pad) override { for (auto& v : voices) if (v.on && v.pad == pad) v.held = false; }
     void padsReleaseAll() override { for (auto& v : voices) v.held = false; }
+
+    static float inputFactor(int percent) { return percent <= 50 ? (float)percent / 50.0f : 1.0f + (float)(percent - 50) / 12.5f; }
 
     // One block of audio: the same job the firmware's audio interrupt does.
     void audioBlock(int n)
     {
-        // input level (smoothed amplitude)
+        const float f = source == Source::Pads ? 1.0f : inputFactor(gains[(int)source]) * (source == Source::MicLow ? 2.0f : source == Source::MicHigh ? 4.0f : 1.0f);
         float sl = 0, sr = 0;
         for (int i = 0; i < n; i++)
         {
+            g_inL[i] *= f;
+            g_inR[i] *= f;
             const float a = g_inL[i] < 0 ? -g_inL[i] : g_inL[i];
             const float b = g_inR[i] < 0 ? -g_inR[i] : g_inR[i];
             if (a > sl) sl = a;
@@ -171,26 +238,38 @@ class EmuHal : public Hal
             if (!v.on) continue;
             for (int i = 0; i < n; i++)
             {
-                v.phase += v.inc;
-                if (v.phase >= 1.0f) v.phase -= 1.0f;
-                const float saw = v.phase * 2.0f - 1.0f;
-                pad[i] += saw * v.amp;
-                v.amp *= v.held ? 0.99985f : 0.9985f;
+                if (v.slot >= 0)
+                {
+                    const SampleSlot& s = g_slot[v.slot];
+                    const uint32_t idx = (uint32_t)v.phase;
+                    if (idx + 1 >= s.length) { v.on = false; break; }
+                    const float fr = v.phase - (float)idx;
+                    const float a = g_samples[s.start + idx], b = g_samples[s.start + idx + 1];
+                    pad[i] += (a + (b - a) * fr) / 32768.0f * v.amp;
+                    v.phase += v.rate;
+                    if (!v.held && v.amp > 0.0f) v.amp *= 0.9995f;
+                }
+                else
+                {
+                    v.phase += v.inc;
+                    if (v.phase >= 1.0f) v.phase -= 1.0f;
+                    pad[i] += (v.phase * 2.0f - 1.0f) * v.amp;
+                    v.amp *= v.held ? 0.99985f : 0.9985f;
+                }
             }
-            if (v.amp < 0.002f) v.on = false;
+            if (v.on && v.slot < 0 && v.amp < 0.002f) v.on = false;
         }
 
         // recording: what is recorded depends on the source
         if (recActive)
         {
-            for (int i = 0; i < n; i += kBlock)
+            if (recLen + (uint32_t)n > regionFrames())
             {
-                if (recLen + kBlock > regionFrames())
-                {
-                    recActive = false;
-                    full = true;
-                    break;
-                }
+                recActive = false;
+                full = true;
+            }
+            else
+            {
                 if (!captured)
                 {
                     captured = true;
@@ -205,47 +284,89 @@ class EmuHal : public Hal
                     dst[k] = (int16_t)(s * 32767.0f);
                 }
                 recLen += n;
-                break;
             }
         }
 
-        // playing: the four tracks mixed at one shared position
-        int16_t mix[kBlock];
-        for (int i = 0; i < n; i++) mix[i] = 0;
+        // playing: the four tracks, then the lo-fi master
+        float pl[kBlock], pr[kBlock];
+        for (int i = 0; i < n; i++) pl[i] = pr[i] = 0;
         if (playing && loop > 0)
         {
-            const int16_t* active[4];
-            for (int t = 0; t < 4; t++)
-            {
-                active[t] = data[t];
-                const uint16_t p = loopPeakBlock(data[t], loop, pos, n);
-                if (p > peaks[t]) peaks[t] = p;
-            }
-            loopMixBlock(active, 4, loop, pos, mix, n);
+            trackBank.render(pos, n, pl, pr);
             pos = (pos + n) % loop;
         }
+        lofiMaster.process(pl, pr, n, rate);
 
+        // monitoring of the live input, with protection against feedback through speakers
+        const bool mon = monitor && source != Source::Pads;
+        reduction = 0;
         for (int i = 0; i < n; i++)
         {
-            float o = (float)mix[i] / 32768.0f + pad[i];
-            if (monitor && source != Source::Pads) o += (g_inL[i] + g_inR[i]) * 0.5f;
-            g_outL[i] = o;
-            g_outR[i] = o;
+            float cl = 0;
+            if (clickEnv > 0.001f)
+            {
+                clickPhase += clickInc;
+                if (clickPhase >= 1.0f) clickPhase -= 1.0f;
+                cl = (clickPhase < 0.5f ? 1.0f : -1.0f) * clickEnv * 0.4f;
+                clickEnv *= 0.9985f;
+            }
+            float ml = mon ? g_inL[i] : 0.0f, mr = mon ? g_inR[i] : 0.0f;
+            g_outL[i] = pl[i] + pad[i] + cl + ml;
+            g_outR[i] = pr[i] + pad[i] + cl + mr;
         }
     }
 };
 
-EmuHal g_hal;
+// Global constructors are not run in this build, so the machine is constructed in ft_init.
+alignas(16) char g_halStorage[sizeof(EmuHal)];
+EmuHal& g_hal = *reinterpret_cast<EmuHal*>(g_halStorage);
 Palette g_pal;
 alignas(8) char g_appStorage[sizeof(App)];
 App* g_app = nullptr;
 
 void loadPalette()
 {
-    g_pal.background = g_palette[0]; g_pal.text = g_palette[1]; g_pal.bright = g_palette[2];
-    g_pal.dim = g_palette[3]; g_pal.panel = g_palette[4]; g_pal.hairline = g_palette[5];
-    g_pal.selected = g_palette[6]; g_pal.meterBack = g_palette[7]; g_pal.wave = g_palette[8];
-    g_pal.record = g_palette[9]; g_pal.marker = g_palette[10]; g_pal.good = g_palette[11];
+    uint32_t* d = (uint32_t*)&g_pal;
+    for (int i = 0; i < 17; i++) d[i] = g_palette[i];
+}
+
+// A small built-in kit so the pads have real sounds to play without any files.
+void makeKit(uint32_t rate)
+{
+    const char* names[8] = { "Kick", "Snare", "Hat", "Clap", "Bass", "Pluck", "Stab", "Zap" };
+    uint32_t seed = 12345;
+    auto noise = [&]() { seed = seed * 1664525u + 1013904223u; return (float)(int32_t)(seed >> 8) / 8388608.0f - 1.0f; };
+    for (int k = 0; k < 8; k++)
+    {
+        const uint32_t len = rate * (k == 2 ? 15 : k == 3 ? 30 : k == 4 ? 45 : k == 5 ? 40 : k == 6 ? 35 : 25) / 100;
+        SampleSlot& s = g_slot[k];
+        s.start = g_samplesUsed;
+        s.length = len;
+        for (int i = 0; i < 23 && names[k][i]; i++) { s.name[i] = names[k][i]; s.name[i + 1] = 0; }
+        float ph = 0, lp = 0;
+        for (uint32_t i = 0; i < len; i++)
+        {
+            const float t = (float)i / (float)rate;
+            const float e = 1.0f - (float)i / (float)len;
+            float v = 0;
+            switch (k)
+            {
+                case 0: { const float fr = 45.0f + 110.0f * e * e * e; ph += fr / (float)rate; v = triangle(ph) * e * e; break; }
+                case 1: { ph += 190.0f / (float)rate; v = (triangle(ph) * 0.4f + noise() * 0.6f) * e * e; break; }
+                case 2: { const float nz = noise(); lp = lp * 0.5f + nz * 0.5f; v = (nz - lp) * e * e * e; break; }
+                case 3: { const float burst = ((i / (rate / 100)) % 3 == 2) ? 1.0f : 0.5f; v = noise() * e * e * burst * 0.7f; break; }
+                case 4: { ph += 55.0f / (float)rate; v = (triangle(ph) + 0.3f * triangle(ph * 2)) * e * 0.9f; break; }
+                case 5: { ph += 330.0f / (float)rate; v = (saw(ph) * 0.5f) * e * e * 0.8f; lp = lp * 0.9f + v * 0.1f; v = lp * 3.0f; break; }
+                case 6: { ph += 220.0f / (float)rate; v = (saw(ph) + saw(ph * 1.5f) + saw(ph * 1.25f)) * 0.25f * e * e; break; }
+                default: { ph += (1800.0f * e + 100.0f) / (float)rate; v = triangle(ph) * e * 0.6f; break; }
+            }
+            (void)t;
+            if (v > 1) v = 1;
+            if (v < -1) v = -1;
+            g_samples[s.start + i] = (int16_t)(v * 30000.0f);
+        }
+        g_samplesUsed += len;
+    }
 }
 } // namespace
 
@@ -262,34 +383,57 @@ uint8_t* ft_pool_ptr() { return g_pool; }
 
 void ft_init(uint32_t rate)
 {
+    new (g_halStorage) EmuHal();
     g_hal.rate = rate > kMaxRate ? kMaxRate : rate;
+    makeKit(g_hal.rate);
     loadPalette();
+    static BufferGfx measure;
     g_app = new (g_appStorage) App(g_hal, g_pal);
+    g_app->setMeasure(&measure);
     g_app->enter();
 }
 
 void ft_set_palette() { loadPalette(); g_app->setPalette(g_pal); }
 void ft_set_monitor(int on) { g_hal.monitor = on != 0; }
+void ft_shift(int held) { g_app->setShift(held != 0); }
+void ft_key_up(int k) { g_app->keyUp(k); }
+
+// Loading a sample onto a pad: the page asks for room, writes the audio there, then names it.
+int16_t* ft_sample_prepare(int slot, uint32_t frames)
+{
+    if (slot < 0 || slot >= kSampleSlots) return nullptr;
+    // reclaim the old sample's room only if it was the last one loaded
+    if (g_slot[slot].length > 0 && g_slot[slot].start + g_slot[slot].length == g_samplesUsed) g_samplesUsed = g_slot[slot].start;
+    if (g_samplesUsed + frames > kSamplePool) return nullptr;
+    g_slot[slot].start = g_samplesUsed;
+    g_slot[slot].length = frames;
+    g_slot[slot].name[0] = 0;
+    g_samplesUsed += frames;
+    return g_samples + g_slot[slot].start;
+}
+char* ft_sample_name_ptr(int slot) { return g_slot[slot].name; }
+void ft_sample_clear(int slot) { if (slot >= 0 && slot < kSampleSlots) g_slot[slot].length = 0; }
+int ft_state_screen() { return (int)g_app->screen(); }
 void ft_audio(int n) { g_hal.audioBlock(n); }
 void ft_tick(uint32_t ms) { g_hal.nowMs = ms; g_app->tick(); }
 void ft_key(int k) { g_app->key(k); }
 void ft_jog(int d) { g_app->jog(d); }
+void* ft_alloc_scratch(uint32_t n) { static uint8_t buf[65536]; return n <= sizeof buf ? buf : nullptr; }
 void ft_pad(int p, int down) { g_app->pad(p, down != 0); }
 
 // Collects everything on the screen, layer by layer in drawing order, and returns the number of
-// commands. Layer 0 (top bar and lanes), 2 (hint and buttons), 1 (playhead and levels), then 3
-// (the question) on top.
+// commands: the main screen (layers 0, 2, 1, 3), or a page (4), then a popup (5) on top.
 int ft_frame()
 {
     g_cmdCount = 0;
     g_poolUsed = 0;
     BufferGfx gfx;
-    static const int order[4] = { 0, 2, 1, 3 };
-    for (int i = 0; i < 4; i++)
+    static const int order[6] = { 0, 2, 1, 3, 4, 5 };
+    for (int i = 0; i < 6; i++)
     {
         const int layer = order[i];
         if (!g_app->layerVisible(layer)) continue;
-        for (int s = 0; s < layerStages(layer); s++) g_app->draw(layer, s, gfx);
+        for (int s = 0; s < g_app->stagesOf(layer); s++) g_app->draw(layer, s, gfx);
     }
     return g_cmdCount;
 }

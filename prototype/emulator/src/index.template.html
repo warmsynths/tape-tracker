@@ -24,13 +24,20 @@
         <button data-key="Stop">Stop</button>
       </div>
       <div class="group">
+        <button id="shift" type="button" title="Hold the Shift key, or click to latch">Shift</button>
+        <button data-key="Sample" title="Sample Edit: Part Editor (E)">Sample Edit</button>
+        <button data-key="Perf" title="Performance: Glitch (G)">Performance</button>
+        <button data-key="Master" title="Master: lo-fi (M)">Master</button>
+        <button data-key="File" title="File: Project (F)">File</button>
+      </div>
+      <div class="group">
         <div class="arrows">
           <button data-key="Up">&#9650;</button>
           <button data-key="Left">&#9664;</button>
           <button data-key="Down">&#9660;</button>
           <button data-key="Right">&#9654;</button>
         </div>
-        <div class="jogwrap"><button id="jogL">&#8634;</button><div id="jog" title="Jog wheel: scroll on it or on the screen"><i></i></div><button id="jogR">&#8635;</button></div>
+        <div class="jogwrap"><button id="jogL">&#8634;</button><div id="jog" title="Jog wheel: scroll on it or on the screen"><i></i></div><button id="jogR">&#8635;</button><button id="jogPress" title="Press the jog wheel (Enter)">Press</button></div>
       </div>
     </div>
     <div id="pads" class="pads" aria-label="Pads"></div>
@@ -45,24 +52,33 @@
     <label><input type="checkbox" id="monitor" checked> Hear the input while recording</label>
     <p class="small">Sample rate: <span id="rate">-</span>. Use headphones with the microphone to avoid feedback.</p>
     <p class="small" id="note"></p>
-    <h2>Font</h2>
+    <h2>Look</h2>
+    <select id="theme"><option value="design">Design colours</option><option value="original">Original Tracker colours</option></select>
     <select id="font"><option value="liberation">Tracker font: Liberation</option><option value="roboto">Tracker font: Roboto Mono</option></select>
+    <h2>Files</h2>
+    <div id="files" class="small"></div>
+    <p class="small">Projects are kept in this browser. Export WAV files appear here to download.</p>
+    <h2>Pad samples</h2>
+    <p class="small">Eight sounds are built in. Load your own onto a pad slot:</p>
+    <label>Slot <input id="sampleSlot" type="number" min="1" max="48" value="9" style="width:4em"></label>
+    <input id="sampleFile" type="file" accept="audio/*">
     <h2>Keys</h2>
     <table class="keys">
       <tr><td>1 to 8</td><td>the eight buttons under the screen</td></tr>
-      <tr><td>R</td><td>Rec</td></tr>
-      <tr><td>Space</td><td>Play</td></tr>
-      <tr><td>S</td><td>Stop</td></tr>
+      <tr><td>R, Space, S</td><td>Rec, Play, Stop</td></tr>
       <tr><td>Arrows</td><td>arrow buttons</td></tr>
-      <tr><td>[ and ] or scroll</td><td>jog wheel</td></tr>
-      <tr><td>Click the pads</td><td>play the pads</td></tr>
+      <tr><td>[ ] or scroll</td><td>jog wheel</td></tr>
+      <tr><td>Enter</td><td>press the jog wheel</td></tr>
+      <tr><td>Shift (hold)</td><td>Shift</td></tr>
+      <tr><td>E, G, M, F</td><td>Sample Edit, Performance, Master, File</td></tr>
     </table>
     <h2>Try this</h2>
     <ol class="small">
       <li>Press Rec (R), let it play a few seconds, press Stop (S).</li>
       <li>Choose the bars with the jog wheel, press button 8 (OK).</li>
       <li>Press button 6 for track 2, then Rec: it waits for the loop start and records one loop.</li>
-      <li>Press the same track button again to change its source (LINE, MIC, PADS).</li>
+      <li>Shift + button 4 sets where each track records from. Shift + button 2 opens the pads.</li>
+      <li>G opens Glitch (hold buttons 1 to 4), M the lo-fi master, F projects and export.</li>
     </ol>
   </aside>
 </main>

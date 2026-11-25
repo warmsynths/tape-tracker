@@ -250,7 +250,7 @@ void App::jogScreen(int delta)
             {
                 int t = (int)set.tempoTenths;
                 if (t == 0) t = 1200;
-                t += delta * (shift ? 10 : 1);
+                else t += delta * (shift ? 10 : 1);
                 set.tempoTenths = (uint16_t)clampi(t, 400, 2400);
             }
             else set.countIn = !set.countIn;

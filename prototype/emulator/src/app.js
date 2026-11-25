@@ -8,10 +8,15 @@
   const WORKLET = document.getElementById('worklet-src').textContent;
 
   // Key ids, same order as core/ft/App.h
-  const K = { B1: 0, B2: 1, B3: 2, B4: 3, B5: 4, B6: 5, B7: 6, B8: 7, Up: 8, Down: 9, Left: 10, Right: 11, Rec: 12, Play: 13, Stop: 14, Shift: 15 };
+  const K = { B1: 0, B2: 1, B3: 2, B4: 3, B5: 4, B6: 5, B7: 6, B8: 7, Up: 8, Down: 9, Left: 10, Right: 11, Rec: 12, Play: 13, Stop: 14, Jog: 15, Sample: 16, Perf: 17, Master: 18, File: 19 };
 
-  // Colours: the Tracker's "Original" theme roles, in the order of the Palette in core/ft/Gfx.h
-  const PALETTE = [0x000000, 0x777777, 0xffffff, 0x575757, 0x222222, 0x3f3f3f, 0x3f3f3f, 0x222222, 0x777777, 0xcd1818, 0xd67022, 0x30cb3f];
+  // Colours, in the order of the Palette in core/ft/Gfx.h: bg, top, topText, frame, text, dim,
+  // cell, sel, panel, rec, meter, track, wave, waveBg, waveOff, marker, warn
+  const THEMES = {
+    design: [0x15130f, 0x221f19, 0xd3c8ae, 0x3a342a, 0xe6dcc3, 0x91876f, 0x211e18, 0x332e25, 0x1c1a15, 0xc4452e, 0x93a66a, 0x2c2922, 0x8d826c, 0x191712, 0x575043, 0xd8873a, 0xd2a94f],
+    original: [0x000000, 0x222222, 0xffffff, 0x3f3f3f, 0xffffff, 0x575757, 0x222222, 0x3f3f3f, 0x222222, 0xcd1818, 0x30cb3f, 0x222222, 0x777777, 0x0c0c0c, 0x3f3f3f, 0xd67022, 0xd67022],
+  };
+  let PALETTE = THEMES.design;
 
   let fontSet = 'liberation';
   let glyphs = {}; // cache: set|font|ch|color -> canvas
@@ -102,9 +107,12 @@
     node.port.onmessage = (e) => {
       const m = e.data;
       if (m.type === 'frame') frame = m;
+      else if (m.type === 'changed') filesChanged(m.paths);
+      else if (m.type === 'file') fileArrived(m);
+      else if (m.type === 'sample-result') sampleDone(m);
       else if (m.type === 'ready') document.getElementById('rate').textContent = m.sampleRate + ' Hz';
     };
-    node.port.postMessage({ type: 'init', wasm: WASM, palette: PALETTE, advances: advances() });
+    node.port.postMessage({ type: 'init', wasm: WASM, palette: PALETTE, advances: advances(), files: await loadSaved() });
     node.connect(audio.destination);
     setInput('demo');
     if (audio.state === 'suspended') await audio.resume();
@@ -135,10 +143,23 @@
   // ------------------------------------------------------------------------------------------
   // The device: screen scaling, buttons, jog wheel, pads
   function press(key) { start().then(() => send({ type: 'key', key })); }
+  function release(key) { send({ type: 'keyup', key }); }
+
+  let shiftOn = false;
+  function setShift(on) {
+    if (shiftOn === on) return;
+    shiftOn = on;
+    document.getElementById('shift').classList.toggle('on', on);
+    send({ type: 'shift', on });
+  }
+  document.getElementById('shift').addEventListener('click', () => start().then(() => setShift(!shiftOn)));
 
   document.getElementById('overlay').addEventListener('click', start);
   document.querySelectorAll('[data-key]').forEach((el) => {
-    el.addEventListener('click', () => press(K[el.dataset.key]));
+    const k = K[el.dataset.key];
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); press(k); });
+    el.addEventListener('pointerup', () => release(k));
+    el.addEventListener('pointerleave', () => { if (el.matches(':active')) release(k); });
   });
 
   const jog = document.getElementById('jog');
@@ -148,6 +169,7 @@
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); turn(e.deltaY > 0 ? 1 : -1); }, { passive: false });
   document.getElementById('jogL').addEventListener('click', () => turn(-1));
   document.getElementById('jogR').addEventListener('click', () => turn(1));
+  document.getElementById('jogPress').addEventListener('click', () => press(K.Jog));
 
   const padGrid = document.getElementById('pads');
   for (let i = 0; i < 48; i++) {
@@ -165,8 +187,19 @@
   // Buttons under the screen sit exactly under the eight columns of the screen
   const KEYMAP = { '1': 'B1', '2': 'B2', '3': 'B3', '4': 'B4', '5': 'B5', '6': 'B6', '7': 'B7', '8': 'B8',
     ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', r: 'Rec', R: 'Rec', ' ': 'Play', s: 'Stop', S: 'Stop' };
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'Shift') { setShift(false); return; }
+    const k = KEYMAP[e.key];
+    if (k) release(K[k]);
+  });
   window.addEventListener('keydown', (e) => {
-    if (e.repeat || e.target.tagName === 'INPUT') return;
+    if (e.repeat || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'Shift') { start().then(() => setShift(true)); return; }
+    if (e.key === 'Enter') { press(K.Jog); return; }
+    if (e.key === 'e') { press(K.Sample); return; }
+    if (e.key === 'g') { press(K.Perf); return; }
+    if (e.key === 'm') { press(K.Master); return; }
+    if (e.key === 'f') { press(K.File); return; }
     if (e.key === '[') { turn(-1); return; }
     if (e.key === ']') { turn(1); return; }
     const k = KEYMAP[e.key];
@@ -183,7 +216,97 @@
   document.getElementById('monitor').addEventListener('change', (e) => send({ type: 'monitor', on: e.target.checked }));
   document.getElementById('font').addEventListener('change', (e) => { fontSet = e.target.value; glyphs = {}; if (node) node.port.postMessage({ type: 'init-fonts', advances: advances() }); });
 
+  document.getElementById('theme').addEventListener('change', (e) => {
+    PALETTE = THEMES[e.target.value];
+    send({ type: 'palette', palette: PALETTE });
+  });
+
+  // ------------------------------------------------------------------------------------------
+  // Files: the project files are kept in browser storage; exports are downloaded from the list
+  const DB = 'four-track-emulator';
+  function db() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('files');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function dbPut(path, data) { try { const d = await db(); d.transaction('files', 'readwrite').objectStore('files').put(data, path); } catch (e) { /* storage unavailable */ } }
+  async function dbDel(path) { try { const d = await db(); d.transaction('files', 'readwrite').objectStore('files').delete(path); } catch (e) { /* ignore */ } }
+  async function loadSaved() {
+    try {
+      const d = await db();
+      return await new Promise((res) => {
+        const out = [];
+        const c = d.transaction('files').objectStore('files').openCursor();
+        c.onsuccess = () => { const cur = c.result; if (cur) { out.push({ path: cur.key, data: cur.value }); cur.continue(); } else res(out); };
+        c.onerror = () => res([]);
+      });
+    } catch (e) { return []; }
+  }
+  const known = new Map(); // exported files and projects by path
+  let timers = {};
+  function filesChanged(list) {
+    list.forEach(({ path, size }) => {
+      if (path.startsWith('undo/')) return;
+      if (size < 0) { known.delete(path); dbDel(path); renderFiles(); return; }
+      known.set(path, size);
+      clearTimeout(timers[path]);
+      timers[path] = setTimeout(() => send({ type: 'getfile', path, why: path.startsWith('Projects/') ? 'save' : 'list' }), 700);
+    });
+    renderFiles();
+  }
+  function fileArrived(m) {
+    if (!m.data) return;
+    known.set(m.path, m.data.length);
+    if (m.why === 'save') dbPut(m.path, m.data);
+    else if (m.why === 'download') {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([m.data], { type: m.path.endsWith('.wav') ? 'audio/wav' : 'application/octet-stream' }));
+      a.download = m.path.split('/').pop();
+      a.click();
+    }
+    renderFiles();
+  }
+  function renderFiles() {
+    const box = document.getElementById('files');
+    box.textContent = '';
+    [...known.keys()].filter((p) => p.startsWith('Exports/') || p.startsWith('Projects/')).sort().forEach((p) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = p + ' (' + Math.round(known.get(p) / 1024) + ' KB)';
+      b.addEventListener('click', () => send({ type: 'getfile', path: p, why: 'download' }));
+      box.appendChild(b);
+    });
+    if (!box.children.length) box.textContent = 'Nothing saved yet.';
+  }
+  renderFiles();
+
+  // ------------------------------------------------------------------------------------------
+  // Samples for the pads
+  document.getElementById('sampleFile').addEventListener('change', async (e) => {
+    await start();
+    const slot = Math.max(0, Math.min(47, (parseInt(document.getElementById('sampleSlot').value, 10) || 1) - 1));
+    for (const file of e.target.files) {
+      try {
+        const buf = await audio.decodeAudioData(await file.arrayBuffer());
+        const n = buf.length, mono = new Int16Array(n);
+        for (let i = 0; i < n; i++) {
+          let s = 0;
+          for (let c = 0; c < buf.numberOfChannels; c++) s += buf.getChannelData(c)[i];
+          s /= buf.numberOfChannels;
+          mono[i] = Math.max(-1, Math.min(1, s)) * 32767;
+        }
+        send({ type: 'sample', slot, data: mono, name: file.name.replace(/\.[^.]+$/, '') });
+        document.getElementById('sampleSlot').value = slot + 2;
+        return;
+      } catch (err) { document.getElementById('note').textContent = 'Could not read ' + file.name; }
+    }
+  });
+  function sampleDone(m) { document.getElementById('note').textContent = m.ok ? 'Sample loaded.' : 'No room left in sample memory.'; }
+
   // Initial picture before audio starts: a blank device screen
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 800, 480);
+  ctx.fillStyle = css(PALETTE[0]); ctx.fillRect(0, 0, 800, 480);
   requestAnimationFrame(loop);
 })();

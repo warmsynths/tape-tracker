@@ -1,6 +1,12 @@
 // Runs inside the audio thread. It holds the Four-Track application compiled to WebAssembly (the
 // same code the Tracker firmware runs) and does what the firmware's audio interrupt and main
 // loop do: one 128-frame block at a time.
+function ascii(str) {
+  const out = new Uint8Array(Math.min(str.length, 23));
+  for (let i = 0; i < out.length; i++) out[i] = str.charCodeAt(i) & 127;
+  return out;
+}
+
 class FourTrackProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -9,17 +15,73 @@ class FourTrackProcessor extends AudioWorkletProcessor {
     this.demo = false;
     this.demoPhase = 0;
     this.demoVoices = [];
+    this.files = new Map(); // path -> { buf: Uint8Array, len }
+    this.changed = new Set();
+    this.pending = [];
     this.port.onmessage = (e) => this.onMessage(e.data);
+  }
+
+  // ---- the SD card: files kept in memory, reached by the firmware code through imports
+  str(ptr) {
+    const mem = new Uint8Array(this.x.memory.buffer);
+    let end = ptr;
+    while (mem[end] !== 0) end++;
+    let out = '';
+    for (let i = ptr; i < end; i++) out += String.fromCharCode(mem[i]); // no TextDecoder in a worklet
+    return out;
+  }
+  hostImports() {
+    const self = this;
+    return {
+      file_write(pathPtr, dataPtr, len, append) {
+        const path = self.str(pathPtr);
+        let f = self.files.get(path);
+        if (!f || !append) { f = { buf: new Uint8Array(Math.max(len, 1024)), len: 0 }; self.files.set(path, f); }
+        if (f.len + len > f.buf.length) {
+          const nb = new Uint8Array(Math.max(f.buf.length * 2, f.len + len));
+          nb.set(f.buf.subarray(0, f.len));
+          f.buf = nb;
+        }
+        f.buf.set(new Uint8Array(self.x.memory.buffer, dataPtr, len), f.len);
+        f.len += len;
+        self.changed.add(path);
+        return 1;
+      },
+      file_read(pathPtr, offset, bufPtr, len) {
+        const f = self.files.get(self.str(pathPtr));
+        if (!f || offset >= f.len) return 0;
+        const n = Math.min(len, f.len - offset);
+        new Uint8Array(self.x.memory.buffer, bufPtr, n).set(f.buf.subarray(offset, offset + n));
+        return n;
+      },
+      file_size(pathPtr) { const f = self.files.get(self.str(pathPtr)); return f ? f.len : 0; },
+      file_remove(pathPtr) { const p = self.str(pathPtr); self.changed.add(p); return self.files.delete(p) ? 1 : 0; },
+      file_list(dirPtr, outPtr, max) {
+        const prefix = self.str(dirPtr) + '/';
+        const out = new Uint8Array(self.x.memory.buffer, outPtr, max * 24);
+        let n = 0;
+        for (const p of self.files.keys()) {
+          if (p.startsWith(prefix) && n < max) {
+            const name = ascii(p.slice(prefix.length));
+            out.fill(0, n * 24, n * 24 + 24);
+            out.set(name, n * 24);
+            n++;
+          }
+        }
+        return n;
+      },
+    };
   }
 
   onMessage(m) {
     if (m.type === 'init') {
-      WebAssembly.instantiate(m.wasm, {}).then(({ instance }) => {
+      WebAssembly.instantiate(m.wasm, { host: this.hostImports() }).then(({ instance }) => {
         this.x = instance.exports;
         const mem = this.x.memory.buffer;
-        const pal = new Uint32Array(mem, this.x.ft_palette_ptr(), 12);
+        const pal = new Uint32Array(mem, this.x.ft_palette_ptr(), 17);
         m.palette.forEach((v, i) => (pal[i] = v));
         m.advances.forEach((a, f) => new Uint8Array(mem, this.x.ft_adv_ptr(f), 128).set(a));
+        (m.files || []).forEach((f) => this.files.set(f.path, { buf: f.data, len: f.data.length }));
         this.x.ft_init(sampleRate);
         this.inL = new Float32Array(mem, this.x.ft_in_l_ptr(), 128);
         this.inR = new Float32Array(mem, this.x.ft_in_r_ptr(), 128);
@@ -31,6 +93,9 @@ class FourTrackProcessor extends AudioWorkletProcessor {
         this.ready = true;
         this.port.postMessage({ type: 'ready', sampleRate });
       });
+    } else if (m.type === 'getfile') {
+      const f = this.files.get(m.path);
+      this.port.postMessage({ type: 'file', path: m.path, data: f ? f.buf.slice(0, f.len) : null, why: m.why });
     } else if (m.type === 'demo') {
       this.demo = m.on; // can arrive before the engine has loaded
     } else if (!this.ready) {
@@ -39,10 +104,22 @@ class FourTrackProcessor extends AudioWorkletProcessor {
       m.advances.forEach((a, f) => new Uint8Array(this.x.memory.buffer, this.x.ft_adv_ptr(f), 128).set(a));
     } else if (m.type === 'key') this.x.ft_key(m.key);
     else if (m.type === 'jog') this.x.ft_jog(m.delta);
+    else if (m.type === 'keyup') this.x.ft_key_up(m.key);
+    else if (m.type === 'shift') this.x.ft_shift(m.on ? 1 : 0);
     else if (m.type === 'pad') this.x.ft_pad(m.pad, m.down ? 1 : 0);
+    else if (m.type === 'sample') {
+      // mono 16-bit audio for a pad slot
+      const ptr = this.x.ft_sample_prepare(m.slot, m.data.length);
+      if (!ptr) { this.port.postMessage({ type: 'sample-result', slot: m.slot, ok: false }); return; }
+      new Int16Array(this.x.memory.buffer, ptr, m.data.length).set(m.data);
+      const name = ascii(m.name);
+      const np = new Uint8Array(this.x.memory.buffer, this.x.ft_sample_name_ptr(m.slot), 24);
+      np.fill(0); np.set(name);
+      this.port.postMessage({ type: 'sample-result', slot: m.slot, ok: true });
+    }
     else if (m.type === 'monitor') this.x.ft_set_monitor(m.on ? 1 : 0);
     else if (m.type === 'palette') {
-      const pal = new Uint32Array(this.x.memory.buffer, this.x.ft_palette_ptr(), 12);
+      const pal = new Uint32Array(this.x.memory.buffer, this.x.ft_palette_ptr(), 17);
       m.palette.forEach((v, i) => (pal[i] = v));
       this.x.ft_set_palette();
     }
@@ -96,10 +173,14 @@ class FourTrackProcessor extends AudioWorkletProcessor {
     this.blocks++;
     if (this.blocks % 2 === 0) this.x.ft_tick(Math.floor((this.blocks * 128 * 1000) / sampleRate));
     if (this.blocks % 8 === 0) {
+      if (this.changed.size) {
+        this.port.postMessage({ type: 'changed', paths: [...this.changed].map((p) => ({ path: p, size: (this.files.get(p) || { len: -1 }).len })) });
+        this.changed.clear();
+      }
       const n = this.x.ft_frame();
       const used = this.x.ft_pool_used();
       this.port.postMessage(
-        { type: 'frame', cmd: this.cmd.slice(0, n * 7), pool: this.pool.slice(0, used), mode: this.x.ft_state_mode() }
+        { type: 'frame', cmd: this.cmd.slice(0, n * 7), pool: this.pool.slice(0, used), mode: this.x.ft_state_mode(), screen: this.x.ft_state_screen() }
       );
     }
     return true;

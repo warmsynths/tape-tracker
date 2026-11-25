@@ -144,10 +144,10 @@ void App::drawGlitch(Pen& p)
         for (int s = 0; s < 4; s++)
         {
             const FxSlot& sl = c.slot[s];
-            const int y = 118 + s * 78;
+            const int y = 118 + s * 76;
             const bool cur = (t == gTrack && s == gSlot);
-            p.rect(x, y, 186, 70, cur ? pal.sel : pal.panel);
-            if (cur) p.frame(x, y, 186, 70, pal.text);
+            p.rect(x, y, 186, 68, cur ? pal.sel : pal.panel);
+            if (cur) p.frame(x, y, 186, 68, pal.text);
             char n[8];
             fmt(n, sizeof n, "B%d", s + 1);
             p.text(x + 10, y + 6, n, F12, pal.dim);
@@ -159,7 +159,7 @@ void App::drawGlitch(Pen& p)
             if (c.held[s]) p.tag(x + 56, y + 46, "HOLD", true, pal.marker, pal.bg);
         }
     }
-    p.text(12, 432, "Hold B1 to B4 to play a slot. Jog changes the amount, Shift+jog the effect, jog press keeps it on.", F12, pal.dim);
+    p.text(12, 422, "Hold B1 to B4 to play a slot. Jog changes the amount, Shift+jog the effect, jog press keeps it on.", F12, pal.dim);
     const char* l[8] = { "Slot 1", "Slot 2", "Slot 3", "Slot 4", "Clear track", "Clear all", hal.bank().cfg[gTrack].granular ? "Pitch: grain" : "Pitch: tape", "Back" };
     p.buttons(l);
 }
