@@ -65,7 +65,8 @@ label { display:block; margin:4px 0; } select { background:#2b2720; color:var(--
     <h1>Four-Track Emulator</h1>
     <p>This page runs the same screen and recording logic as the Tracker firmware (the same C++, compiled to WebAssembly). What you see and do here is what the device does, apart from the audio hardware.</p>
     <h2>Audio</h2>
-    <label><input type="radio" name="input" value="demo" checked> Demo instrument</label>
+    <button id="sound" type="button">Sound on (click to turn off)</button>
+    <label><input type="radio" name="input" value="demo" checked> Demo instrument (plays only while you record)</label>
     <label><input type="radio" name="input" value="mic"> Microphone</label>
     <label><input type="checkbox" id="monitor" checked> Hear the input while recording</label>
     <p class="small">Sample rate: <span id="rate">-</span>. Use headphones with the microphone to avoid feedback.</p>
@@ -122,7 +123,7 @@ class FourTrackProcessor extends AudioWorkletProcessor {
         this.outR = new Float32Array(mem, this.x.ft_out_r_ptr(), 128);
         this.cmd = new Int32Array(mem, this.x.ft_cmd_ptr(), 4096 * 7);
         this.pool = new Uint8Array(mem, this.x.ft_pool_ptr(), 32768);
-        this.x.ft_set_monitor(1);
+        this.x.ft_set_monitor(0);
         this.ready = true;
         this.port.postMessage({ type: 'ready', sampleRate });
       });
@@ -172,8 +173,11 @@ class FourTrackProcessor extends AudioWorkletProcessor {
     const out = outputs[0];
     if (!this.ready) return true;
     const input = inputs[0];
+    // The demo instrument only sounds while a take is being recorded (first take or a Part)
+    const mode = this.x.ft_state_mode();
     if (this.demo) {
-      this.demoBlock(this.inL, this.inR);
+      if (mode === 1 || mode === 3) this.demoBlock(this.inL, this.inR);
+      else { this.inL.fill(0); this.inR.fill(0); }
     } else if (input && input.length > 0) {
       this.inL.set(input[0]);
       this.inR.set(input.length > 1 ? input[1] : input[0]);
@@ -315,6 +319,10 @@ registerProcessor('four-track', FourTrackProcessor);
   async function setInput(kind) {
     document.querySelectorAll('[name=input]').forEach((r) => (r.checked = r.value === kind));
     if (micSource) { micSource.disconnect(); micSource = null; }
+    // Hearing a microphone through speakers feeds back, so monitoring starts off for it.
+    const mon = document.getElementById('monitor');
+    mon.checked = kind === 'demo';
+    send({ type: 'monitor', on: mon.checked });
     if (kind === 'demo') { send({ type: 'demo', on: true }); return; }
     send({ type: 'demo', on: false });
     if (kind === 'mic') {
@@ -371,6 +379,12 @@ registerProcessor('four-track', FourTrackProcessor);
   });
 
   document.querySelectorAll('[name=input]').forEach((r) => r.addEventListener('change', () => start().then(() => setInput(r.value))));
+  const soundBtn = document.getElementById('sound');
+  soundBtn.addEventListener('click', async () => {
+    if (!audio) return;
+    if (audio.state === 'running') { await audio.suspend(); soundBtn.textContent = 'Sound off (click to turn on)'; }
+    else { await audio.resume(); soundBtn.textContent = 'Sound on (click to turn off)'; }
+  });
   document.getElementById('monitor').addEventListener('change', (e) => send({ type: 'monitor', on: e.target.checked }));
   document.getElementById('font').addEventListener('change', (e) => { fontSet = e.target.value; glyphs = {}; if (node) node.port.postMessage({ type: 'init-fonts', advances: advances() }); });
 

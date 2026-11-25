@@ -27,7 +27,7 @@ class FourTrackProcessor extends AudioWorkletProcessor {
         this.outR = new Float32Array(mem, this.x.ft_out_r_ptr(), 128);
         this.cmd = new Int32Array(mem, this.x.ft_cmd_ptr(), 4096 * 7);
         this.pool = new Uint8Array(mem, this.x.ft_pool_ptr(), 32768);
-        this.x.ft_set_monitor(1);
+        this.x.ft_set_monitor(0);
         this.ready = true;
         this.port.postMessage({ type: 'ready', sampleRate });
       });
@@ -77,8 +77,11 @@ class FourTrackProcessor extends AudioWorkletProcessor {
     const out = outputs[0];
     if (!this.ready) return true;
     const input = inputs[0];
+    // The demo instrument only sounds while a take is being recorded (first take or a Part)
+    const mode = this.x.ft_state_mode();
     if (this.demo) {
-      this.demoBlock(this.inL, this.inR);
+      if (mode === 1 || mode === 3) this.demoBlock(this.inL, this.inR);
+      else { this.inL.fill(0); this.inR.fill(0); }
     } else if (input && input.length > 0) {
       this.inL.set(input[0]);
       this.inR.set(input.length > 1 ? input[1] : input[0]);

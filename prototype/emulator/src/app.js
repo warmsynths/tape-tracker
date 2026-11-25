@@ -114,6 +114,10 @@
   async function setInput(kind) {
     document.querySelectorAll('[name=input]').forEach((r) => (r.checked = r.value === kind));
     if (micSource) { micSource.disconnect(); micSource = null; }
+    // Hearing a microphone through speakers feeds back, so monitoring starts off for it.
+    const mon = document.getElementById('monitor');
+    mon.checked = kind === 'demo';
+    send({ type: 'monitor', on: mon.checked });
     if (kind === 'demo') { send({ type: 'demo', on: true }); return; }
     send({ type: 'demo', on: false });
     if (kind === 'mic') {
@@ -170,6 +174,12 @@
   });
 
   document.querySelectorAll('[name=input]').forEach((r) => r.addEventListener('change', () => start().then(() => setInput(r.value))));
+  const soundBtn = document.getElementById('sound');
+  soundBtn.addEventListener('click', async () => {
+    if (!audio) return;
+    if (audio.state === 'running') { await audio.suspend(); soundBtn.textContent = 'Sound off (click to turn on)'; }
+    else { await audio.resume(); soundBtn.textContent = 'Sound on (click to turn off)'; }
+  });
   document.getElementById('monitor').addEventListener('change', (e) => send({ type: 'monitor', on: e.target.checked }));
   document.getElementById('font').addEventListener('change', (e) => { fontSet = e.target.value; glyphs = {}; if (node) node.port.postMessage({ type: 'init-fonts', advances: advances() }); });
 

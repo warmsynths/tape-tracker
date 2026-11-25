@@ -39,7 +39,8 @@
     <h1>Four-Track Emulator</h1>
     <p>This page runs the same screen and recording logic as the Tracker firmware (the same C++, compiled to WebAssembly). What you see and do here is what the device does, apart from the audio hardware.</p>
     <h2>Audio</h2>
-    <label><input type="radio" name="input" value="demo" checked> Demo instrument</label>
+    <button id="sound" type="button">Sound on (click to turn off)</button>
+    <label><input type="radio" name="input" value="demo" checked> Demo instrument (plays only while you record)</label>
     <label><input type="radio" name="input" value="mic"> Microphone</label>
     <label><input type="checkbox" id="monitor" checked> Hear the input while recording</label>
     <p class="small">Sample rate: <span id="rate">-</span>. Use headphones with the microphone to avoid feedback.</p>
