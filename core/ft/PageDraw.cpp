@@ -9,13 +9,20 @@ namespace
 const char* const kWindowName[5] = { "Off", "30 ms", "60 ms", "100 ms", "150 ms" };
 const char* const kPreRollName[5] = { "0 ms", "60 ms", "120 ms", "250 ms", "500 ms" };
 const char* const kRoundName[3] = { "Off", "0.1 BPM", "1 BPM" };
-const char* const kFxName[(int)FxType::kCount] = { "Empty", "Jump back", "Jump back 2", "Stutter", "Reverse", "Pitch", "Bit-crush", "Overdrive", "Pan", "Low-pass", "High-pass", "Volume" };
+const char* const kFxName[(int)FxType::kCount] = { "Empty", "Jump back", "Jump back 2", "Stutter", "Reverse", "Pitch", "Bit-crush", "Overdrive", "Pan", "Low-pass", "High-pass", "Volume", "Random jumps", "Pitch steps" };
 const char* const kSourceName[4] = { "Line in", "Mic low", "Mic high", "Pads" };
 
 void fxValue(const FxSlot& s, char* out, size_t n)
 {
     switch (s.type)
     {
+        case FxType::RandomJumps: fmt(out, n, "%d%% of slices", s.amount); break;
+        case FxType::PitchSteps:
+        {
+            static const char* const names[5] = { "Mixed", "Fifths", "Octaves", "Thirds", "Sevenths" };
+            fmt(out, n, "%s, %d%%", names[s.semis < 0 || s.semis > 4 ? 0 : s.semis], s.amount);
+            break;
+        }
         case FxType::Pitch: fmt(out, n, "%s%d st", s.semis < 0 ? "-" : "+", s.semis < 0 ? -s.semis : s.semis); break;
         case FxType::None: out[0] = 0; break;
         case FxType::JumpBack: case FxType::JumpBack2: fmt(out, n, "%d%%", s.amount); break;
@@ -160,7 +167,7 @@ void App::drawGlitch(Pen& p)
         }
     }
     p.text(12, 420, "Hold B1-B4: play slot. Left/Right or B5-B8: track. Up/Down: slot. Jog: amount. Shift+jog: effect. Insert: keep on.", F12, pal.dim);
-    p.text(12, 404, shift ? "Shift: B1 clear track, B2 clear all, B3 pitch style. Performance goes back." : "Shift+B1 clear track, Shift+B2 clear all, Shift+B3 pitch style. Performance goes back.", F12, pal.dim);
+    p.text(12, 404, hal.bank().cfg[gTrack].slot[gSlot].type == FxType::PitchSteps ? "Pitch steps: Shift+Left/Right picks the intervals (Mixed, Fifths, Octaves, Thirds, Sevenths), jog the chance." : shift ? "Shift: B1 clear track, B2 clear all, B3 pitch style. Performance goes back." : "Shift+B1 clear track, Shift+B2 clear all, Shift+B3 pitch style. Performance goes back.", F12, pal.dim);
     const char* l[8] = { "Slot 1", "Slot 2", "Slot 3", "Slot 4", "Track 1", "Track 2", "Track 3", "Track 4" };
     p.buttons(l, 4 + gTrack);
 }

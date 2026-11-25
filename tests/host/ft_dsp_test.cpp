@@ -131,6 +131,35 @@ int main()
         float peak = 0; for (int i = 4000; i < 8000; i++) peak = std::fmax(peak, std::fabs(s[i]));
         CHECK(peak > 0.3f && peak < 0.7f, "wow and flutter keeps the signal at about the same level");
     }
+    {   // random jumps and pitch steps: stay in time, differ from pass to pass, change the sound
+        TrackBank b;
+        const int L = 44100 * 2;
+        std::vector<int16_t> d(L);
+        for (int i = 0; i < L; i++) d[i] = (int16_t)(std::sin(i * 0.03f) * 8000 + (i / 4000 % 2) * 6000);
+        b.data[0] = d.data();
+        b.loop = L;
+        b.slice = 11025;
+        b.cfg[0].slot[0] = { FxType::RandomJumps, true, 100, 0 };
+        std::vector<float> l1(L), r1(L), l2(L), r2(L);
+        for (int p = 0; p < L; p += 1000) b.render(p, 1000 < L - p ? 1000 : L - p, l1.data() + p, r1.data() + p);
+        for (int p = 0; p < L; p += 1000) b.render(p, 1000 < L - p ? 1000 : L - p, l2.data() + p, r2.data() + p);
+        int diffPass = 0;
+        for (int i = 0; i < L; i++) if (std::fabs(l1[i] - l2[i]) > 0.001f) diffPass++;
+        CHECK(diffPass > L / 10, "random jumps are different on the next pass");
+        TrackBank plain;
+        plain.data[0] = d.data(); plain.loop = L; plain.slice = 11025;
+        std::vector<float> lp(L), rp(L);
+        for (int p = 0; p < L; p += 1000) plain.render(p, 1000 < L - p ? 1000 : L - p, lp.data() + p, rp.data() + p);
+        int diffPlain = 0;
+        for (int i = 0; i < L; i++) if (std::fabs(l1[i] - lp[i]) > 0.001f) diffPlain++;
+        CHECK(diffPlain > L / 10, "random jumps change the sound");
+        b.cfg[0].slot[0] = { FxType::PitchSteps, true, 100, 1 };
+        b.pass = 0;
+        for (int p = 0; p < L; p += 1000) b.render(p, 1000 < L - p ? 1000 : L - p, l1.data() + p, r1.data() + p);
+        int diffPitch = 0;
+        for (int i = 0; i < L; i++) if (std::fabs(l1[i] - lp[i]) > 0.001f) diffPitch++;
+        CHECK(diffPitch > L / 10, "pitch steps change the sound");
+    }
     {   // wav header
         uint8_t h[44];
         CHECK(wavHeader(h, 1000, 44100) == 44, "a WAV header is 44 bytes");

@@ -36,7 +36,7 @@ App::App(Hal& h, const Palette& palette)
     for (int i = 0; i < 48; i++) padModeKeys[i] = true;
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
-        FxSlot defaults[4] = { { FxType::Stutter, false, 50, 7 }, { FxType::Pitch, false, 50, 7 }, { FxType::Reverse, false, 50, 7 }, { FxType::JumpBack, false, 50, 7 } };
+        FxSlot defaults[4] = { { FxType::RandomJumps, false, 50, 0 }, { FxType::PitchSteps, false, 40, 0 }, { FxType::Stutter, false, 50, 7 }, { FxType::Reverse, false, 50, 7 } };
         for (int s = 0; s < 4; s++) hal.bank().cfg[t].slot[s] = defaults[s];
     }
 }

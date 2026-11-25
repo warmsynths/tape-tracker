@@ -14,7 +14,7 @@ const uint16_t kWindowMs[5] = { 0, 30, 60, 100, 150 };
 const uint16_t kPreRollMs[5] = { 0, 60, 120, 250, 500 };
 const char* const kRound[3] = { "Off", "0.1 BPM", "1 BPM" };
 
-const char* const kFxNames[(int)FxType::kCount] = { "Empty slot", "Jump back", "Jump back 2", "Stutter", "Reverse", "Pitch", "Bit-crush", "Overdrive", "Pan", "Low-pass", "High-pass", "Volume" };
+const char* const kFxNames[(int)FxType::kCount] = { "Empty slot", "Jump back", "Jump back 2", "Stutter", "Reverse", "Pitch", "Bit-crush", "Overdrive", "Pan", "Low-pass", "High-pass", "Volume", "Random jumps", "Pitch steps" };
 
 const char* intervalName(int semis)
 {
@@ -402,8 +402,14 @@ void App::glitchKey(int k)
     switch (k)
     {
         case kB5: case kB6: case kB7: case kB8: gTrack = k - kB5; break;
-        case kLeft: gTrack = clampi(gTrack - 1, 0, 3); break;
-        case kRight: gTrack = clampi(gTrack + 1, 0, 3); break;
+        case kLeft: case kRight:
+            if (shift && c.slot[gSlot].type == FxType::PitchSteps)
+            {
+                int v = c.slot[gSlot].semis + (k == kRight ? 1 : -1);
+                c.slot[gSlot].semis = (int8_t)clampi(v, 0, 4);
+            }
+            else gTrack = clampi(gTrack + (k == kRight ? 1 : -1), 0, 3);
+            break;
         case kUp: gSlot = clampi(gSlot - 1, 0, 3); break;
         case kDown: gSlot = clampi(gSlot + 1, 0, 3); break;
         case kJogPress: { FxSlot& s = c.slot[gSlot]; s.on = !s.on; unsaved = true; break; }

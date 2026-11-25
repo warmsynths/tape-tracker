@@ -133,6 +133,8 @@ void TrackBank::resetState()
         lp[t] = hp[t] = hpPrev[t] = crushHold[t] = 0.0f;
         crushCount[t] = 0;
     }
+    pass = 0;
+    lastPos = 0;
 }
 
 float TrackBank::readAt(int t, float srcIndex) const
@@ -149,10 +151,20 @@ float TrackBank::readAt(int t, float srcIndex) const
     return ((float)d[i0] * (1.0f - frac) + (float)d[i1] * frac) * (1.0f / 32768.0f);
 }
 
+// A repeatable pseudo-random number for a slice of a track on one pass of the loop
+static uint32_t sliceHash(int track, uint32_t pass, uint32_t slice, uint32_t salt)
+{
+    uint32_t x = (uint32_t)track * 0x9E3779B1u + pass * 0x85EBCA6Bu + slice * 0xC2B2AE35u + salt * 0x27D4EB2Fu;
+    x ^= x >> 15; x *= 0x2C1B3C6Du; x ^= x >> 12; x *= 0x297A2D39u; x ^= x >> 15;
+    return x;
+}
+
 void TrackBank::render(uint32_t pos, int n, float* left, float* right)
 {
     for (int i = 0; i < n; i++) left[i] = right[i] = 0.0f;
     if (loop == 0) return;
+    if (pos < lastPos) pass++;
+    lastPos = pos;
     const uint32_t sl = slice ? slice : (loop / 16 > 0 ? loop / 16 : 1);
     const float grainLen = (float)(sl / 2 < kRate * 40 / 1000 ? (sl / 2 > 0 ? sl / 2 : 1) : kRate * 40 / 1000);
 
@@ -204,6 +216,38 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
                             uint32_t span = sl;
                             if (ss + span > loop) span = loop - ss;
                             q = ss + (span - 1 - (within < span ? within : span - 1));
+                            break;
+                        }
+                        case FxType::RandomJumps:
+                        {
+                            const uint32_t h = sliceHash(t, pass, q / sl, 1);
+                            if ((h % 100) >= f.amount) break;
+                            const uint32_t kind = (h >> 8) & 3;
+                            if (kind == 0) q = (q + loop - (sl % loop)) % loop;
+                            else if (kind == 3) q = (q + loop - ((2 * sl) % loop)) % loop;
+                            else if (kind == 1)
+                            {
+                                uint32_t k = sl / 4;
+                                if (k < 1) k = 1;
+                                q = ss + ((q - ss) % k);
+                            }
+                            else
+                            {
+                                uint32_t within = q - ss;
+                                uint32_t span = sl;
+                                if (ss + span > loop) span = loop - ss;
+                                q = ss + (span - 1 - (within < span ? within : span - 1));
+                            }
+                            break;
+                        }
+                        case FxType::PitchSteps:
+                        {
+                            const uint32_t h = sliceHash(t, pass, q / sl, 2);
+                            if ((h % 100) >= f.amount) break;
+                            static const int8_t sets[5][5] = { { 7, -7, 12, 4, -12 }, { 7, -5, 7, -7, 5 }, { 12, -12, 12, -12, 12 }, { 3, 4, -3, -4, 3 }, { 10, 11, -10, -11, 10 } };
+                            const int8_t st = sets[f.semis < 0 || f.semis > 4 ? 0 : f.semis][(h >> 8) % 5];
+                            pitchOn = true;
+                            ratio = semitoneRatio(st);
                             break;
                         }
                         case FxType::Pitch: pitchOn = true; ratio = semitoneRatio(f.semis); break;

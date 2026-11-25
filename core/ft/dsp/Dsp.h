@@ -35,6 +35,8 @@ enum class FxType : uint8_t
     LowPass,
     HighPass,
     Volume,     // 0 to -48 dB
+    RandomJumps, // each slice may jump back, stutter, reverse or jump back two (amount: chance per slice)
+    PitchSteps,  // each slice may step to a musical interval (amount: chance; semis: which set of intervals)
     kCount
 };
 
@@ -69,7 +71,9 @@ class TrackBank
     uint32_t loop = 0;          // loop length in frames, 0: nothing to play
     uint32_t slice = 0;         // length of a glitch slice (a half beat); 0: loop / 16
     bool playOnce = false;      // Repeat wraps shifted audio around the loop, play once cuts it
-    uint16_t peak[4] = {};      // largest sample of each track since the caller cleared it
+    uint16_t peak[4] = {};
+    uint32_t pass = 0;          // how many times the loop has come round (the random effects differ each time)
+    uint32_t lastPos = 0;      // largest sample of each track since the caller cleared it
 
     // Renders `n` frames starting at loop position `pos` into stereo float buffers (-1..1).
     void render(uint32_t pos, int n, float* left, float* right);
