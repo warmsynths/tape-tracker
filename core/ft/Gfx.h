@@ -24,23 +24,35 @@ class Gfx
     virtual void bars(int x0, int cy, int step, int barWidth, const uint8_t* heights, int count) = 0;
 };
 
-// Colour roles used by the screens. Filled from the Tracker's theme so a custom theme recolours
-// everything.
+// Colour roles used by the screens: the design's 17 roles (docs/design). Filled from the
+// Tracker's theme on the device, so a custom theme recolours everything.
 struct Palette
 {
-    uint32_t background;
-    uint32_t text;     // normal text
-    uint32_t bright;   // emphasised text, playhead
-    uint32_t dim;      // captions, outlines, off states
-    uint32_t panel;    // track headers, buttons, selected row
-    uint32_t hairline; // thin separators
-    uint32_t selected; // selected cell in a grid
-    uint32_t meterBack;
-    uint32_t wave;
-    uint32_t record;
-    uint32_t marker;   // loop line, mute, memory warnings
-    uint32_t good;     // meters, ON tags
+    uint32_t bg;       // screen ground
+    uint32_t top;      // top bar
+    uint32_t topText;  // top-bar text
+    uint32_t frame;    // hairlines, button strip, panel edge
+    uint32_t text;     // primary text, playhead, focus line
+    uint32_t dim;      // captions, outlined tags, off states
+    uint32_t cell;     // button cells
+    uint32_t sel;      // selected track, field, row, slot
+    uint32_t panel;    // track headers, fields, panels
+    uint32_t rec;      // record only
+    uint32_t meter;    // level meters, GLT and ON tags, activity
+    uint32_t track;    // meter and bar backgrounds
+    uint32_t wave;     // waveform
+    uint32_t waveBg;   // lane audio area
+    uint32_t waveOff;  // muted or trimmed audio
+    uint32_t marker;   // loop region and markers, mute on
+    uint32_t warn;     // memory and feedback warnings, unsaved mark, bypass
 };
+
+// The design's "Original" palette (docs/design/four-track-recorder-design-r4.zip).
+inline Palette designPalette()
+{
+    return Palette{ 0x15130f, 0x221f19, 0xd3c8ae, 0x3a342a, 0xe6dcc3, 0x91876f, 0x211e18, 0x332e25, 0x1c1a15,
+                    0xc4452e, 0x93a66a, 0x2c2922, 0x8d826c, 0x191712, 0x575043, 0xd8873a, 0xd2a94f };
+}
 } // namespace ft
 
 #endif /* FT_GFX_H_ */

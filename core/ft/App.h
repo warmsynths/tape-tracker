@@ -1,6 +1,7 @@
 #ifndef FT_APP_H_
 #define FT_APP_H_
 
+#include "Canvas.h"
 #include "FourTrackSession.h"
 #include "Gfx.h"
 #include "Hal.h"
@@ -10,16 +11,43 @@
 namespace ft
 {
 // Buttons and keys of the Tracker that the application reacts to. The eight buttons under the
-// screen are B1 to B8.
+// screen are B1 to B8. Shift is held, not pressed: see App::setShift.
 enum Key
 {
     kB1, kB2, kB3, kB4, kB5, kB6, kB7, kB8,
     kUp, kDown, kLeft, kRight,
-    kRec, kPlay, kStop, kShift,
+    kRec, kPlay, kStop,
+    kJogPress,
+    kSampleEdit,   // opens the Part Editor
+    kPerformance,  // opens Glitch and live effects
+    kMaster,       // opens the lo-fi master
+    kFile,         // opens Project
     kKeyCount
 };
 
-// The Four-Track application: the main screen and everything behind it. No hardware in here: it
+enum class Screen : uint8_t
+{
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory
+};
+
+enum class Popup : uint8_t
+{
+    None, Replace, NoSound, NotArmed, SdMissing, Unsaved, Message
+};
+
+struct Settings
+{
+    bool loopOnce = false;     // project: Loop Mode
+    bool click = false;        // project: click while playing
+    uint8_t windowIdx = 2;     // device: alignment window 0, 30, 60, 100, 150 ms
+    uint8_t preRollIdx = 2;    // device: pre-roll 0, 60, 120, 250, 500 ms
+    uint8_t roundIdx = 0;      // device: tempo rounding off, 0.1, 1
+    uint16_t tempoTenths = 0;  // starting tempo in tenths of a BPM, 0: Free
+    bool countIn = true;
+    bool monitorLine = true;   // device: monitoring default for line
+};
+
+// The Four-Track application: every screen and everything behind them. No hardware in here: it
 // talks to the machine only through Hal and draws only through Gfx. The Tracker firmware and
 // the web emulator both run exactly this code.
 class App
@@ -33,24 +61,34 @@ class App
 
     // Input
     void key(int key);
+    void keyUp(int key); // releases matter for the held effect buttons on the Glitch screen
     void jog(int delta);
+    void setShift(bool held) { shift = held; }
     void pad(int pad, bool down);
 
     // One pass of the main loop.
     void tick();
 
-    // Drawing. A layer is drawn in stages. Returns true if the layer has to be redrawn since the
-    // last call (it clears the flag). Layer 3 is only visible while a question is open.
+    // Drawing. Layers 0 to 3 are the main screen (View.h); layer 4 is the page of any other
+    // screen, layer 5 a popup. A layer is drawn in stages. takeRedraw returns true if the layer
+    // has to be redrawn since the last call and clears the flag.
     bool takeRedraw(int layer);
     bool layerVisible(int layer) const;
+    int stagesOf(int layer) const;
     void draw(int layer, int stage, Gfx& gfx) const;
+    void setMeasure(Gfx* g) { page.setMeasure(g); popupPage.setMeasure(g); }
     const View& view() const { return model; }
-    void setPalette(const Palette& palette) { pal = palette; }
+    void setPalette(const Palette& palette) { pal = palette; dirtyAll(); }
 
     const FourTrackSession& state() const { return session; }
+    Screen screen() const { return current; }
+    Popup popup() const { return popupKind; }
+    const Settings& settings() const { return set; }
 
   private:
+    // ---- main screen
     void pressRecord();
+    void startRecording(); // after the replace question and the count-in
     void pressStop();
     void pressPlay();
     void selectTrack(int track);
@@ -59,7 +97,8 @@ class App
     void promptConfirm();
     void promptCancel();
     void togglePadMode();
-
+    void muteTrack(int track);
+    void undoTake();
     void applySource(Source source);
     void startPlayer();
     void syncPlayer();
@@ -67,38 +106,159 @@ class App
     void serviceFirstTake();
     void serviceArmed();
     void servicePartRecording();
-    void finishPartEarly();
+    void finishPart(int track, uint32_t firstSample, bool early);
     void cancelRecording();
-
+    void serviceClick();
+    void serviceCountIn();
     bool updateTrackMeters();
     void computeWave(int track);
     void fillView();
     void refresh(bool force);
-
+    void applyAlignment(int track, uint32_t firstSample);
+    void pushBank();
+    void syncTrackCfg(int track);
+    uint32_t windowFrames() const;
+    uint32_t preRollFrames() const;
     static const char* sourceName(Source source);
+
+    // ---- other screens
+    void open(Screen s);
+    void back();
+    void keyScreen(int k);
+    void jogScreen(int delta);
+    void buildPage();
+    void drawTempo(class Pen& p);
+    void drawEditor(class Pen& p);
+    void drawGlitch(class Pen& p);
+    void drawMaster(class Pen& p);
+    void drawInput(class Pen& p);
+    void drawProject(class Pen& p);
+    void drawNameEntry(class Pen& p);
+    void drawSettings(class Pen& p);
+    void drawExport(class Pen& p);
+    void drawPads(class Pen& p);
+    void drawMemory(class Pen& p);
+    void drawPopup(class Pen& p);
+    void showPopup(Popup kind, int arg = 0);
+    void popupKey(int k);
+    void dirtyAll();
+
+    // Part Editor
+    struct EditParams
+    {
+        uint32_t trimStart, trimEnd, fadeIn, fadeOut;
+        float gain;
+        int32_t userOffset;
+    };
+    void editEnter();
+    void editApply(const EditParams& e);
+    void editPush();
+    EditParams editNow() const;
+    void editField(int delta);
+    int editTrack = 0, editFieldIdx = 0, editHist = 0, editHistLen = 0;
+    EditParams editStack[16];
+    EditParams editEntry{};
+    bool auditioning = false;
+    uint8_t editWave[100];
+    bool editWaveDirty = true;
+    void computeEditWave();
+
+    // Glitch
+    void glitchKey(int k);
+    int gTrack = 0, gSlot = 0;
+    bool shiftChoosesEffect = false;
+
+    // Master
+    void masterKey(int k);
+    void masterJog(int delta);
+    int mRow = 0, mSub = 0;
+
+    // Settings
+    int sRow = 0;
+    void settingsJog(int delta);
+
+    // Project
+    void projectKey(int k);
+    void refreshProjectList();
+    void newProject();
+    void startSave();
+    void startLoad(const char* name);
+    void startExport();
+    void serviceJob();
+    uint32_t partOffset(int track) const;
+    void nameKey(int k);
+    void nameJog(int delta);
+    bool loadHeader(const char* path);
+    char list[16][24] = {};
+    int listCount = 0, listSel = 0;
+    char projectName[20] = "Untitled";
+    bool unsaved = false;
+    char nameEdit[17] = {};
+    int nameCursor = 0, nameChar = 0;
+    bool nameForSaveAs = false;
+    int pendingAction = 0; // what to do after the "Save your changes?" question
+    char pendingName[24] = {};
+
+    // jobs: saving and loading a project, writing a WAV
+    enum class Job : uint8_t { None, Save, Load, Export, Done };
+    Job job = Job::None;
+    char jobPath[48] = {};
+    uint32_t jobDone = 0, jobTotal = 0, jobStage = 0;
+    int jobTrack = 0;
+    int exportRepeats = 1;
+    char exportFile[40] = {};
+    int exportPercent = 0;
+    TrackBank exportBank;
+    Lofi exportLofi;
+
+    // Pads
+    int padsSel = 0;
+    // Input
+    int inputRow = 0;
 
     Hal& hal;
     Palette pal;
     FourTrackSession session;
     View model{};
+    Settings set;
+    Screen current = Screen::Main;
+    Popup popupKind = Popup::None;
+    int popupArg = 0;
+    bool shift = false;
 
     Source trackSource[FourTrackSession::kTracks] = { Source::Line, Source::Line, Source::Line, Source::Line };
     const int16_t* partData[FourTrackSession::kTracks]{};
+    int32_t alignShift[FourTrackSession::kTracks]{};
+    int32_t userOffset[FourTrackSession::kTracks]{};
+    bool hasUndoTake[FourTrackSession::kTracks]{};
+    bool glitchLatched[FourTrackSession::kTracks]{};
     int appliedSource = -1;
     bool padsKeysMode = true;
+    bool padModeKeys[48];
 
     bool promptShown = false;
     int promptBars[kBarChoiceMax]{};
     int promptCount = 0;
     int promptSelected = 0;
 
+    // count-in before a first take at a set tempo
+    bool countingIn = false;
+    uint32_t countInStart = 0;
+    int countInBeats = 0;
+    bool replaceConfirmed = false;
+    int lastClickBeat = -1;
+
     uint32_t staticSignature = 0;
+    uint32_t pageSignature = 0;
     bool waveDirty[FourTrackSession::kTracks] = { true, true, true, true };
     uint8_t waveVersion[FourTrackSession::kTracks]{};
     uint32_t meterTimer = 0;
+    uint32_t pageTimer = 0;
     int trackDb[FourTrackSession::kTracks] = { -60, -60, -60, -60 };
-    bool redraw[kLayerCount] = { true, true, true, false };
+    bool redraw[6] = { true, true, true, false, false, false };
     bool visibleNow = false;
+
+    Canvas page, popupPage;
 };
 } // namespace ft
 

@@ -48,6 +48,7 @@ struct View
     char pos[10];
     char input[12];
     char inputLevels[20];
+    char fb[12]; // feedback protection, for example FB -6 dB; empty when it is not acting
     bool monitor;
     char status[20];
     uint8_t statusKind; // 0 stopped, 1 playing, 2 recording, 3 armed

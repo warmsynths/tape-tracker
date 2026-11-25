@@ -1,6 +1,7 @@
 #ifndef FT_HAL_H_
 #define FT_HAL_H_
 
+#include "dsp/Dsp.h"
 #include <stdint.h>
 
 namespace ft
@@ -42,13 +43,41 @@ class Hal
     virtual bool recordStartCaptured() = 0;   // the first block has arrived
     virtual uint32_t recordStartPosition() = 0; // loop position when the first block arrived
 
-    // The looping player (all four tracks share one position)
+    // The looping player (all four tracks share one position). The application sets up the
+    // tracks (offsets, trims, glitch effects) and the lo-fi master directly in `bank()` and
+    // `lofi()`; the audio side renders from them.
     virtual void playerSetTrack(int track, const int16_t* data) = 0;
     virtual void playerStart(uint32_t frames) = 0;
     virtual void playerStop() = 0;
     virtual bool playerPlaying() = 0;
     virtual uint32_t playerPosition() = 0;
     virtual uint16_t playerTakePeak(int track) = 0; // largest sample since last call, 0 to 32767
+    virtual TrackBank& bank() = 0;
+    virtual Lofi& lofi() = 0;
+
+    // Input gain, 0 to 100 percent, per source; and monitoring of the live input
+    virtual int gain(Source source) = 0;
+    virtual void setGain(Source source, int percent) = 0;
+    virtual void setMonitor(bool on) = 0;
+    virtual int monitorReductionDb() = 0; // 0, or negative while feedback protection acts
+
+    // Clicks for the metronome and the count-in
+    virtual void click(bool accent) = 0;
+
+    // Files (the SD card on the Tracker, browser storage in the emulator). Paths use '/'.
+    virtual bool sdPresent() = 0;
+    virtual bool fileWrite(const char* path, const void* data, uint32_t len, bool append) = 0;
+    virtual uint32_t fileRead(const char* path, uint32_t offset, void* buf, uint32_t len) = 0;
+    virtual uint32_t fileSize(const char* path) = 0; // 0 if it does not exist
+    virtual bool fileRemove(const char* path) = 0;
+    virtual int fileList(const char* dir, char (*names)[24], int maxNames) = 0; // file names only
+
+    // The samples on the pads
+    virtual int sampleCount() = 0;                       // loaded samples
+    virtual bool sampleName(int slot, char* out, int size) = 0; // false if the slot is empty
+    virtual int currentSample() = 0;                     // the sample Keys mode plays, -1 if none
+    virtual void setCurrentSample(int slot) = 0;
+    virtual void sampleMemory(uint32_t& usedBytes, uint32_t& totalBytes) = 0;
 
     // Pads
     virtual void padOn(int pad, bool keysMode) = 0;

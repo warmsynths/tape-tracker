@@ -81,30 +81,30 @@ class Painter
 void Painter::drawTop()
 {
     const uint32_t text = pal.text;
-    const uint32_t bright = pal.bright;
+    const uint32_t bright = pal.text;
     const uint32_t dim = pal.dim;
     const uint32_t panel = pal.panel;
-    const uint32_t hair = pal.hairline;
+    const uint32_t hair = pal.frame;
 
     // ---- Top bar ------------------------------------------------------------------------
-    rect(0, 0, 800, kTopBarH, panel);
-    int x = drawText(12, 8, v.project, kF17Bold, bright);
+    rect(0, 0, 800, kTopBarH, pal.top);
+    int x = drawText(12, 8, v.project, kF17Bold, pal.topText);
     if (v.unsaved)
     {
         rect(x + 6, 12, 6, 6, pal.marker);
     }
     x = 150;
     x = drawText(x, 12, "BPM", kF12, dim);
-    x = drawText(x + 6, 8, v.tempo, kF17Bold, bright);
+    x = drawText(x + 6, 8, v.tempo, kF17Bold, pal.topText);
     x = drawText(x + 18, 12, "BARS", kF12, dim);
-    x = drawText(x + 6, 8, v.bars, kF17Bold, bright);
+    x = drawText(x + 6, 8, v.bars, kF17Bold, pal.topText);
     drawText(330, 12, "POS", kF12, dim); // the value is drawn by the dynamic layer
     x = drawText(456, 12, "IN", kF12, dim);
     x = drawText(x + 6, 9, v.input, kF14, text);
     if (v.monitor)
     {
-        rect(x + 10, 7, 36, 18, bright);
-        drawText(x + 14, 11, "MON", kF12, pal.background);
+        rect(x + 10, 7, 36, 18, pal.topText);
+        drawText(x + 14, 11, "MON", kF12, pal.bg);
     }
     else
     {
@@ -112,15 +112,22 @@ void Painter::drawTop()
         drawText(x + 14, 11, "MON OFF", kF12, dim);
     }
 
+    if (v.fb[0] != 0)
+    {
+        const int w = textWidth(v.fb, kF12) + 12;
+        rect(716, 7, w, 18, pal.warn);
+        drawText(722, 9, v.fb, kF12, pal.bg);
+    }
+
     // ---- Status row and loop ruler ------------------------------------------------------
     switch (v.statusKind)
     {
         case 1: drawText(14, 36, "\x1a\x1b", kF17Bold, bright); break;                 // play glyph
-        case 2: dot(20, 44, 5, pal.record); break;                                        // recording
+        case 2: dot(20, 44, 5, pal.rec); break;                                        // recording
         case 3: frame(15, 39, 10, 10, dim); break;                                    // armed
         default: rect(15, 39, 10, 10, bright); break;                                 // stopped
     }
-    drawText(32, 37, v.status, kF14, v.statusKind == 2 ? pal.record : bright);
+    drawText(32, 37, v.status, kF14, v.statusKind == 2 ? pal.rec : bright);
     if (v.statusNote[0] != 0)
     {
         drawText(kWaveX + 14, 40, v.statusNote, kF12, dim);
@@ -147,7 +154,7 @@ void Painter::drawHint()
 {
     const uint32_t text = pal.text;
     const uint32_t dim = pal.dim;
-    const uint32_t hair = pal.hairline;
+    const uint32_t hair = pal.frame;
 
     rect(0, kHintY, 800, 1, hair);
     drawText(14, kHintY + 14, v.hint, kF14, text);
@@ -163,14 +170,15 @@ void Painter::drawLane(int i, int y0)
 {
     const Lane& L = v.lane[i];
     const uint32_t text = pal.text;
-    const uint32_t bright = pal.bright;
+    const uint32_t bright = pal.text;
     const uint32_t dim = pal.dim;
     const uint32_t panel = pal.panel;
-    const uint32_t hair = pal.hairline;
+    const uint32_t hair = pal.frame;
 
+    rect(kWaveX - 4, y0, kWaveW + 8, kLaneH - 1, pal.waveBg);
     if (L.selected)
     {
-        rect(0, y0, kHeaderW, kLaneH - 1, panel);
+        rect(0, y0, kHeaderW, kLaneH - 1, pal.sel);
         rect(0, y0, 3, kLaneH - 1, bright);
     }
     rect(0, y0 + kLaneH - 1, 800, 1, hair);
@@ -185,7 +193,7 @@ void Painter::drawLane(int i, int y0)
     if (L.muted)
     {
         rect(134, y0 + 8, 20, 18, pal.marker);
-        drawText(140, y0 + 11, "M", kF12, pal.background);
+        drawText(140, y0 + 11, "M", kF12, pal.bg);
     }
     else
     {
@@ -201,19 +209,19 @@ void Painter::drawLane(int i, int y0)
     tx += tagW + 4;
     if (L.glitch)
     {
-        rect(tx, y0 + 36, textWidth("GLT", kF12) + 12, 18, pal.good);
-        drawText(tx + 6, y0 + 40, "GLT", kF12, pal.background);
+        rect(tx, y0 + 36, textWidth("GLT", kF12) + 12, 18, pal.meter);
+        drawText(tx + 6, y0 + 40, "GLT", kF12, pal.bg);
     }
     if (L.active)
     {
-        dot(kHeaderW - 18, y0 + 45, 5, pal.record);
+        dot(kHeaderW - 18, y0 + 45, 5, pal.rec);
     }
     if (L.info[0] != 0)
     {
         drawText(14, y0 + 60, L.info, kF12, dim);
     }
     // meter background (the filled part is the dynamic layer)
-    rect(14, y0 + 76, 140, 3, pal.meterBack);
+    rect(14, y0 + 76, 140, 3, pal.track);
 
     // waveform or message
     if (L.hasPart && L.waveCount > 0)
@@ -224,7 +232,7 @@ void Painter::drawLane(int i, int y0)
         {
             heights[c] = (uint8_t)(2 + (L.wave[c] * 68) / 255);
         }
-        g.color(L.muted ? pal.dim : pal.wave);
+        g.color(L.muted ? pal.waveOff : pal.wave);
         g.bars(kWaveX, cy, 6, 4, heights, L.waveCount); // 100 columns of 6 px
     }
     else
@@ -243,15 +251,15 @@ void Painter::drawLane(int i, int y0)
 void Painter::drawButtons()
 {
     const uint32_t text = pal.text;
-    const uint32_t bright = pal.bright;
+    const uint32_t bright = pal.text;
     const uint32_t panel = pal.panel;
-    const uint32_t hair = pal.hairline;
+    const uint32_t hair = pal.frame;
 
     rect(0, kButtonsY, 800, 1, hair);
     for (int b = 0; b < 8; b++)
     {
         const int x0 = b * 100;
-        rect(x0 + 1, kButtonsY + 1, 97, 38, panel);
+        rect(x0 + 1, kButtonsY + 1, 97, 38, pal.cell);
         if (v.btnSelected == b)
         {
             rect(x0 + 1, kButtonsY + 1, 97, 2, bright);
@@ -261,7 +269,7 @@ void Painter::drawButtons()
         switch (v.btnKind[b])
         {
             case 1: // Rec dot and text
-                dot(x0 + 24, kButtonsY + 20, 5, pal.record);
+                dot(x0 + 24, kButtonsY + 20, 5, pal.rec);
                 drawText(x0 + 38, kButtonsY + 12, label, kF14, text);
                 break;
             case 2: // Stop square and text
@@ -279,12 +287,12 @@ void Painter::drawButtons()
 
 void Painter::drawDynamic()
 {
-    const uint32_t bright = pal.bright;
+    const uint32_t bright = pal.text;
     const uint32_t dim = pal.dim;
 
     // position readout in the top bar
     drawText(358, 8, v.pos, kF17Bold, bright);
-    drawText(640, 11, v.inputLevels, kF12, dim);
+    drawText(612, 11, v.inputLevels, kF12, dim);
 
     // counters of the lanes being recorded or armed
     for (int i = 0; i < 4; i++)
@@ -296,7 +304,7 @@ void Painter::drawDynamic()
     }
 
     // level bars
-    g.color(pal.good);
+    g.color(pal.meter);
     for (int i = 0; i < 4; i++)
     {
         const int w = (v.lane[i].meter * 140) / 100;
@@ -330,19 +338,19 @@ void Painter::drawPrompt()
 {
     const Prompt& P = v.prompt;
     const uint32_t text = pal.text;
-    const uint32_t bright = pal.bright;
+    const uint32_t bright = pal.text;
     const uint32_t dim = pal.dim;
     const uint32_t panel = pal.panel;
-    const uint32_t hair = pal.hairline;
+    const uint32_t hair = pal.frame;
 
-    rect(0, kPromptY, 800, 480 - kPromptY, pal.background);
+    rect(0, kPromptY, 800, 480 - kPromptY, pal.bg);
     rect(0, kPromptY, 800, 2, bright);
 
     int x = drawText(14, kPromptY + 16, "How many bars?", kF17Bold, bright);
     if (P.memoryFull)
     {
         rect(x + 16, kPromptY + 17, textWidth("MEMORY FULL", kF12) + 12, 18, pal.marker);
-        x = drawText(x + 22, kPromptY + 21, "MEMORY FULL", kF12, pal.background);
+        x = drawText(x + 22, kPromptY + 21, "MEMORY FULL", kF12, pal.bg);
         drawText(x + 22, kPromptY + 20, P.note, kF14, pal.marker);
     }
     drawText(14, kPromptY + 44, P.played, kF14, text);
@@ -375,7 +383,7 @@ void Painter::drawPromptChoices()
 {
     const Prompt& P = v.prompt;
     const uint32_t text = pal.text;
-    const uint32_t bright = pal.bright;
+    const uint32_t bright = pal.text;
     const uint32_t dim = pal.dim;
     const uint32_t panel = pal.panel;
 
@@ -384,7 +392,7 @@ void Painter::drawPromptChoices()
         const int x0 = (i % kCellsPerRow) * 100;
         const int y0 = kCellsY + (i / kCellsPerRow) * (kCellH + 4);
         const bool selected = (i == P.selected);
-        rect(x0 + 1, y0, 97, kCellH, selected ? pal.selected : panel);
+        rect(x0 + 1, y0, 97, kCellH, selected ? pal.sel : panel);
         if (selected)
         {
             rect(x0 + 1, y0, 97, 2, bright);

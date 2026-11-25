@@ -60,6 +60,15 @@ class FourTrackSession
     // Throws the first take away. With no other Part there is no loop again.
     void cancelBars();
 
+    // A new, empty project; or one that was opened with a loop of `loopFrames` and `bars`, and
+    // Parts on the tracks set in `partMask` (bit 0 is track 1).
+    void reset();
+    // The length the loop will get when the bars are confirmed (the take trimmed or padded to a grid).
+    void setPendingFrames(uint32_t frames) { if (currentMode == Mode::ChoosingBars) pending = frames; }
+    void restore(uint32_t loopFrames, int bars, uint8_t partMask);
+    // A later take was cancelled or replaced: forget the Part on a track.
+    void dropPart(int track);
+
   private:
     void finishFirst(uint32_t frames);
 

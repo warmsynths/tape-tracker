@@ -153,3 +153,35 @@ void FourTrackSession::cancelBars()
     currentMode = Mode::Idle;
     isPlaying = (loop > 0);
 }
+
+void FourTrackSession::reset()
+{
+    loop = 0;
+    pending = 0;
+    barCount = 0;
+    full = false;
+    isPlaying = false;
+    currentMode = Mode::Idle;
+    selectedTrack = 0;
+    for (int i = 0; i < kTracks; i++) parts[i] = false;
+}
+
+void FourTrackSession::restore(uint32_t loopFrames, int bars, uint8_t partMask)
+{
+    reset();
+    loop = loopFrames;
+    barCount = bars;
+    for (int i = 0; i < kTracks; i++) parts[i] = (partMask >> i) & 1;
+}
+
+void FourTrackSession::dropPart(int track)
+{
+    if (track < 0 || track >= kTracks) return;
+    parts[track] = false;
+    if (partCount() == 0)
+    {
+        loop = 0;
+        barCount = 0;
+        isPlaying = false;
+    }
+}

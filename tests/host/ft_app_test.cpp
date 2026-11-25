@@ -4,6 +4,8 @@
 
 #include <cstdio>
 #include <cstring>
+#include <map>
+#include <string>
 #include <vector>
 
 using namespace ft;
@@ -32,6 +34,12 @@ struct FakeHal : Hal
     const int16_t* data[4] = {};
     Source applied = Source::Line;
     int padsOn = 0;
+    TrackBank trackBank;
+    Lofi lofiMaster;
+    int gains[4] = { 50, 50, 50, 50 };
+    std::map<std::string, std::vector<uint8_t>> files;
+    int clicks = 0;
+    int curSample = 0;
 
     FakeHal()
     {
@@ -56,6 +64,46 @@ struct FakeHal : Hal
     bool playerPlaying() override { return playing; }
     uint32_t playerPosition() override { return pos; }
     uint16_t playerTakePeak(int) override { return 8000; }
+    TrackBank& bank() override { return trackBank; }
+    Lofi& lofi() override { return lofiMaster; }
+    int gain(Source s) override { return gains[(int)s]; }
+    void setGain(Source s, int p) override { gains[(int)s] = p; }
+    void setMonitor(bool) override {}
+    int monitorReductionDb() override { return 0; }
+    void click(bool) override { clicks++; }
+    bool sdPresent() override { return true; }
+    bool fileWrite(const char* path, const void* d, uint32_t n, bool append) override
+    {
+        auto& f = files[path];
+        if (!append) f.clear();
+        f.insert(f.end(), (const uint8_t*)d, (const uint8_t*)d + n);
+        return true;
+    }
+    uint32_t fileRead(const char* path, uint32_t off, void* buf, uint32_t n) override
+    {
+        auto it = files.find(path);
+        if (it == files.end() || off >= it->second.size()) return 0;
+        uint32_t k = (uint32_t)it->second.size() - off;
+        if (k > n) k = n;
+        std::memcpy(buf, it->second.data() + off, k);
+        return k;
+    }
+    uint32_t fileSize(const char* path) override { auto it = files.find(path); return it == files.end() ? 0 : (uint32_t)it->second.size(); }
+    bool fileRemove(const char* path) override { return files.erase(path) > 0; }
+    int fileList(const char* dir, char (*names)[24], int maxNames) override
+    {
+        int n = 0;
+        const std::string prefix = std::string(dir) + "/";
+        for (auto& kv : files)
+            if (kv.first.compare(0, prefix.size(), prefix) == 0 && n < maxNames)
+                std::snprintf(names[n++], 24, "%s", kv.first.c_str() + prefix.size());
+        return n;
+    }
+    int sampleCount() override { return 0; }
+    bool sampleName(int, char*, int) override { return false; }
+    int currentSample() override { return curSample; }
+    void setCurrentSample(int s) override { curSample = s; }
+    void sampleMemory(uint32_t& u, uint32_t& t) override { u = 0; t = 2600000; }
     void padOn(int, bool) override { padsOn++; }
     void padOff(int) override { padsOn--; }
     void padsReleaseAll() override { padsOn = 0; }
@@ -84,17 +132,130 @@ struct FakeHal : Hal
     }
 };
 
-static Palette palette()
+static Palette palette() { return designPalette(); }
+
+
+struct NullGfx : Gfx
 {
-    Palette p{};
-    p.background = 0; p.text = 0x777777; p.bright = 0xFFFFFF; p.dim = 0x575757; p.panel = 0x222222;
-    p.hairline = 0x3F3F3F; p.selected = 0x3F3F3F; p.meterBack = 0x222222; p.wave = 0x777777;
-    p.record = 0xcd1818; p.marker = 0xD67022; p.good = 0x30cb3f;
-    return p;
+    void color(uint32_t) override {}
+    void rect(int, int, int, int) override {}
+    void line(int, int, int, int) override {}
+    void dot(int, int, int) override {}
+    void text(int, int, const char*, int) override {}
+    int textWidth(const char* s, int) override { return (int)std::strlen(s) * 8; }
+    void bars(int, int, int, int, const uint8_t*, int) override {}
+};
+
+static void recordLoop(FakeHal& hal, App& app)
+{
+    app.key(kRec);
+    hal.advance(app, FakeHal::kRate * 4);
+    app.key(kStop);
+    app.key(kB8);
+}
+
+static void pagesAndProjects()
+{
+    using Mode = FourTrackSession::Mode;
+    NullGfx gfx;
+    {   // every page builds, fits its stage budget and draws
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kB6); app.key(kRec);
+        hal.advance(app, hal.loop * 3);
+        const int keys[] = { kSampleEdit, kPerformance, kMaster };
+        for (int k : keys)
+        {
+            app.key(k);
+            CHECK(app.screen() != Screen::Main, "a screen key opens a page");
+            CHECK(app.layerVisible(4) && app.stagesOf(4) >= 1 && app.stagesOf(4) <= 5, "a page has 1 to 5 stages");
+            for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+            app.key(kB8);
+            CHECK(app.screen() == Screen::Main, "B8 goes back");
+        }
+        const int shiftB[] = { kB2, kB3, kB4 };
+        for (int b : shiftB)
+        {
+            app.setShift(true); app.key(b); app.setShift(false);
+            CHECK(app.screen() != Screen::Main, "a Shift button opens a page");
+            for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+            app.key(kB8);
+        }
+        app.setShift(true); app.key(kDown); app.setShift(false);
+        CHECK(app.screen() == Screen::Settings, "Shift+Down opens Settings");
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        app.key(kB8);
+        app.key(kFile);
+        CHECK(app.screen() == Screen::Project, "File opens Project");
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+    }
+    {   // tempo: the loop is set to the chosen tempo's grid and shown
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kB2);
+        CHECK(app.screen() == Screen::Tempo, "B2 on an empty home opens Tempo");
+        app.key(kB8);
+        app.key(kRec);
+        hal.advance(app, FakeHal::kRate * 2);
+        CHECK(hal.clicks > 0 || app.state().mode() != Mode::Idle, "a count-in or a take starts");
+    }
+    {   // save then open a project gives the same Parts back
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        const uint32_t loop = app.state().loopFrames();
+        app.key(kFile);
+        app.key(kB3);
+        for (int i = 0; i < 400 && app.screen() == Screen::Export; i++) hal.advance(app, 128);
+        CHECK(hal.fileSize("Projects/Untitled.ftp") > 512, "saving writes the project file");
+        FakeHal hal2;
+        hal2.files = hal.files;
+        App app2(hal2, palette());
+        app2.setMeasure(&gfx);
+        app2.enter();
+        app2.key(kFile);
+        app2.key(kB2);
+        for (int i = 0; i < 400 && app2.screen() == Screen::Export; i++) hal2.advance(app2, 128);
+        CHECK(app2.state().loopFrames() == loop && app2.state().hasPart(0), "opening restores the loop and the Part");
+        CHECK(std::memcmp(hal.mem[0].data(), hal2.mem[0].data(), loop * 2) == 0, "the audio is the same");
+    }
+    {   // export writes a WAV of the right length
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        const uint32_t loop = app.state().loopFrames();
+        app.key(kFile);
+        app.key(kB6);
+        app.key(kRight);
+        app.key(kB1);
+        for (int i = 0; i < 2000 && hal.fileSize("Exports/Untitled.wav") < 44 + loop * 4; i++) hal.advance(app, 128);
+        CHECK(hal.fileSize("Exports/Untitled.wav") == 44 + loop * 4, "two repeats make a WAV twice the loop long");
+    }
+    {   // a take replaced can be brought back with undo
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kRec);
+        CHECK(app.popup() == Popup::Replace, "recording over a Part asks first");
+        app.key(kB8);
+        CHECK(hal.fileSize("undo/t0.raw") > 0, "the old take is kept");
+    }
 }
 
 int main()
 {
+    pagesAndProjects();
     using Mode = FourTrackSession::Mode;
     {
         FakeHal hal;
