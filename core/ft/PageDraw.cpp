@@ -76,7 +76,7 @@ void App::drawTempo(Pen& p)
     p.text(28, 122, b, F17B, pal.text);
     p.rect(12, 170, 776, 56, sRow == 1 ? pal.sel : pal.panel);
     p.text(28, 178, "Count-in", F14, pal.dim);
-    p.text(28, 198, set.countIn ? "On: one bar of clicks before the first take" : "Off", F14, pal.text);
+    p.text(28, 198, set.countIn ? "On: four clicks before the first take (120 BPM when the tempo is Free)" : "Off", F14, pal.text);
     p.text(12, 250, "With a tempo set, the first take is a whole number of bars and the click can play.", F14, pal.dim);
     p.text(12, 272, "Free: record first, then say how many bars it was.", F14, pal.dim);
     const char* l[8] = { "Free", "", "", "", "", "", "", "OK" };
@@ -144,10 +144,10 @@ void App::drawGlitch(Pen& p)
         for (int s = 0; s < 4; s++)
         {
             const FxSlot& sl = c.slot[s];
-            const int y = 118 + s * 76;
+            const int y = 118 + s * 72;
             const bool cur = (t == gTrack && s == gSlot);
-            p.rect(x, y, 186, 68, cur ? pal.sel : pal.panel);
-            if (cur) p.frame(x, y, 186, 68, pal.text);
+            p.rect(x, y, 186, 64, cur ? pal.sel : pal.panel);
+            if (cur) p.frame(x, y, 186, 64, pal.text);
             char n[8];
             fmt(n, sizeof n, "B%d", s + 1);
             p.text(x + 10, y + 6, n, F12, pal.dim);
@@ -155,13 +155,14 @@ void App::drawGlitch(Pen& p)
             char v[20];
             fxValue(sl, v, sizeof v);
             p.text(x + 10, y + 32, v, F14, pal.dim);
-            if (sl.on) p.tag(x + 10, y + 46, "ON", true, pal.meter, pal.bg);
-            if (c.held[s]) p.tag(x + 56, y + 46, "HOLD", true, pal.marker, pal.bg);
+            if (sl.on) p.tag(x + 10, y + 42, "ON", true, pal.meter, pal.bg);
+            if (c.held[s]) p.tag(x + 56, y + 42, "HOLD", true, pal.marker, pal.bg);
         }
     }
-    p.text(12, 422, "Hold B1 to B4 to play a slot. Jog changes the amount, Shift+jog the effect, jog press keeps it on.", F12, pal.dim);
-    const char* l[8] = { "Slot 1", "Slot 2", "Slot 3", "Slot 4", "Clear track", "Clear all", hal.bank().cfg[gTrack].granular ? "Pitch: grain" : "Pitch: tape", "Back" };
-    p.buttons(l);
+    p.text(12, 420, "Hold B1-B4: play slot. Left/Right or B5-B8: track. Up/Down: slot. Jog: amount. Shift+jog: effect. Insert: keep on.", F12, pal.dim);
+    p.text(12, 404, shift ? "Shift: B1 clear track, B2 clear all, B3 pitch style. Performance goes back." : "Shift+B1 clear track, Shift+B2 clear all, Shift+B3 pitch style. Performance goes back.", F12, pal.dim);
+    const char* l[8] = { "Slot 1", "Slot 2", "Slot 3", "Slot 4", "Track 1", "Track 2", "Track 3", "Track 4" };
+    p.buttons(l, 4 + gTrack);
 }
 
 void App::drawMaster(Pen& p)

@@ -149,6 +149,7 @@ struct NullGfx : Gfx
 static void recordLoop(FakeHal& hal, App& app)
 {
     app.key(kRec);
+    hal.advance(app, 100000); // the count-in
     hal.advance(app, FakeHal::kRate * 4);
     app.key(kStop);
     app.key(kB8);
@@ -173,8 +174,8 @@ static void pagesAndProjects()
             CHECK(app.screen() != Screen::Main, "a screen key opens a page");
             CHECK(app.layerVisible(4) && app.stagesOf(4) >= 1 && app.stagesOf(4) <= 5, "a page has 1 to 5 stages");
             for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
-            app.key(kB8);
-            CHECK(app.screen() == Screen::Main, "B8 goes back");
+            app.key(k == kPerformance ? kPerformance : kB8);
+            CHECK(app.screen() == Screen::Main, "the page closes");
         }
         const int shiftB[] = { kB2, kB3, kB4 };
         for (int b : shiftB)
@@ -191,6 +192,27 @@ static void pagesAndProjects()
         app.key(kFile);
         CHECK(app.screen() == Screen::Project, "File opens Project");
         for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+    }
+    {   // count-in happens in Free tempo too; Play and Stop work on the Glitch page
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kRec);
+        CHECK(app.state().mode() == Mode::Idle, "Rec counts in first");
+        hal.advance(app, FakeHal::kRate * 3);
+        CHECK(hal.clicks == 4 && app.state().mode() == Mode::RecordingFirst, "four clicks, then the take starts");
+        hal.advance(app, FakeHal::kRate);
+        app.key(kStop); app.key(kB8);
+        app.key(kPerformance);
+        CHECK(app.screen() == Screen::Glitch, "Performance opens Glitch");
+        app.key(kB7);
+        app.key(kStop);
+        CHECK(!hal.playing, "Stop works on the Glitch page");
+        app.key(kPlay);
+        CHECK(hal.playing, "Play works on the Glitch page");
+        app.key(kPerformance);
+        CHECK(app.screen() == Screen::Main, "Performance again goes back");
     }
     {   // tempo: the loop is set to the chosen tempo's grid and shown
         FakeHal hal;
@@ -249,6 +271,7 @@ static void pagesAndProjects()
         app.key(kRec);
         CHECK(app.popup() == Popup::Replace, "recording over a Part asks first");
         app.key(kB8);
+        hal.advance(app, 100000); // the count-in
         CHECK(hal.fileSize("undo/t0.raw") > 0, "the old take is kept");
     }
 }
@@ -266,6 +289,7 @@ int main()
 
         // First take: 4 seconds, then Stop asks how many bars.
         app.key(kRec);
+    hal.advance(app, 100000); // the count-in
         CHECK(app.state().mode() == Mode::RecordingFirst, "Rec starts the first take");
         hal.advance(app, FakeHal::kRate * 4);
         app.key(kStop);
@@ -281,6 +305,7 @@ int main()
         app.key(kLeft);
         CHECK(app.view().prompt.selected == before, "left goes back");
         app.key(kRec);
+    hal.advance(app, 100000); // the count-in
         CHECK(app.state().mode() == Mode::ChoosingBars, "Rec is ignored while the question is open");
         app.key(kB8);
         CHECK(app.state().mode() == Mode::Idle && hal.playing, "OK sets the loop and plays it");
@@ -312,6 +337,7 @@ int main()
         App app(hal, palette());
         app.enter();
         app.key(kRec);
+    hal.advance(app, 100000); // the count-in
         hal.advance(app, FakeHal::kRate * 3);
         app.key(kStop);
         app.key(kB7);
@@ -323,6 +349,7 @@ int main()
         App app(hal, palette());
         app.enter();
         app.key(kRec);
+    hal.advance(app, 100000); // the count-in
         hal.advance(app, FakeHal::kRate * 30);
         CHECK(app.state().mode() == Mode::ChoosingBars, "memory full ends the first take and asks for the bars");
         CHECK(app.view().prompt.memoryFull, "the question says memory is full");
@@ -333,6 +360,7 @@ int main()
         App app(hal, palette());
         app.enter();
         app.key(kRec);
+    hal.advance(app, 100000); // the count-in
         hal.advance(app, FakeHal::kRate * 4);
         app.key(kStop);
         app.key(kB8);

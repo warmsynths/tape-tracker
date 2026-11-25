@@ -128,7 +128,7 @@ New: after you stop the first take (or it stops by itself at 24 s), the Tracker 
 Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.
 
 ## Test build FT16: the whole design, one build
-`firmware/PolyendTracker_FT16_full.ptf`. Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
+`firmware/PolyendTracker_FT17_full.ptf` (FT16 plus the fixes below). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
 
 What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-requirements.md` for each screen):
 - **Main screen:** starting tempo and count-in, click, source per track (line, mic low, mic high, pads), alignment of each Part to the loop (first-note detection and snap, window in Settings), offset, mute, Loop Mode, undo of a replaced take, How many bars.
@@ -140,3 +140,5 @@ What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-req
 Not verified on a device (only in the emulator and by PC tests): CPU load with glitch and lo-fi running on four tracks, speed of saving and exporting to the SD card, the feedback-protection readout (always off on the Tracker for now), and pan (the loop player is now stereo).
 
 Please check first: record a loop, record a second track, open Glitch and hold B1 to B4, open Master, save a project from File, export a WAV. If the audio crackles with Glitch or Master on, tell me which one.
+
+FT17 changes after the first emulator test: the count-in also happens when the tempo is Free (four clicks at 120 BPM, the tempo stays Free); Play and Stop work on the Glitch, Master, Part Editor, Input, Settings, Pads and Memory pages; on Glitch, B5 to B8 pick the track (as on the main screen), Shift+B1 clears the track, Shift+B2 clears all, Shift+B3 switches the pitch style, and the Performance button goes back.

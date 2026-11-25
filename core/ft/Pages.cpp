@@ -391,18 +391,23 @@ void App::computeEditWave()
 void App::glitchKey(int k)
 {
     TrackCfg& c = hal.bank().cfg[gTrack];
+    if (shift && k >= kB1 && k <= kB3)
+    {
+        if (k == kB1) for (int s = 0; s < 4; s++) { c.slot[s].on = false; c.held[s] = false; }
+        else if (k == kB2) for (int t = 0; t < 4; t++) for (int s = 0; s < 4; s++) { hal.bank().cfg[t].slot[s].on = false; hal.bank().cfg[t].held[s] = false; }
+        else { c.granular = !c.granular; unsaved = true; }
+        return;
+    }
     if (k >= kB1 && k <= kB4) { c.held[k - kB1] = true; return; }
     switch (k)
     {
+        case kB5: case kB6: case kB7: case kB8: gTrack = k - kB5; break;
         case kLeft: gTrack = clampi(gTrack - 1, 0, 3); break;
         case kRight: gTrack = clampi(gTrack + 1, 0, 3); break;
         case kUp: gSlot = clampi(gSlot - 1, 0, 3); break;
         case kDown: gSlot = clampi(gSlot + 1, 0, 3); break;
         case kJogPress: { FxSlot& s = c.slot[gSlot]; s.on = !s.on; unsaved = true; break; }
-        case kB5: for (int s = 0; s < 4; s++) { c.slot[s].on = false; c.held[s] = false; } break;
-        case kB6: for (int t = 0; t < 4; t++) for (int s = 0; s < 4; s++) { hal.bank().cfg[t].slot[s].on = false; hal.bank().cfg[t].held[s] = false; } break;
-        case kB7: c.granular = !c.granular; unsaved = true; break;
-        case kB8: back(); return;
+        case kPerformance: back(); return;
         default: break;
     }
 }

@@ -106,6 +106,12 @@ void App::key(int k)
     }
     if (current != Screen::Main)
     {
+        // Play and Stop work on the pages that sit beside the recorder
+        const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
+                               current == Screen::Input || current == Screen::Pads || current == Screen::Memory ||
+                               current == Screen::Settings;
+        if (transport && k == kPlay) { pressPlay(); refresh(true); return; }
+        if (transport && k == kStop) { pressStop(); refresh(true); return; }
         keyScreen(k);
         return;
     }
@@ -329,7 +335,7 @@ void App::pressRecord()
     replaceConfirmed = false;
     // A first take at a set tempo starts with a bar of clicks
     const bool firstTake = session.loopFrames() == 0 || (session.partCount() == 1 && session.hasPart(t));
-    if (firstTake && set.tempoTenths > 0 && set.countIn && set.tempoTenths < 2400)
+    if (firstTake && set.countIn && set.tempoTenths < 2400)
     {
         countingIn = true;
         countInStart = hal.millis();
@@ -622,7 +628,7 @@ void App::serviceClick()
 void App::serviceCountIn()
 {
     if (!countingIn) return;
-    const uint32_t beatMs = 600000u / set.tempoTenths;
+    const uint32_t beatMs = 600000u / (set.tempoTenths > 0 ? set.tempoTenths : 1200u); // Free tempo counts in at 120
     const uint32_t elapsed = hal.millis() - countInStart;
     const int beats = (int)(elapsed / beatMs);
     if (countInBeats == 0 && beats == 0)
