@@ -197,6 +197,8 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
                 {
                     if (!act[s]) continue;
                     const FxSlot& f = c.slot[s];
+                    // Held: always. Latched: on a random share of the slices, set by the chance.
+                    if (!c.held[s] && f.chance < 100 && (sliceHash(t, pass, P / sl, 10 + s) % 100) >= f.chance) continue;
                     const uint32_t ss = (q / sl) * sl;
                     switch (f.type)
                     {
@@ -220,8 +222,7 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
                         }
                         case FxType::RandomJumps:
                         {
-                            const uint32_t h = sliceHash(t, pass, q / sl, 1);
-                            if ((h % 100) >= f.amount) break;
+                            const uint32_t h = sliceHash(t, pass, P / sl, 1);
                             const uint32_t kind = (h >> 8) & 3;
                             if (kind == 0) q = (q + loop - (sl % loop)) % loop;
                             else if (kind == 3) q = (q + loop - ((2 * sl) % loop)) % loop;
@@ -242,8 +243,7 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
                         }
                         case FxType::PitchSteps:
                         {
-                            const uint32_t h = sliceHash(t, pass, q / sl, 2);
-                            if ((h % 100) >= f.amount) break;
+                            const uint32_t h = sliceHash(t, pass, P / sl, 2);
                             static const int8_t sets[5][5] = { { 7, -7, 12, 4, -12 }, { 7, -5, 7, -7, 5 }, { 12, -12, 12, -12, 12 }, { 3, 4, -3, -4, 3 }, { 10, 11, -10, -11, 10 } };
                             const int8_t st = sets[f.semis < 0 || f.semis > 4 ? 0 : f.semis][(h >> 8) % 5];
                             pitchOn = true;

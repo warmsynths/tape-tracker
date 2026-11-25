@@ -14,20 +14,25 @@ const char* const kSourceName[4] = { "Line in", "Mic low", "Mic high", "Pads" };
 
 void fxValue(const FxSlot& s, char* out, size_t n)
 {
+    char detail[24] = {};
     switch (s.type)
     {
-        case FxType::RandomJumps: fmt(out, n, "%d%% of slices", s.amount); break;
+        case FxType::Pitch: fmt(detail, sizeof detail, "%s%d st", s.semis < 0 ? "-" : "+", s.semis < 0 ? -s.semis : s.semis); break;
         case FxType::PitchSteps:
         {
             static const char* const names[5] = { "Mixed", "Fifths", "Octaves", "Thirds", "Sevenths" };
-            fmt(out, n, "%s, %d%%", names[s.semis < 0 || s.semis > 4 ? 0 : s.semis], s.amount);
+            fmt(detail, sizeof detail, "%s", names[s.semis < 0 || s.semis > 4 ? 0 : s.semis]);
             break;
         }
-        case FxType::Pitch: fmt(out, n, "%s%d st", s.semis < 0 ? "-" : "+", s.semis < 0 ? -s.semis : s.semis); break;
-        case FxType::None: out[0] = 0; break;
-        case FxType::JumpBack: case FxType::JumpBack2: fmt(out, n, "%d%%", s.amount); break;
-        default: fmt(out, n, "%d%%", s.amount); break;
+        case FxType::Stutter: fmt(detail, sizeof detail, "1/%d", s.amount < 25 ? 2 : s.amount < 50 ? 4 : s.amount < 75 ? 8 : 16); break;
+        case FxType::Crush: case FxType::Drive: case FxType::LowPass: case FxType::HighPass: case FxType::Volume:
+            fmt(detail, sizeof detail, "%d%%", s.amount); break;
+        case FxType::Pan: { const int p = (int)s.amount - 100; fmt(detail, sizeof detail, "%s%d", p < 0 ? "L " : (p > 0 ? "R " : "C"), p < 0 ? -p : p); break; }
+        default: break;
     }
+    if (s.type == FxType::None) { out[0] = 0; return; }
+    if (s.chance >= 100) fmt(out, n, "%s%s", detail, detail[0] ? ", always" : "always");
+    else fmt(out, n, "%s%s%d%% of slices", detail, detail[0] ? ", " : "", s.chance);
 }
 
 void ms(char* out, size_t n, uint32_t frames, uint32_t rate)
@@ -166,8 +171,8 @@ void App::drawGlitch(Pen& p)
             if (c.held[s]) p.tag(x + 56, y + 42, "HOLD", true, pal.marker, pal.bg);
         }
     }
-    p.text(12, 420, "Hold B1-B4: play slot. Left/Right or B5-B8: track. Up/Down: slot. Jog: amount. Shift+jog: effect. Insert: keep on.", F12, pal.dim);
-    p.text(12, 404, hal.bank().cfg[gTrack].slot[gSlot].type == FxType::PitchSteps ? "Pitch steps: Shift+Left/Right picks the intervals (Mixed, Fifths, Octaves, Thirds, Sevenths), jog the chance." : shift ? "Shift: B1 clear track, B2 clear all, B3 pitch style. Performance goes back." : "Shift+B1 clear track, Shift+B2 clear all, Shift+B3 pitch style. Performance goes back.", F12, pal.dim);
+    p.text(12, 420, "Hold B1-B4: play now. Insert: latch on. Jog: chance %. Shift+jog: effect. Shift+Up/Down: setting. Left/Right, B5-B8: track.", F12, pal.dim);
+    p.text(12, 404, hal.bank().cfg[gTrack].slot[gSlot].type == FxType::PitchSteps ? "Pitch steps: Shift+Up/Down picks the intervals (Mixed, Fifths, Octaves, Thirds, Sevenths)." : shift ? "Shift: B1 clear track, B2 clear all, B3 pitch style. Performance goes back." : "Shift+B1 clear track, Shift+B2 clear all, Shift+B3 pitch style. Performance goes back.", F12, pal.dim);
     const char* l[8] = { "Slot 1", "Slot 2", "Slot 3", "Slot 4", "Track 1", "Track 2", "Track 3", "Track 4" };
     p.buttons(l, 4 + gTrack);
 }

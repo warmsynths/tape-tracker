@@ -159,6 +159,26 @@ int main()
         int diffPitch = 0;
         for (int i = 0; i < L; i++) if (std::fabs(l1[i] - lp[i]) > 0.001f) diffPitch++;
         CHECK(diffPitch > L / 10, "pitch steps change the sound");
+        // chance 0 while latched does nothing; holding forces it
+        b.cfg[0].slot[0] = { FxType::RandomJumps, true, 50, 0, 0 };
+        b.pass = 0;
+        for (int p = 0; p < L; p += 1000) b.render(p, 1000 < L - p ? 1000 : L - p, l1.data() + p, r1.data() + p);
+        int diffZero = 0;
+        for (int i = 0; i < L; i++) if (std::fabs(l1[i] - lp[i]) > 0.001f) diffZero++;
+        CHECK(diffZero == 0, "a chance of 0 percent never triggers");
+        b.cfg[0].held[0] = true;
+        b.pass = 0;
+        for (int p = 0; p < L; p += 1000) b.render(p, 1000 < L - p ? 1000 : L - p, l1.data() + p, r1.data() + p);
+        int diffHeld = 0;
+        for (int i = 0; i < L; i++) if (std::fabs(l1[i] - lp[i]) > 0.001f) diffHeld++;
+        CHECK(diffHeld > L / 10, "holding triggers it whatever the chance");
+        b.cfg[0].held[0] = false;
+        b.cfg[0].slot[0] = { FxType::Reverse, true, 50, 0, 50 };
+        b.pass = 0;
+        for (int p = 0; p < L; p += 1000) b.render(p, 1000 < L - p ? 1000 : L - p, l1.data() + p, r1.data() + p);
+        int some = 0;
+        for (int i = 0; i < L; i++) if (std::fabs(l1[i] - lp[i]) > 0.001f) some++;
+        CHECK(some > L / 20 && some < L * 9 / 10, "a chance of 50 percent triggers on some slices only");
     }
     {   // wav header
         uint8_t h[44];

@@ -45,7 +45,8 @@ struct FxSlot
     FxType type = FxType::None;
     bool on = false;      // latched on
     uint8_t amount = 50;  // 0..100 (Pan: 0..200)
-    int8_t semis = 7;     // Pitch: semitones, -12..12
+    int8_t semis = 7;     // Pitch: semitones, -12..12 (Pitch steps: which set of intervals)
+    uint8_t chance = 100; // percent of slices it happens on while latched on; 100 is always. Held: always
 };
 
 struct TrackCfg

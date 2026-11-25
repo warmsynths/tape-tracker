@@ -295,8 +295,7 @@ void App::jogScreen(int delta)
                 if (type >= (int)FxType::kCount) type = 0;
                 s.type = (FxType)type;
             }
-            else if (s.type == FxType::Pitch) s.semis = (int8_t)stepInterval(s.semis, delta > 0 ? 1 : -1);
-            else s.amount = (uint8_t)clampi((int)s.amount + delta * 5, 0, s.type == FxType::Pan ? 200 : 100);
+            else s.chance = (uint8_t)clampi((int)s.chance + delta * 5, 0, 100);
             break;
         }
         case Screen::Master: masterJog(delta); break;
@@ -402,16 +401,20 @@ void App::glitchKey(int k)
     switch (k)
     {
         case kB5: case kB6: case kB7: case kB8: gTrack = k - kB5; break;
-        case kLeft: case kRight:
-            if (shift && c.slot[gSlot].type == FxType::PitchSteps)
-            {
-                int v = c.slot[gSlot].semis + (k == kRight ? 1 : -1);
-                c.slot[gSlot].semis = (int8_t)clampi(v, 0, 4);
-            }
-            else gTrack = clampi(gTrack + (k == kRight ? 1 : -1), 0, 3);
+        case kLeft: gTrack = clampi(gTrack - 1, 0, 3); break;
+        case kRight: gTrack = clampi(gTrack + 1, 0, 3); break;
+        case kUp: case kDown:
+        {
+            const int d = k == kDown ? 1 : -1;
+            if (!shift) { gSlot = clampi(gSlot + d, 0, 3); break; }
+            // Shift+Up/Down: the effect's own setting (interval, set of intervals, how hard)
+            FxSlot& s = c.slot[gSlot];
+            if (s.type == FxType::Pitch) s.semis = (int8_t)stepInterval(s.semis, -d);
+            else if (s.type == FxType::PitchSteps) s.semis = (int8_t)clampi(s.semis - d, 0, 4);
+            else s.amount = (uint8_t)clampi((int)s.amount - d * 5, 0, s.type == FxType::Pan ? 200 : 100);
+            unsaved = true;
             break;
-        case kUp: gSlot = clampi(gSlot - 1, 0, 3); break;
-        case kDown: gSlot = clampi(gSlot + 1, 0, 3); break;
+        }
         case kJogPress: { FxSlot& s = c.slot[gSlot]; s.on = !s.on; unsaved = true; break; }
         case kPerformance: back(); return;
         default: break;
@@ -642,7 +645,7 @@ void App::startSave()
     uint8_t h[kHeader];
     for (int i = 0; i < kHeader; i++) h[i] = 0;
     W w{ h };
-    w.u8('F'); w.u8('T'); w.u8('1'); w.u8(0);
+    w.u8('F'); w.u8('T'); w.u8('2'); w.u8(0);
     w.u32(session.loopFrames());
     w.u8((uint32_t)session.bars());
     uint8_t mask = 0;
@@ -657,7 +660,7 @@ void App::startSave()
         w.u8((uint32_t)trackSource[t]); w.u8(c.mute); w.u8(c.granular); w.u8(0);
         w.u32((uint32_t)alignShift[t]); w.u32((uint32_t)userOffset[t]);
         w.u32(c.trimStart); w.u32(c.trimEnd); w.u32(c.fadeIn); w.u32(c.fadeOut); w.f32(c.gain);
-        for (int s = 0; s < 4; s++) { w.u8((uint32_t)c.slot[s].type); w.u8(c.slot[s].on); w.u8(c.slot[s].amount); w.u8((uint8_t)c.slot[s].semis); }
+        for (int s = 0; s < 4; s++) { w.u8((uint32_t)c.slot[s].type); w.u8(c.slot[s].on); w.u8(c.slot[s].amount); w.u8((uint8_t)c.slot[s].semis); w.u8(c.slot[s].chance); }
     }
     const LofiCfg& l = hal.lofi().cfg;
     w.u8(l.bypass); w.u8(l.glueOn); w.u8(l.satOn); w.u8(l.wowOn); w.u8(l.crushOn);
@@ -679,7 +682,7 @@ void App::startLoad(const char* name)
     if (!hal.sdPresent()) { showPopup(Popup::SdMissing); return; }
     fmt(jobPath, sizeof(jobPath), "Projects/%s.ftp", name);
     uint8_t h[kHeader];
-    if (hal.fileRead(jobPath, 0, h, kHeader) != (uint32_t)kHeader || h[0] != 'F' || h[1] != 'T') { showPopup(Popup::Message, 3); return; }
+    if (hal.fileRead(jobPath, 0, h, kHeader) != (uint32_t)kHeader || h[0] != 'F' || h[1] != 'T' || h[2] != '2') { showPopup(Popup::Message, 3); return; }
     R r{ h };
     r.u32();
     const uint32_t loop = r.u32();
@@ -699,7 +702,7 @@ void App::startLoad(const char* name)
         c.mute = r.u8() != 0; c.granular = r.u8() != 0; r.u8();
         alignShift[t] = (int32_t)r.u32(); userOffset[t] = (int32_t)r.u32();
         c.trimStart = r.u32(); c.trimEnd = r.u32(); c.fadeIn = r.u32(); c.fadeOut = r.u32(); c.gain = r.f32();
-        for (int s = 0; s < 4; s++) { c.slot[s].type = (FxType)(r.u8() % (int)FxType::kCount); c.slot[s].on = r.u8() != 0; c.slot[s].amount = (uint8_t)r.u8(); c.slot[s].semis = (int8_t)r.u8(); c.held[s] = false; }
+        for (int s = 0; s < 4; s++) { c.slot[s].type = (FxType)(r.u8() % (int)FxType::kCount); c.slot[s].on = r.u8() != 0; c.slot[s].amount = (uint8_t)r.u8(); c.slot[s].semis = (int8_t)r.u8(); c.slot[s].chance = (uint8_t)r.u8(); c.held[s] = false; }
         partData[t] = nullptr;
     }
     LofiCfg& l = hal.lofi().cfg;
