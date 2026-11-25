@@ -153,7 +153,10 @@ class App
     void moveStep(int track, int dir, bool fine);
     void moveTo(int track, bool toStart);
     void moveKey(int k);
+    void enterMove();
+    void actionKey(int k);
     bool moveMode = false, moveAll = false;
+    bool actionMenu = false; // Insert on a selected track: Move, Edit, Glitch, Mute, Source, Undo
     int32_t moveEntry[FourTrackSession::kTracks]{};
     int32_t noteAt[FourTrackSession::kTracks] = { -2, -2, -2, -2 }; // -2: not worked out yet
 

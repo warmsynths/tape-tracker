@@ -86,6 +86,7 @@ void App::leave()
     if (job != Job::None) job = Job::None;
     countingIn = false;
     moveMode = false;
+    actionMenu = false;
     if (session.mode() != FourTrackSession::Mode::Idle) pressStop();
     if (session.playing()) session.pressStop();
     hal.playerStop();
@@ -119,6 +120,11 @@ void App::key(int k)
     if (moveMode)
     {
         moveKey(k);
+        return;
+    }
+    if (actionMenu)
+    {
+        actionKey(k);
         return;
     }
     if (session.mode() == FourTrackSession::Mode::ChoosingBars)
@@ -174,11 +180,10 @@ void App::key(int k)
             break;
         case kPerformance: if (session.mode() == FourTrackSession::Mode::Idle) { gTrack = session.selected(); open(Screen::Glitch); } break;
         case kJogPress:
-            if (shift && session.mode() == FourTrackSession::Mode::Idle && session.loopFrames() > 0 && session.hasPart(session.selected()))
+            if (session.mode() == FourTrackSession::Mode::Idle && session.loopFrames() > 0 && session.hasPart(session.selected()))
             {
-                moveMode = true;
-                for (int t = 0; t < FourTrackSession::kTracks; t++) { moveEntry[t] = userOffset[t]; noteAt[t] = -2; }
-                refresh(true);
+                if (shift) enterMove();
+                else { actionMenu = true; refresh(true); }
             }
             break;
         case kMaster: open(Screen::Master); break;
@@ -942,6 +947,9 @@ void App::fillView()
     else if (mode == FourTrackSession::Mode::RecordingPart) fmt(v.hint, sizeof(v.hint), "Stop keeps what was recorded, the rest is silence.");
     else if (loop == 0) fmt(v.hint, sizeof(v.hint), "Rec records the first Part, which sets the Loop.");
     else fmt(v.hint, sizeof(v.hint), "Rec arms Track %d. Again: source. Shift+Insert: move its Part.", session.selected() + 1);
+    if (mode == FourTrackSession::Mode::Idle && loop > 0 && session.hasPart(session.selected()))
+        fmt(v.hint, sizeof(v.hint), "Track %d: Insert for actions. Shift+Insert move. Shift+B%d mute.", session.selected() + 1, session.selected() + 5);
+    if (actionMenu) fmt(v.hint, sizeof(v.hint), "Track %d: choose an action. Insert or B8 closes.", session.selected() + 1);
     if (moveMode) fmt(v.hint, sizeof(v.hint), "Move Track %d: jog or arrows step by the grid, Shift+arrows by 1 ms.", session.selected() + 1);
     fmt(v.loopMode, sizeof(v.loopMode), "%s", set.loopOnce ? "Play once" : "Repeat");
     fmt(v.padsMode, sizeof(v.padsMode), "%s", padsKeysMode ? "KEYS" : "PAD");
@@ -959,6 +967,13 @@ void App::fillView()
     }
     fmt(v.btn[3], sizeof(v.btn[3]), "%s", padsKeysMode ? "Pads:Keys" : "Pads:Pad");
     v.btnSelected = (int8_t)(4 + session.selected());
+    if (actionMenu)
+    {
+        static const char* const am[8] = { "Move", "Edit", "Glitch", "Mute", "Source", "Undo take", "", "Close" };
+        for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", am[b]); v.btnKind[b] = 0; }
+        fmt(v.btn[3], sizeof(v.btn[3]), "%s", hal.bank().cfg[session.selected()].mute ? "Unmute" : "Mute");
+        v.btnSelected = -1;
+    }
     if (moveMode)
     {
         static const char* const mv[8] = { "To start", "To beat", "", "", "", "", "Cancel", "OK" };
@@ -1190,6 +1205,40 @@ void App::moveKey(int k)
         case kStop: pressStop(); break;
         default: break;
     }
+    refresh(true);
+}
+} // namespace ft
+
+namespace ft
+{
+void App::enterMove()
+{
+    moveMode = true;
+    actionMenu = false;
+    for (int t = 0; t < FourTrackSession::kTracks; t++) { moveEntry[t] = userOffset[t]; noteAt[t] = -2; }
+    refresh(true);
+}
+
+// The action menu for the selected track: the same things the shortcuts do, in plain words
+void App::actionKey(int k)
+{
+    const int t = session.selected();
+    switch (k)
+    {
+        case kB1: enterMove(); return;
+        case kB2: actionMenu = false; editTrack = t; editEnter(); open(Screen::Editor); return;
+        case kB3: actionMenu = false; gTrack = t; open(Screen::Glitch); return;
+        case kB4: muteTrack(t); break;
+        case kB5: selectTrack(t); break; // pressing the selected track again changes its source
+        case kB6: actionMenu = false; undoTake(); return;
+        case kB7: case kB8: case kJogPress: actionMenu = false; break;
+        case kUp: moveSelection(-1); break;
+        case kDown: moveSelection(1); break;
+        case kPlay: pressPlay(); break;
+        case kStop: pressStop(); break;
+        default: break;
+    }
+    if (!session.hasPart(session.selected())) actionMenu = false;
     refresh(true);
 }
 } // namespace ft

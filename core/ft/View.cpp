@@ -234,6 +234,7 @@ void Painter::drawLane(int i, int y0)
         }
         g.color(L.muted ? pal.waveOff : pal.wave);
         g.bars(kWaveX, cy, 6, 4, heights, L.waveCount); // 100 columns of 6 px
+        if (L.selected) frame(kWaveX - 4, y0, kWaveW + 8, kLaneH - 1, dim); // the Part that the actions apply to
     }
     else
     {

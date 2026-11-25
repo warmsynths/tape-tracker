@@ -231,6 +231,29 @@ static void pagesAndProjects()
         CHECK(app.screen() == Screen::Input, "Shift+B4 opens Input setup");
         app.setShift(false);
     }
+    {   // the action menu on Insert
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kJogPress);
+        CHECK(std::strcmp(app.view().btn[0], "Move") == 0 && std::strcmp(app.view().btn[7], "Close") == 0, "Insert opens the action menu");
+        app.key(kB4);
+        CHECK(hal.trackBank.cfg[0].mute, "Mute in the menu mutes the track");
+        app.key(kB4);
+        app.key(kB1);
+        CHECK(std::strcmp(app.view().btn[0], "To start") == 0, "Move in the menu starts move mode");
+        app.key(kB7);
+        app.key(kJogPress);
+        app.key(kB2);
+        CHECK(app.screen() == Screen::Editor, "Edit in the menu opens the Part Editor");
+        app.key(kB8);
+        app.key(kJogPress);
+        app.key(kB8);
+        CHECK(std::strcmp(app.view().btn[0], "Rec") == 0, "Close leaves the menu");
+        CHECK(std::strstr(app.view().hint, "Insert for actions") != nullptr, "the hint says what Insert does");
+    }
     {   // moving a Part: Shift+Insert enters, the jog steps the first note along the grid
         FakeHal hal;
         App app(hal, palette());
@@ -241,6 +264,7 @@ static void pagesAndProjects()
         const uint32_t bars = (uint32_t)app.state().bars();
         app.key(kJogPress);
         CHECK(!app.view().btn[0][0] || std::strcmp(app.view().btn[0], "To start") != 0, "Insert alone does not enter move mode");
+        app.key(kJogPress); // closes the action menu again
         app.setShift(true); app.key(kJogPress); app.setShift(false);
         CHECK(std::strcmp(app.view().btn[0], "To start") == 0, "Shift+Insert enters move mode");
         app.jog(1);
