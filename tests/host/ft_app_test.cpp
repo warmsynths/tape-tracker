@@ -214,6 +214,23 @@ static void pagesAndProjects()
         app.key(kPerformance);
         CHECK(app.screen() == Screen::Main, "Performance again goes back");
     }
+    {   // a Glitch slot is held while its button is down and let go on release
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kPerformance);
+        app.key(kB1);
+        CHECK(hal.trackBank.cfg[0].held[0], "pressing B1 on Glitch holds slot 1");
+        app.keyUp(kB1);
+        CHECK(!hal.trackBank.cfg[0].held[0], "releasing B1 lets it go");
+        app.key(kPerformance);
+        app.setShift(true);
+        app.key(kB4);
+        CHECK(app.screen() == Screen::Input, "Shift+B4 opens Input setup");
+        app.setShift(false);
+    }
     {   // moving a Part: Shift+Insert enters, the jog steps the first note along the grid
         FakeHal hal;
         App app(hal, palette());
