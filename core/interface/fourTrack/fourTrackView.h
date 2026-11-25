@@ -1,110 +1,36 @@
 #ifndef INTERFACE_FOURTRACK_FOURTRACKVIEW_H_
 #define INTERFACE_FOURTRACK_FOURTRACKVIEW_H_
 
+#include "App.h"
 #include "displayControls.h"
-#include <stdint.h>
 
-// Everything the Four-Track main screen shows. The module fills it in; the view only draws it.
-// Layout follows docs/design/screen-requirements.md section 4.1 (800 x 480).
-struct strFtLane
-{
-    char name[12];
-    char tag[10];  // source: LINE, MIC LOW, ...
-    char info[20]; // second line, for example "Offset +522 ms"
-    char msg1[32]; // shown in the waveform area when there is no Part (Empty, Recording ...)
-    char msg2[24]; // bigger second line in that area
-    bool hasPart;
-    bool muted;
-    bool selected;
-    bool glitch;
-    bool active; // being recorded or armed: red mark
-    uint8_t waveCount;
-    uint8_t wave[120]; // 0..255 height of each waveform column
-    uint8_t meter;     // 0..100, filled width of the level bar
-};
-
-// The "How many bars?" question shown over the main screen after a first take.
-struct strFtPrompt
-{
-    bool active;
-    bool memoryFull;
-    uint8_t count;    // number of choices
-    uint8_t selected; // index of the highlighted choice
-    uint8_t bars[12];
-    uint16_t bpm10[12]; // tempo of each choice in tenths of a BPM
-    char played[80];    // "You played 8.35 s. No audio is stretched; only the tempo is worked out."
-    char note[48];      // "Stopped at 24.0 s. Everything recorded is kept."
-    char suggestion[32];
-};
-
-struct strFtView
-{
-    char project[20];
-    bool unsaved;
-    char tempo[10];
-    char bars[6];
-    char pos[10];
-    char input[12];
-    char inputLevels[20]; // left and right input level, for checking a stereo source
-    bool monitor;
-    char status[20];
-    uint8_t statusKind; // 0 stopped, 1 playing, 2 recording, 3 armed
-    char statusNote[24];
-    uint32_t loopFrames; // 0: no loop yet
-    uint32_t posFrames;
-    uint8_t barCount;
-    char hint[72];
-    char loopMode[8];
-    char padsMode[6];
-    char btn[8][10];
-    uint8_t btnKind[8]; // 0 text, 1 Rec dot, 2 Stop square, 3 Play glyph
-    int8_t btnSelected; // -1 none
-    strFtLane lane[4];
-    strFtPrompt prompt;
-};
-
-// Draws the main screen. Three copies are created, told apart by `value`:
-//   0: top bar, status, loop ruler and the four lanes (rebuilt on events). Five stages: the
-//      display chip's command buffer is only 4 KB and a stage must stay well below that.
-//   1: playhead, position, counters and level bars (rebuilt about 20 times a second).
-//   2: hint line and the button row (two stages).
-// Text is drawn the way the stock tracker grid does it, one character at a time, so the drawing
-// budget stays small.
+// A display control that draws one layer of the Four-Track main screen (see core/ft/View.h).
+// The drawing itself is the shared code in core/ft; this class only turns it into display chip
+// commands. The layer is passed as `value`; each stage is one coprocessor step (the chip's
+// command buffer is only 4 KB, so a stage must stay small).
 class cFourTrackView : public cDisplayControl
 {
   public:
     cFourTrackView(strControlProperties* properties);
     virtual ~cFourTrackView() {}
 
-    virtual void update() override;
-    virtual void update2() override;
-    virtual void update3() override;
-    virtual void update4() override;
-    virtual void update5() override;
+    virtual void update() override { stage(0); }
+    virtual void update2() override { stage(1); }
+    virtual void update3() override { stage(2); }
+    virtual void update4() override { stage(3); }
+    virtual void update5() override { stage(4); }
     virtual void setStyle(uint32_t style) override { this->style = style; }
     virtual void setText(const char* text) override { this->text = text; }
     virtual void setValue(int value) override { this->value = value; }
     virtual void setColors(const uint32_t* colors) override { this->colors = colors; }
-    virtual void setData(void* data) override { view = (const strFtView*)data; }
+    virtual void setData(void* data) override { app = (const ft::App*)data; }
+
+    // Used by the drawing adapter.
+    void drawString(int x, int y, const char* s, int fontIndex);
 
   private:
-    // Drawing helpers
-    void rect(int x, int y, int w, int h, uint32_t color);
-    void frame(int x, int y, int w, int h, uint32_t color);
-    void dot(int x, int y, int radius, uint32_t color);
-    // Draws text, returns the x just after it. `fontIndex` is 0 to 4 (the five font slots).
-    int drawText(int x, int y, const char* s, int fontIndex, uint32_t color);
-    int textWidth(const char* s, int fontIndex) const;
-
-    void drawTop();
-    void drawLane(int index, int y0);
-    void drawHint();
-    void drawButtons();
-    void drawDynamic();
-    void drawPrompt();
-    void drawPromptChoices();
-
-    const strFtView* view = nullptr;
+    void stage(int n);
+    const ft::App* app = nullptr;
 };
 
 #endif /* INTERFACE_FOURTRACK_FOURTRACKVIEW_H_ */
