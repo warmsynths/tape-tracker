@@ -16,10 +16,17 @@ static void functKey(uint8_t index)
 {
     FT->application().key(index);
 }
-static void functB1() { functKey(ft::kB1); }
-static void functB2() { functKey(ft::kB2); }
-static void functB3() { functKey(ft::kB3); }
-static void functB4() { functKey(ft::kB4); }
+// B1 to B4 and Shift report both press and release (one handler per button gets the state),
+// because the Glitch page holds a slot while the button is down and Shift is a held key.
+static void functB1(uint8_t state) { if (state == buttonPress) functKey(ft::kB1); else if (state == buttonRelease) FT->application().keyUp(ft::kB1); }
+static void functB2(uint8_t state) { if (state == buttonPress) functKey(ft::kB2); else if (state == buttonRelease) FT->application().keyUp(ft::kB2); }
+static void functB3(uint8_t state) { if (state == buttonPress) functKey(ft::kB3); else if (state == buttonRelease) FT->application().keyUp(ft::kB3); }
+static void functB4(uint8_t state) { if (state == buttonPress) functKey(ft::kB4); else if (state == buttonRelease) FT->application().keyUp(ft::kB4); }
+static void functShift(uint8_t state)
+{
+    if (state == buttonPress) FT->application().setShift(true);
+    else if (state == buttonRelease) FT->application().setShift(false);
+}
 static void functB5() { functKey(ft::kB5); }
 static void functB6() { functKey(ft::kB6); }
 static void functB7() { functKey(ft::kB7); }
@@ -30,12 +37,6 @@ static void functLeft() { functKey(ft::kLeft); }
 static void functRight() { functKey(ft::kRight); }
 static void functRec() { functKey(ft::kRec); }
 static void functPlay() { functKey(ft::kPlay); }
-static void functB1Up() { FT->application().keyUp(ft::kB1); }
-static void functB2Up() { FT->application().keyUp(ft::kB2); }
-static void functB3Up() { FT->application().keyUp(ft::kB3); }
-static void functB4Up() { FT->application().keyUp(ft::kB4); }
-static void functShiftDown() { FT->application().setShift(true); }
-static void functShiftUp() { FT->application().setShift(false); }
 static void functJogPress() { functKey(ft::kJogPress); }
 static void functSampleEdit() { functKey(ft::kSampleEdit); }
 static void functPerformance() { functKey(ft::kPerformance); }
@@ -108,6 +109,7 @@ void cFourTrack::start(uint32_t options)
 
 void cFourTrack::stop()
 {
+    application().setShift(false);
     application().leave();
     moduleRefresh = 0;
     hal.restoreAudio();
@@ -124,16 +126,11 @@ void cFourTrack::setDefaultScreenFunct()
     ip->clearButtonsRange(interfaceButton0, interfaceButton7);
     ip->clearAllPots();
 
-    ip->setButtonObj(interfaceButton0, buttonPress, functB1);
-    ip->setButtonObj(interfaceButton1, buttonPress, functB2);
-    ip->setButtonObj(interfaceButton2, buttonPress, functB3);
-    ip->setButtonObj(interfaceButton3, buttonPress, functB4);
-    ip->setButtonObj(interfaceButton0, buttonRelease, functB1Up);
-    ip->setButtonObj(interfaceButton1, buttonRelease, functB2Up);
-    ip->setButtonObj(interfaceButton2, buttonRelease, functB3Up);
-    ip->setButtonObj(interfaceButton3, buttonRelease, functB4Up);
-    ip->setButtonObj(interfaceButtonShift, buttonPress, functShiftDown);
-    ip->setButtonObj(interfaceButtonShift, buttonRelease, functShiftUp);
+    ip->setButtonObj(interfaceButton0, functB1);
+    ip->setButtonObj(interfaceButton1, functB2);
+    ip->setButtonObj(interfaceButton2, functB3);
+    ip->setButtonObj(interfaceButton3, functB4);
+    ip->setButtonObj(interfaceButtonShift, functShift);
     ip->setButtonObj(interfaceButtonInsert, buttonPress, functJogPress); // the Original has no push on the wheel
     ip->setButtonObj(interfaceButton4, buttonPress, functB5);
     ip->setButtonObj(interfaceButton5, buttonPress, functB6);
