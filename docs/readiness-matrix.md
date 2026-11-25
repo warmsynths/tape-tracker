@@ -1,6 +1,6 @@
 # Readiness matrix
 
-Which features are ready to be built into the firmware, and what is still missing for each. Drafted from the decisions in `wayfinder/`, the research in `docs/research/`, and a reading of the simulator source in `prototype/sim/`.
+Which features are ready to be built into the firmware, and what is still missing for each. Drafted from the decisions in `wayfinder/`, the research in `docs/research/`.
 
 ## How to read it
 A feature is ready to build only when every check below says Yes. Looking right in the simulator is one check out of six, because a browser hides what makes firmware hard: it has unlimited CPU, perfect timing and as much memory as it wants.

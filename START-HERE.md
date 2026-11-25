@@ -13,4 +13,4 @@ This fork is the home of a four-track recorder firmware for the Original Polyend
 - `docs/research/`: findings on CPU and memory, recording delay, first-note detection, lo-fi effects and a desktop build.
 - `docs/design/`: the hard screen limits and the first prompt for Claude Design.
 - `core/ft/`: the shared Four-Track application and screen drawing, run by both the firmware and the emulator.
-- `prototype/emulator/`: the web emulator. `prototype/four-track-PROTOTYPE.html` is the old throwaway sketch.
+- `prototype/emulator/`: the web emulator.

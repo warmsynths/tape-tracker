@@ -22,11 +22,11 @@ See `wayfinder/tickets/`. A ticket's `status:` and `blocked-by:` lines tell you 
 - Open and takeable by you: 06 (build the stock Original firmware and measure sizes). It may be blocked by network access to the ARM toolchain; if so, record that and write the owner a checklist.
 - Open and needs the owner: 07 (recovery drill on their device), 13 (measure the audio round-trip delay with a cable), 08 (they play the prototype and report back).
 - Blocked: 09, 10, 11 (alignment rules, effects and budget, screen and controls), then 12 (write the v1 spec).
-- `docs/readiness-matrix.md` lists every feature against six readiness checks and the findings that came out of it. Keep it up to date as tickets close. The simulator in `prototype/sim` was added after this handover was first written; its tests, type check and build pass (`cd prototype/sim && npm ci && npm test && npm run build`). Its package list originally pointed at a company-internal registry, which broke installs anywhere else; that is fixed.
+- `docs/readiness-matrix.md` lists every feature against six readiness checks and the findings that came out of it. Keep it up to date as tickets close.
 - Not created yet, offered and not yet answered: a research ticket on how the display pipeline works, and a hardware test ticket for what animation the Original can really sustain.
 
 ## Waiting on the owner
-- Feedback from playing the prototype (`prototype/four-track-PROTOTYPE.html`, also at the private link in `START-HERE.md`). It is the main input for tickets 09 and 11.
+- Feedback from playing the prototype (the web emulator, `prototype/emulator/dist/four-track-emulator.html`, also at the private link in `START-HERE.md`). It is the main input for tickets 09 and 11.
 - Screens back from the design AI. Two briefs were sent: the main screens (`docs/design/claude-design-first-prompt.md`) and a second round (settings, input setup, project, popups). A motion brief was also sent; see the tiers below. When screens arrive, check each against `docs/design/ui-constraints.md` and report anything unbuildable.
 
 ## Animation, in short
