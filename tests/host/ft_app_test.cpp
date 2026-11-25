@@ -214,6 +214,49 @@ static void pagesAndProjects()
         app.key(kPerformance);
         CHECK(app.screen() == Screen::Main, "Performance again goes back");
     }
+    {   // moving a Part: Shift+Insert enters, the jog steps the first note along the grid
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        const uint32_t loop = app.state().loopFrames();
+        const uint32_t bars = (uint32_t)app.state().bars();
+        app.key(kJogPress);
+        CHECK(!app.view().btn[0][0] || std::strcmp(app.view().btn[0], "To start") != 0, "Insert alone does not enter move mode");
+        app.setShift(true); app.key(kJogPress); app.setShift(false);
+        CHECK(std::strcmp(app.view().btn[0], "To start") == 0, "Shift+Insert enters move mode");
+        app.jog(1);
+        CHECK(hal.trackBank.cfg[0].offset == (int32_t)(loop / (bars * 16)), "the jog moves the first note one sixteenth");
+        app.key(kB3); // grid 1/4 is not next: the grid goes round to off
+        app.key(kB3);
+        app.key(kB1);
+        CHECK(hal.trackBank.cfg[0].offset == 0, "To start puts the first note on the loop start");
+        app.key(kB4);
+        app.jog(1);
+        app.key(kB7);
+        CHECK(hal.trackBank.cfg[0].offset == 0, "Cancel puts it back");
+        app.setShift(true); app.key(kJogPress); app.setShift(false);
+        app.jog(1);
+        app.key(kB8);
+        CHECK(hal.trackBank.cfg[0].offset != 0 && std::strcmp(app.view().btn[0], "To start") != 0, "OK keeps the move and leaves move mode");
+    }
+    {   // Part Editor: trim silence and snapping
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kSampleEdit);
+        CHECK(app.screen() == Screen::Editor, "Sample Edit opens the Part Editor");
+        app.key(kB6);
+        app.key(kB5);
+        app.jog(1);
+        app.setShift(true); app.key(kUp); app.setShift(false);
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        CHECK(app.layerVisible(4) && app.stagesOf(4) <= 5, "the editor still fits its stages when zoomed");
+        app.key(kB8);
+    }
     {   // tempo: the loop is set to the chosen tempo's grid and shown
         FakeHal hal;
         App app(hal, palette());

@@ -46,6 +46,59 @@ constexpr uint32_t kRate = 44100;
 } // namespace
 
 //------------------------------------------------------------------------------------------
+int findLastSound(const int16_t* x, uint32_t from, uint32_t to, uint32_t rate)
+{
+    constexpr uint32_t cell = 32;
+    if (to <= from + cell * 8) return -1;
+    const uint32_t n = (to - from) / cell;
+    int32_t maxPeak = 0;
+    auto cellPeak = [&](uint32_t i) -> int32_t {
+        int32_t m = 0;
+        for (uint32_t j = 0; j < cell; j++)
+        {
+            const int32_t a = abs32(x[from + i * cell + j]);
+            if (a > m) m = a;
+        }
+        return m;
+    };
+    for (uint32_t i = 0; i < n; i++)
+    {
+        const int32_t cp = cellPeak(i);
+        if (cp > maxPeak) maxPeak = cp;
+    }
+    int32_t thr = maxPeak / 40; // about -32 dB below the loudest part
+    if (thr < 103) thr = 103;
+    if (maxPeak < thr) return -1;
+    uint32_t conf = rate * 5 / 1000 / cell;
+    if (conf < 1) conf = 1;
+    for (uint32_t i = n; i > conf; i--)
+    {
+        uint32_t above = 0;
+        for (uint32_t k = 0; k < conf; k++)
+            if (cellPeak(i - 1 - k) >= thr) above++;
+        if (above == conf)
+        {
+            uint32_t end = from + i * cell;
+            return (int)snapToZero(x, to, end, rate / 200);
+        }
+    }
+    return -1;
+}
+
+uint32_t snapToZero(const int16_t* x, uint32_t frames, uint32_t pos, uint32_t maxDistance)
+{
+    if (frames < 2) return pos;
+    if (pos >= frames) pos = frames - 1;
+    auto crossing = [&](uint32_t i) { return i > 0 && i < frames && ((x[i - 1] <= 0 && x[i] > 0) || (x[i - 1] >= 0 && x[i] < 0)); };
+    for (uint32_t d = 0; d <= maxDistance; d++)
+    {
+        if (crossing(pos + d)) return pos + d;
+        if (d <= pos && crossing(pos - d)) return pos - d;
+    }
+    return pos;
+}
+
+//------------------------------------------------------------------------------------------
 int findFirstOnset(const int16_t* x, uint32_t from, uint32_t to, uint32_t rate)
 {
     constexpr uint32_t cell = 32;

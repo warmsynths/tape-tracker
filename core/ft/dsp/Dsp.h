@@ -18,6 +18,13 @@ namespace ft
 // a zero-crossing snap (docs/research/onset-detection.md). `sampleRate` in Hz.
 int findFirstOnset(const int16_t* x, uint32_t from, uint32_t to, uint32_t sampleRate);
 
+// Index just after the last sound in [from, to), or -1 if there is none (the end of the audible part).
+int findLastSound(const int16_t* x, uint32_t from, uint32_t to, uint32_t sampleRate);
+
+// The zero crossing nearest to `pos` within `maxDistance` samples, or `pos` itself if there is none.
+// Cutting there avoids a click.
+uint32_t snapToZero(const int16_t* x, uint32_t frames, uint32_t pos, uint32_t maxDistance);
+
 //------------------------------------------------------------------------------------------
 // The four tracks, played with offsets, trims, glitch effects and per-track effects
 

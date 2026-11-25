@@ -45,6 +45,8 @@ struct Settings
     uint16_t tempoTenths = 0;  // starting tempo in tenths of a BPM, 0: Free
     bool countIn = true;
     bool monitorLine = true;   // device: monitoring default for line
+    uint8_t gridIdx = 4;       // project: move and snap grid: 0 Off (1 ms), 1 Bar, 2 1/4, 3 1/8, 4 1/16
+    bool snapZero = true;      // project: cut points land on a zero crossing
 };
 
 // The Four-Track application: every screen and everything behind them. No hardware in here: it
@@ -143,7 +145,23 @@ class App
     void popupKey(int k);
     void dirtyAll();
 
+    // Moving a Part on the main screen (Shift + Insert) and the beat grid
+    uint32_t gridFrames() const;
+    static const char* gridName(int idx);
+    int32_t noteFrame(int track);             // where the first note sits in the Part, -1 if none
+    void shiftTrack(int track, int32_t delta, bool all);
+    void moveStep(int track, int dir, bool fine);
+    void moveTo(int track, bool toStart);
+    void moveKey(int k);
+    bool moveMode = false, moveAll = false;
+    int32_t moveEntry[FourTrackSession::kTracks]{};
+    int32_t noteAt[FourTrackSession::kTracks] = { -2, -2, -2, -2 }; // -2: not worked out yet
+
     // Part Editor
+    int editZoom = 0; // 0 whole loop, 1 a quarter, 2 a sixteenth, 3 a sixty-fourth
+    void editTrim();
+    uint32_t zoomStart() const;
+    uint32_t zoomSpan() const;
     struct EditParams
     {
         uint32_t trimStart, trimEnd, fadeIn, fadeOut;

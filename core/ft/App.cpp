@@ -85,6 +85,7 @@ void App::leave()
 {
     if (job != Job::None) job = Job::None;
     countingIn = false;
+    moveMode = false;
     if (session.mode() != FourTrackSession::Mode::Idle) pressStop();
     if (session.playing()) session.pressStop();
     hal.playerStop();
@@ -113,6 +114,11 @@ void App::key(int k)
         if (transport && k == kPlay) { pressPlay(); refresh(true); return; }
         if (transport && k == kStop) { pressStop(); refresh(true); return; }
         keyScreen(k);
+        return;
+    }
+    if (moveMode)
+    {
+        moveKey(k);
         return;
     }
     if (session.mode() == FourTrackSession::Mode::ChoosingBars)
@@ -167,6 +173,14 @@ void App::key(int k)
             if (session.mode() == FourTrackSession::Mode::Idle && session.hasPart(session.selected())) { editTrack = session.selected(); editEnter(); open(Screen::Editor); }
             break;
         case kPerformance: if (session.mode() == FourTrackSession::Mode::Idle) { gTrack = session.selected(); open(Screen::Glitch); } break;
+        case kJogPress:
+            if (shift && session.mode() == FourTrackSession::Mode::Idle && session.loopFrames() > 0 && session.hasPart(session.selected()))
+            {
+                moveMode = true;
+                for (int t = 0; t < FourTrackSession::kTracks; t++) { moveEntry[t] = userOffset[t]; noteAt[t] = -2; }
+                refresh(true);
+            }
+            break;
         case kMaster: open(Screen::Master); break;
         case kFile: refreshProjectList(); open(Screen::Project); break;
         default: break;
@@ -185,6 +199,11 @@ void App::jog(int delta)
     if (session.mode() == FourTrackSession::Mode::ChoosingBars)
     {
         promptMove(delta > 0 ? 1 : -1);
+        return;
+    }
+    if (moveMode)
+    {
+        moveStep(session.selected(), delta > 0 ? 1 : -1, shift);
         return;
     }
     moveSelection(delta > 0 ? 1 : -1);
@@ -438,6 +457,7 @@ void App::undoTake()
     alignShift[t] = trailer[0];
     userOffset[t] = trailer[1];
     hasUndoTake[t] = false;
+    noteAt[t] = -2;
     session.restore(session.loopFrames(), session.bars(), (uint8_t)((1u << t) | [&] { uint8_t m = 0; for (int i = 0; i < 4; i++) if (session.hasPart(i)) m |= (uint8_t)(1u << i); return m; }()));
     waveDirty[t] = true;
     unsaved = true;
@@ -489,7 +509,7 @@ void App::syncPlayer()
 void App::onFirstTakeFinished()
 {
     // The first Part defines the loop. Anything before its first note is cut.
-    for (int t = 0; t < FourTrackSession::kTracks; t++) partData[t] = nullptr;
+    for (int t = 0; t < FourTrackSession::kTracks; t++) { partData[t] = nullptr; noteAt[t] = -2; }
     const int rec = session.recordingTrack();
     if (session.mode() == FourTrackSession::Mode::ChoosingBars && rec >= 0)
     {
@@ -555,6 +575,7 @@ void App::applyAlignment(int track, uint32_t firstSample)
     const int onset = findFirstOnset(region, 0, firstSample + length, hal.sampleRate());
     alignShift[track] = 0;
     userOffset[track] = 0;
+    noteAt[track] = -2;
     if (onset < 0)
     {
         showPopup(Popup::NoSound, track + 1);
@@ -920,7 +941,8 @@ void App::fillView()
     else if (mode == FourTrackSession::Mode::Armed) fmt(v.hint, sizeof(v.hint), "Records one Loop from the loop start. Rec disarms.");
     else if (mode == FourTrackSession::Mode::RecordingPart) fmt(v.hint, sizeof(v.hint), "Stop keeps what was recorded, the rest is silence.");
     else if (loop == 0) fmt(v.hint, sizeof(v.hint), "Rec records the first Part, which sets the Loop.");
-    else fmt(v.hint, sizeof(v.hint), "Rec arms Track %d. Press it again to change its source.", session.selected() + 1);
+    else fmt(v.hint, sizeof(v.hint), "Rec arms Track %d. Again: source. Shift+Insert: move its Part.", session.selected() + 1);
+    if (moveMode) fmt(v.hint, sizeof(v.hint), "Move Track %d: jog or arrows step by the grid, Shift+arrows by 1 ms.", session.selected() + 1);
     fmt(v.loopMode, sizeof(v.loopMode), "%s", set.loopOnce ? "Play once" : "Repeat");
     fmt(v.padsMode, sizeof(v.padsMode), "%s", padsKeysMode ? "KEYS" : "PAD");
 
@@ -937,6 +959,14 @@ void App::fillView()
     }
     fmt(v.btn[3], sizeof(v.btn[3]), "%s", padsKeysMode ? "Pads:Keys" : "Pads:Pad");
     v.btnSelected = (int8_t)(4 + session.selected());
+    if (moveMode)
+    {
+        static const char* const mv[8] = { "To start", "To beat", "", "", "", "", "Cancel", "OK" };
+        for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", mv[b]); v.btnKind[b] = 0; }
+        fmt(v.btn[2], sizeof(v.btn[2]), "%s", gridName(set.gridIdx));
+        fmt(v.btn[3], sizeof(v.btn[3]), "All %s", moveAll ? "on" : "off");
+        v.btnSelected = -1;
+    }
 }
 
 void App::refresh(bool force)
@@ -1040,5 +1070,126 @@ void App::draw(int layer, int stage, Gfx& gfx) const
     if (layer < 4) drawLayer(layer, stage, model, pal, gfx);
     else if (layer == 4) page.replay(stage, gfx);
     else popupPage.replay(stage, gfx);
+}
+} // namespace ft
+
+namespace ft
+{
+//--------------------------------------------------------------------------------------------
+// Beat grid and moving a Part
+
+const char* App::gridName(int idx)
+{
+    static const char* const names[5] = { "Grid off", "Bar", "1/4", "1/8", "1/16" };
+    return names[idx < 0 || idx > 4 ? 0 : idx];
+}
+
+uint32_t App::gridFrames() const
+{
+    const uint32_t loop = session.loopFrames();
+    const uint32_t bars = session.bars() > 0 ? (uint32_t)session.bars() : 1;
+    uint32_t g;
+    switch (set.gridIdx)
+    {
+        case 1: g = loop / bars; break;
+        case 2: g = loop / (bars * 4); break;
+        case 3: g = loop / (bars * 8); break;
+        case 4: g = loop / (bars * 16); break;
+        default: g = hal.sampleRate() / 1000; break;
+    }
+    return g > 0 ? g : 1;
+}
+
+int32_t App::noteFrame(int t)
+{
+    if (noteAt[t] == -2)
+    {
+        const int16_t* d = partData[t];
+        noteAt[t] = (d == nullptr) ? -1 : findFirstOnset(d, 0, session.loopFrames(), hal.sampleRate());
+    }
+    return noteAt[t];
+}
+
+void App::shiftTrack(int track, int32_t delta, bool all)
+{
+    const int32_t L = (int32_t)session.loopFrames();
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+    {
+        if (!(t == track || (all && session.hasPart(t)))) continue;
+        int32_t u = userOffset[t] + delta;
+        if (L > 0)
+        {
+            u %= L;
+            if (u > L / 2) u -= L;
+            if (u < -L / 2) u += L;
+        }
+        userOffset[t] = u;
+    }
+    unsaved = true;
+    pushBank();
+    for (int t = 0; t < FourTrackSession::kTracks; t++) waveDirty[t] = waveDirty[t] || t == track || all;
+    editWaveDirty = true;
+    refresh(true);
+}
+
+// Steps the Part so its first note moves to the next (or previous) grid line. With the grid off,
+// or `fine`, it moves by 1 ms.
+void App::moveStep(int track, int dir, bool fine)
+{
+    const int32_t L = (int32_t)session.loopFrames();
+    if (L <= 0) return;
+    const int32_t note = noteFrame(track) < 0 ? 0 : noteFrame(track);
+    int32_t pos = (note + alignShift[track] + userOffset[track]) % L;
+    if (pos < 0) pos += L;
+    const int32_t g = (int32_t)gridFrames();
+    int32_t target;
+    if (fine || set.gridIdx == 0) target = pos + dir * (int32_t)(hal.sampleRate() / 1000);
+    else if (pos % g == 0) target = pos + dir * g;
+    else target = dir > 0 ? (pos / g + 1) * g : (pos / g) * g;
+    shiftTrack(track, target - pos, moveAll);
+}
+
+void App::moveTo(int track, bool toStart)
+{
+    const int32_t L = (int32_t)session.loopFrames();
+    if (L <= 0) return;
+    const int32_t note = noteFrame(track) < 0 ? 0 : noteFrame(track);
+    int32_t pos = (note + alignShift[track] + userOffset[track]) % L;
+    if (pos < 0) pos += L;
+    int32_t target = 0;
+    if (!toStart)
+    {
+        const int32_t g = (int32_t)gridFrames();
+        target = ((pos + g / 2) / g) * g;
+    }
+    int32_t delta = target - pos;
+    if (delta > L / 2) delta -= L;
+    if (delta < -L / 2) delta += L;
+    shiftTrack(track, delta, moveAll);
+}
+
+void App::moveKey(int k)
+{
+    const int t = session.selected();
+    switch (k)
+    {
+        case kB1: moveTo(t, true); break;
+        case kB2: moveTo(t, false); break;
+        case kB3: set.gridIdx = (uint8_t)((set.gridIdx + 1) % 5); unsaved = true; break;
+        case kB4: moveAll = !moveAll; break;
+        case kB7:
+            for (int i = 0; i < FourTrackSession::kTracks; i++) userOffset[i] = moveEntry[i];
+            moveMode = false;
+            pushBank();
+            for (int i = 0; i < FourTrackSession::kTracks; i++) waveDirty[i] = true;
+            break;
+        case kB8: moveMode = false; break;
+        case kLeft: moveStep(t, -1, shift); break;
+        case kRight: moveStep(t, 1, shift); break;
+        case kPlay: pressPlay(); break;
+        case kStop: pressStop(); break;
+        default: break;
+    }
+    refresh(true);
 }
 } // namespace ft

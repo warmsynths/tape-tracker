@@ -98,10 +98,11 @@ void App::drawTempo(Pen& p)
 void App::drawEditor(Pen& p)
 {
     title(p, model, "Part Editor");
-    char b[32];
-    fmt(b, sizeof b, "Track %d", editTrack + 1);
+    char b[64];
+    static const char* const zoomName[4] = { "whole loop", "1/4", "1/16", "1/64" };
+    fmt(b, sizeof b, "Track %d  Zoom %s  %s  Snap 0 %s", editTrack + 1, editFieldIdx >= 4 ? zoomName[0] : zoomName[editZoom], gridName(set.gridIdx), set.snapZero ? "on" : "off");
     p.textRight(788, 46, b, F14, pal.dim);
-    // waveform
+    // waveform (zoomed around the field being edited)
     if (editWaveDirty) const_cast<App*>(this)->computeEditWave();
     p.rect(12, 84, 776, 150, pal.waveBg);
     uint8_t h[100];
@@ -112,13 +113,24 @@ void App::drawEditor(Pen& p)
     const uint32_t loop = session.loopFrames();
     if (loop > 0)
     {
-        const int x0 = 16 + (int)((uint64_t)c.trimStart * 700 / loop);
+        const uint32_t ws = zoomStart(), span = zoomSpan();
+        auto xOf = [&](int64_t pos) -> int {
+            int64_t x = 16 + (pos - (int64_t)ws) * 700 / (int64_t)span;
+            return x < 12 ? 12 : (x > 788 ? 788 : (int)x);
+        };
+        // beat grid along the bottom edge
+        if (set.gridIdx > 0)
+        {
+            const uint32_t gs = gridFrames();
+            if ((uint64_t)span * 700 / (loop ? loop : 1) / gs >= 0 && span / gs <= 140)
+                for (uint32_t pos = ((ws + gs - 1) / gs) * gs; pos < ws + span; pos += gs) p.rect(xOf(pos), 226, 1, 8, pal.dim);
+        }
         const uint32_t end = c.trimEnd > loop ? loop : c.trimEnd;
-        const int x1 = 16 + (int)((uint64_t)end * 700 / loop);
+        const int x0 = xOf(c.trimStart), x1 = xOf(end);
         p.rect(12, 84, x0 - 12 > 0 ? x0 - 12 : 0, 150, pal.bg);
         p.rect(x1, 84, 788 - x1 > 0 ? 788 - x1 : 0, 150, pal.bg);
-        p.rect(x0, 84, 2, 150, pal.marker);
-        p.rect(x1, 84, 2, 150, pal.marker);
+        if (c.trimStart >= ws && c.trimStart <= ws + span) p.rect(x0, 84, 2, 150, pal.marker);
+        if (end >= ws && end <= ws + span) p.rect(x1, 84, 2, 150, pal.marker);
     }
     // six fields
     const uint32_t rate = hal.sampleRate();
@@ -133,12 +145,13 @@ void App::drawEditor(Pen& p)
     fmt(v[5], 20, "%s%d ms", off < 0 ? "-" : "+", (int)((off < 0 ? -off : off) * 1000LL / (int)rate));
     for (int i = 0; i < 6; i++)
     {
-        const int x = 12 + (i % 3) * 262, y = 250 + (i / 3) * 84;
-        p.rect(x, y, 252, 74, i == editFieldIdx ? pal.sel : pal.panel);
-        p.text(x + 14, y + 10, names[i], F14, pal.dim);
-        p.text(x + 14, y + 36, v[i], F17B, pal.text);
+        const int x = 12 + (i % 3) * 262, y = 244 + (i / 3) * 76;
+        p.rect(x, y, 252, 68, i == editFieldIdx ? pal.sel : pal.panel);
+        p.text(x + 14, y + 8, names[i], F14, pal.dim);
+        p.text(x + 14, y + 32, v[i], F17B, pal.text);
     }
-    const char* l[8] = { auditioning ? "Stop solo" : "Solo", "Normalize", "Undo", "Redo", "", "", "Cancel", "Done" };
+    p.text(12, 402, "Jog: grid step (cuts snap to zero). Shift+jog: 1 ms. Shift+Up/Down: zoom. Shift+B5: grid.", F12, pal.dim);
+    const char* l[8] = { auditioning ? "Stop solo" : "Solo", "Normalize", "Undo", "Redo", set.snapZero ? "Snap 0 on" : "Snap 0 off", "Trim silence", "Cancel", "Done" };
     p.buttons(l);
 }
 
@@ -294,25 +307,27 @@ void App::drawNameEntry(Pen& p)
 void App::drawSettings(Pen& p)
 {
     title(p, model, "Four-Track settings");
-    const char* names[8] = { "Loop mode", "Click while playing", "Alignment window", "Pre-roll", "Tempo rounding", "Source of this track", "Input gain", "Monitor line" };
-    char v[8][20];
+    const char* names[10] = { "Loop mode", "Click while playing", "Grid for moving and cutting", "Snap cuts to zero", "Alignment window", "Pre-roll", "Tempo rounding", "Source of this track", "Input gain", "Monitor line" };
+    char v[10][20];
     fmt(v[0], 20, "%s", set.loopOnce ? "Play once" : "Repeat");
     fmt(v[1], 20, "%s", set.click ? "On" : "Off");
-    fmt(v[2], 20, "%s", kWindowName[set.windowIdx]);
-    fmt(v[3], 20, "%s", kPreRollName[set.preRollIdx]);
-    fmt(v[4], 20, "%s", kRoundName[set.roundIdx]);
-    fmt(v[5], 20, "%s", kSourceName[(int)trackSource[session.selected()]]);
+    fmt(v[2], 20, "%s", gridName(set.gridIdx));
+    fmt(v[3], 20, "%s", set.snapZero ? "On" : "Off");
+    fmt(v[4], 20, "%s", kWindowName[set.windowIdx]);
+    fmt(v[5], 20, "%s", kPreRollName[set.preRollIdx]);
+    fmt(v[6], 20, "%s", kRoundName[set.roundIdx]);
+    fmt(v[7], 20, "%s", kSourceName[(int)trackSource[session.selected()]]);
     const Source s = trackSource[session.selected()];
-    if (s == Source::Pads) fmt(v[6], 20, "-"); else fmt(v[6], 20, "%d%%", hal.gain(s));
-    fmt(v[7], 20, "%s", set.monitorLine ? "On" : "Off");
-    p.text(12, 76, "This project", F12, pal.dim);
-    for (int i = 0; i < 8; i++)
+    if (s == Source::Pads) fmt(v[8], 20, "-"); else fmt(v[8], 20, "%d%%", hal.gain(s));
+    fmt(v[9], 20, "%s", set.monitorLine ? "On" : "Off");
+    p.text(12, 74, "This project", F12, pal.dim);
+    for (int i = 0; i < 10; i++)
     {
-        if (i == 2) p.text(12, 76 + 2 * 40 + 6 + 4, "This device", F12, pal.dim);
-        const int y = 92 + i * 40 + (i >= 2 ? 22 : 0);
-        p.rect(12, y, 776, 36, i == sRow ? pal.sel : pal.panel);
-        p.text(24, y + 8, names[i], F14, pal.text);
-        p.textRight(776, y + 8, v[i], F14B, pal.text);
+        if (i == 4) p.text(12, 74 + 4 * 29 + 20, "This device", F12, pal.dim);
+        const int y = 88 + i * 29 + (i >= 4 ? 20 : 0);
+        p.rect(12, y, 776, 27, i == sRow ? pal.sel : pal.panel);
+        p.text(24, y + 5, names[i], F14, pal.text);
+        p.textRight(776, y + 5, v[i], F14B, pal.text);
     }
     const char* l[8] = { "", "", "", "", "", "", "", "Back" };
     p.buttons(l);

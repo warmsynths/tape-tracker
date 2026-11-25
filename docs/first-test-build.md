@@ -128,7 +128,7 @@ New: after you stop the first take (or it stops by itself at 24 s), the Tracker 
 Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.
 
 ## Test build FT16: the whole design, one build
-`firmware/PolyendTracker_FT19_full.ptf` (FT16 plus the fixes below; FT19 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
+`firmware/PolyendTracker_FT20_full.ptf` (FT16 plus the fixes below; FT20 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
 
 What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-requirements.md` for each screen):
 - **Main screen:** starting tempo and count-in, click, source per track (line, mic low, mic high, pads), alignment of each Part to the loop (first-note detection and snap, window in Settings), offset, mute, Loop Mode, undo of a replaced take, How many bars.
@@ -146,3 +146,9 @@ FT17 changes after the first emulator test: the count-in also happens when the t
 FT18: the Glitch page now does what the demo clips did. Two new effects for the four slots: **Random jumps** (each half-beat slice has a chance, set by the jog, to jump back one or two slices, stutter or play backwards) and **Pitch steps** (each slice has a chance to step to a musical interval; Shift+Left/Right picks the set: Mixed, Fifths, Octaves, Thirds, Sevenths; the track's pitch style tape or granular still applies). Both differ on every pass of the loop and never change the loop length. Slots 1 and 2 start as these two. The older fixed effects (Stutter, Reverse, Jump back and the stock ones) are still in the list.
 
 FT19: every Glitch slot has a **chance** (jog, 0 to 100%). **Insert** (the jog press in the emulator) latches the slot on: it then happens on that share of the slices as the track plays, and 100% means always, until you latch it off. **Holding B1 to B4** triggers the slot at once, whatever the chance, until you let go. Shift+jog still picks the effect; Shift+Up/Down changes the effect's own setting (interval, set of intervals, how hard). Project files saved by FT16 to FT18 will not open.
+
+FT20: editing.
+- **Move a Part on the main screen:** select the track, hold Shift and press Insert (Enter in the emulator). The jog then moves the Part so its first note steps along the beat grid. Buttons: To start (first note to the loop start), To beat (to the nearest grid line), grid (cycles Off, Bar, 1/4, 1/8, 1/16), All (moves all tracks together), Cancel, OK. Shift+Left/Right moves by 1 ms.
+- **Part Editor:** the jog steps start and end by the grid (Shift: 1 ms) and cut points land on a zero crossing when Snap 0 is on (B5; Shift+B5 cycles the grid). B6 Trim silence cuts the silence off both ends. Shift+Up/Down zooms (whole loop, 1/4, 1/16, 1/64) around the field being edited, the grid ticks show under the waveform, and the Level field now works from the jog (0.5 dB, Shift 0.1 dB).
+- **Settings:** Grid and Snap cuts to zero are project settings. They are saved in the project.
+- Beat lines are not drawn through the lanes on the main screen.

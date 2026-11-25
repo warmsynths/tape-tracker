@@ -180,6 +180,17 @@ int main()
         for (int i = 0; i < L; i++) if (std::fabs(l1[i] - lp[i]) > 0.001f) some++;
         CHECK(some > L / 20 && some < L * 9 / 10, "a chance of 50 percent triggers on some slices only");
     }
+    {   // zero crossings and the end of the sound
+        std::vector<int16_t> x(44100);
+        for (int i = 0; i < 44100; i++) x[i] = (int16_t)(std::sin(i * 0.05f) * 10000);
+        const uint32_t z = snapToZero(x.data(), x.size(), 1000, 100);
+        CHECK(z > 0 && ((x[z - 1] <= 0 && x[z] > 0) || (x[z - 1] >= 0 && x[z] < 0)), "snapToZero lands on a crossing");
+        for (int i = 30000; i < 44100; i++) x[i] = 0;
+        const int e = findLastSound(x.data(), 0, x.size(), 44100);
+        CHECK(e > 29000 && e <= 30500, "the end of the sound is found");
+        std::vector<int16_t> silent(44100, 0);
+        CHECK(findLastSound(silent.data(), 0, silent.size(), 44100) < 0, "silence has no end of sound");
+    }
     {   // wav header
         uint8_t h[44];
         CHECK(wavHeader(h, 1000, 44100) == 44, "a WAV header is 44 bytes");

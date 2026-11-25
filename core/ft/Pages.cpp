@@ -170,8 +170,21 @@ void App::keyScreen(int k)
             break;
         case Screen::Editor:
         {
-            if (k == kLeft || k == kUp) editField(-1);
+            if (shift && (k == kUp || k == kDown))
+            {
+                editZoom = clampi(editZoom + (k == kUp ? 1 : -1), 0, 3);
+                editWaveDirty = true;
+            }
+            else if (k == kLeft || k == kUp) editField(-1);
             else if (k == kRight || k == kDown) editField(1);
+            else if (k == kB5)
+            {
+                if (shift) set.gridIdx = (uint8_t)((set.gridIdx + 1) % 5);
+                else set.snapZero = !set.snapZero;
+                unsaved = true;
+                editWaveDirty = true;
+            }
+            else if (k == kB6) editTrim();
             else if (k == kB1)
             {
                 auditioning = !auditioning;
@@ -210,8 +223,8 @@ void App::keyScreen(int k)
         case Screen::Project:
         case Screen::NameEntry: if (current == Screen::Project) projectKey(k); else nameKey(k); break;
         case Screen::Settings:
-            if (k == kUp) sRow = clampi(sRow - 1, 0, 7);
-            else if (k == kDown) sRow = clampi(sRow + 1, 0, 7);
+            if (k == kUp) sRow = clampi(sRow - 1, 0, 9);
+            else if (k == kDown) sRow = clampi(sRow + 1, 0, 9);
             else if (k == kLeft) settingsJog(-1);
             else if (k == kRight) settingsJog(1);
             else if (k == kB8) back();
@@ -255,35 +268,50 @@ void App::jogScreen(int delta)
             }
             else set.countIn = !set.countIn;
             break;
-        case Screen::Editor: editPush(); editField(0); {
-                const int step = shift ? 10 : 1;
-                const uint32_t rate = hal.sampleRate();
-                const int32_t frames = (int32_t)((int64_t)rate * step * delta / 1000) * (editFieldIdx == 5 ? 1 : 10);
-                TrackCfg& c = hal.bank().cfg[editTrack];
-                const uint32_t loop = session.loopFrames();
-                switch (editFieldIdx)
+        case Screen::Editor:
+        {
+            editPush();
+            const uint32_t rate = hal.sampleRate();
+            const uint32_t loop = session.loopFrames();
+            TrackCfg& c = hal.bank().cfg[editTrack];
+            const int32_t fine = (int32_t)(rate / 1000);
+            const int32_t step = shift ? fine : (set.gridIdx == 0 ? fine * 10 : (int32_t)gridFrames());
+            const int d = delta > 0 ? 1 : -1;
+            // Cut points: to the grid unless Shift is held, then onto a zero crossing if that is on
+            auto cut = [&](int32_t v) -> uint32_t {
+                if (v < 0) v = 0;
+                if (v > (int32_t)loop) v = (int32_t)loop;
+                if (!shift && set.gridIdx > 0)
                 {
-                    case 0: c.trimStart = (uint32_t)clampi((int)c.trimStart + frames, 0, (int)loop); break;
-                    case 1: { int64_t e = (c.trimEnd > loop ? loop : c.trimEnd); e += frames; if (e < 0) e = 0; if (e > loop) e = loop; c.trimEnd = (uint32_t)e; break; }
-                    case 2: c.fadeIn = (uint32_t)clampi((int)c.fadeIn + frames, 0, (int)loop); break;
-                    case 3: c.fadeOut = (uint32_t)clampi((int)c.fadeOut + frames, 0, (int)loop); break;
-                    case 5:
-                    {
-                        // Shift moves by a beat, otherwise by 1 ms
-                        int32_t d = delta * (int32_t)((int64_t)rate / 1000);
-                        if (shift && session.bars() > 0) d = delta * (int32_t)(loop / ((uint32_t)session.bars() * 4));
-                        int32_t u = userOffset[editTrack] + d;
-                        const int32_t L = (int32_t)loop;
-                        if (L > 0) { u %= L; if (u > L / 2) u -= L; if (u < -L / 2) u += L; }
-                        userOffset[editTrack] = u;
-                        pushBank();
-                        break;
-                    }
-                    default: break;
+                    const int32_t gs = (int32_t)gridFrames();
+                    v = ((v + gs / 2) / gs) * gs;
+                    if (v > (int32_t)loop) v = (int32_t)loop;
                 }
+                if (set.snapZero && partData[editTrack] != nullptr && loop > 0) v = (int32_t)snapToZero(partData[editTrack], loop, (uint32_t)v, rate / 100);
+                return (uint32_t)v;
+            };
+            const uint32_t endNow = c.trimEnd > loop ? loop : c.trimEnd;
+            switch (editFieldIdx)
+            {
+                case 0: { const uint32_t v = cut((int32_t)c.trimStart + d * step); if (v < endNow) c.trimStart = v; break; }
+                case 1: { const uint32_t v = cut((int32_t)endNow + d * step); if (v > c.trimStart) c.trimEnd = v; break; }
+                case 2: c.fadeIn = (uint32_t)clampi((int)c.fadeIn + d * (shift ? fine : fine * 10), 0, (int)loop); break;
+                case 3: c.fadeOut = (uint32_t)clampi((int)c.fadeOut + d * (shift ? fine : fine * 10), 0, (int)loop); break;
+                case 4: c.gain *= (d > 0 ? 1.0f : 0.0f) * (shift ? 1.0116f : 1.0593f) + (d > 0 ? 0.0f : 1.0f) * (shift ? 0.9885f : 0.9441f); break; // 0.1 dB or 0.5 dB
+                case 5:
+                {
+                    const bool keep = moveAll;
+                    moveAll = false;
+                    moveStep(editTrack, d, shift);
+                    moveAll = keep;
+                    break;
+                }
+                default: break;
             }
+            pushBank();
             editWaveDirty = true;
             break;
+        }
         case Screen::Glitch:
         {
             TrackCfg& c = hal.bank().cfg[gTrack];
@@ -341,6 +369,7 @@ void App::editApply(const EditParams& e)
 void App::editEnter()
 {
     editFieldIdx = 0;
+    editZoom = 0;
     editEntry = editNow();
     editStack[0] = editEntry;
     editHist = 0;
@@ -365,23 +394,69 @@ void App::editField(int delta)
     editFieldIdx = (editFieldIdx + delta + 6) % 6;
 }
 
+uint32_t App::zoomSpan() const
+{
+    const uint32_t loop = session.loopFrames();
+    if (editFieldIdx >= 4 || editZoom == 0) return loop;
+    const uint32_t s = loop >> (2 * editZoom);
+    return s < 100 ? (loop < 100 ? loop : 100) : s;
+}
+
+uint32_t App::zoomStart() const
+{
+    const uint32_t loop = session.loopFrames();
+    const uint32_t span = zoomSpan();
+    if (span >= loop) return 0;
+    const TrackCfg& c = const_cast<App*>(this)->hal.bank().cfg[editTrack];
+    const uint32_t endNow = c.trimEnd > loop ? loop : c.trimEnd;
+    uint32_t center = c.trimStart;
+    if (editFieldIdx == 1) center = endNow;
+    else if (editFieldIdx == 2) center = c.trimStart + c.fadeIn;
+    else if (editFieldIdx == 3) center = endNow > c.fadeOut ? endNow - c.fadeOut : 0;
+    uint32_t start = center > span / 2 ? center - span / 2 : 0;
+    if (start + span > loop) start = loop - span;
+    return start;
+}
+
 void App::computeEditWave()
 {
     const int16_t* d = partData[editTrack];
     const uint32_t frames = session.loopFrames();
+    const uint32_t ws = zoomStart(), span = zoomSpan();
     for (int c = 0; c < 100; c++)
     {
         uint16_t peak = 0;
         if (d != nullptr && frames > 0)
         {
-            const uint32_t from = (uint32_t)(((uint64_t)c * frames) / 100);
-            const uint32_t to = (uint32_t)(((uint64_t)(c + 1) * frames) / 100);
-            peak = loopPeakBlock(d + from, to - from, 0, (int)(to - from));
+            const uint32_t from = ws + (uint32_t)(((uint64_t)c * span) / 100);
+            const uint32_t to = ws + (uint32_t)(((uint64_t)(c + 1) * span) / 100);
+            if (to > from) peak = loopPeakBlock(d + from, to - from, 0, (int)(to - from));
         }
         const float norm = __builtin_sqrtf((float)peak / 32767.0f);
         editWave[c] = (uint8_t)(norm * 255.0f);
     }
     editWaveDirty = false;
+}
+
+// Cuts the silence off the start and the end of the Part (the Part itself is not changed)
+void App::editTrim()
+{
+    const int16_t* d = partData[editTrack];
+    const uint32_t loop = session.loopFrames();
+    if (d == nullptr || loop == 0) return;
+    const uint32_t rate = hal.sampleRate();
+    const int on = findFirstOnset(d, 0, loop, rate);
+    const int off = findLastSound(d, 0, loop, rate);
+    if (on < 0 || off < 0 || off <= on) return;
+    editPush();
+    TrackCfg& c = hal.bank().cfg[editTrack];
+    uint32_t start = (uint32_t)on > rate / 200 ? (uint32_t)on - rate / 200 : 0;
+    if (set.snapZero) start = snapToZero(d, loop, start, rate / 200);
+    c.trimStart = start;
+    c.trimEnd = (uint32_t)off;
+    editPush();
+    pushBank();
+    editWaveDirty = true;
 }
 
 //--------------------------------------------------------------------------------------------
@@ -467,12 +542,14 @@ void App::settingsJog(int delta)
     {
         case 0: set.loopOnce = !set.loopOnce; pushBank(); break;
         case 1: set.click = !set.click; break;
-        case 2: set.windowIdx = (uint8_t)clampi(set.windowIdx + delta, 0, 4); break;
-        case 3: set.preRollIdx = (uint8_t)clampi(set.preRollIdx + delta, 0, 4); break;
-        case 4: set.roundIdx = (uint8_t)clampi(set.roundIdx + delta, 0, 2); break;
-        case 5: trackSource[session.selected()] = (Source)(((int)trackSource[session.selected()] + (delta > 0 ? 1 : 3)) % 4); applySource(trackSource[session.selected()]); break;
-        case 6: { const Source s = trackSource[session.selected()]; if (s != Source::Pads) hal.setGain(s, clampi(hal.gain(s) + delta * 5, 0, 100)); break; }
-        case 7: set.monitorLine = !set.monitorLine; hal.setMonitor(set.monitorLine); break;
+        case 2: set.gridIdx = (uint8_t)clampi(set.gridIdx + delta, 0, 4); break;
+        case 3: set.snapZero = !set.snapZero; break;
+        case 4: set.windowIdx = (uint8_t)clampi(set.windowIdx + delta, 0, 4); break;
+        case 5: set.preRollIdx = (uint8_t)clampi(set.preRollIdx + delta, 0, 4); break;
+        case 6: set.roundIdx = (uint8_t)clampi(set.roundIdx + delta, 0, 2); break;
+        case 7: trackSource[session.selected()] = (Source)(((int)trackSource[session.selected()] + (delta > 0 ? 1 : 3)) % 4); applySource(trackSource[session.selected()]); break;
+        case 8: { const Source s = trackSource[session.selected()]; if (s != Source::Pads) hal.setGain(s, clampi(hal.gain(s) + delta * 5, 0, 100)); break; }
+        case 9: set.monitorLine = !set.monitorLine; hal.setMonitor(set.monitorLine); break;
         default: break;
     }
     unsaved = true;
@@ -504,6 +581,7 @@ void App::refreshProjectList()
 
 void App::newProject()
 {
+    moveMode = false;
     hal.playerStop();
     session.reset();
     for (int t = 0; t < 4; t++)
@@ -651,8 +729,8 @@ void App::startSave()
     uint8_t mask = 0;
     for (int t = 0; t < 4; t++) if (session.hasPart(t)) mask |= (uint8_t)(1u << t);
     w.u8(mask);
-    w.u8((set.loopOnce ? 1u : 0u) | (set.click ? 2u : 0u) | (set.countIn ? 4u : 0u));
-    w.u8(0);
+    w.u8((set.loopOnce ? 1u : 0u) | (set.click ? 2u : 0u) | (set.countIn ? 4u : 0u) | (set.snapZero ? 8u : 0u));
+    w.u8(set.gridIdx);
     w.u16(set.tempoTenths);
     for (int t = 0; t < 4; t++)
     {
@@ -689,12 +767,16 @@ void App::startLoad(const char* name)
     const int bars = (int)r.u8();
     const uint8_t mask = (uint8_t)r.u8();
     const uint32_t flags = r.u8();
-    r.u8();
+    const uint32_t gridByte = r.u8();
     set.tempoTenths = (uint16_t)r.u16();
     set.loopOnce = flags & 1;
     set.click = flags & 2;
     set.countIn = flags & 4;
+    set.snapZero = flags & 8;
+    set.gridIdx = (uint8_t)(gridByte % 5);
     hal.playerStop();
+    moveMode = false;
+    for (int t = 0; t < 4; t++) noteAt[t] = -2;
     for (int t = 0; t < 4; t++)
     {
         TrackCfg& c = hal.bank().cfg[t];
