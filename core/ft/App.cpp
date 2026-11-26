@@ -941,21 +941,68 @@ void App::computeLive(int track)
     const uint32_t loop = session.loopFrames();
     const bool first = session.mode() == FourTrackSession::Mode::RecordingFirst;
     const uint32_t span = first ? rate * kMaxTakeSeconds : loop;
-    const uint32_t per = span / 120;
+    const uint32_t per = span / 600; // one column per pixel
     if (per == 0) { L.liveCount = 0; return; }
     const uint32_t len = hal.recordLength();
     const uint32_t start = first ? takeOffset : 0;
     const int16_t* d = hal.region(track);
     int cols = (int)((len > start ? len - start : 0) / per);
-    if (cols > 120) cols = 120;
-    for (int c = liveDone > 1 ? liveDone - 1 : 0; c < cols; c++)
+    if (cols > 600) cols = 600;
+    const int from = liveDone > 1 ? liveDone - 1 : 0;
+    for (int c = from; c < cols; c++)
     {
         const uint16_t peak = loopPeakBlock(d + start + (uint32_t)c * per, per, 0, (int)per);
         const int h = (int)(squareRoot((float)peak / 32767.0f) * 255.0f);
-        L.live[c] = (uint8_t)(h > 255 ? 255 : h);
+        live600[c] = (uint8_t)(h > 255 ? 255 : h);
+    }
+    // the 120 columns of plan A are the peaks of five of them
+    const int cols120 = cols / 5;
+    for (int c = 0; c < cols120; c++)
+    {
+        uint8_t m = 0;
+        for (int k = 0; k < 5; k++) if (live600[c * 5 + k] > m) m = live600[c * 5 + k];
+        L.live[c] = m;
+    }
+    L.liveCount = (uint8_t)cols120;
+    // plan D: the lane's big picture grows with the take; only the new columns are sent
+    L.liveBitmap = false;
+    if (set.waveBitmap)
+    {
+        const int slot = maskSlot(track, 1);
+        if (liveDone == 0)
+        {
+            uint8_t zero[16 * kMaskStride] = {};
+            for (int r0 = 0; r0 < kMaskHeight[1]; r0 += 16)
+            {
+                const int rows = (kMaskHeight[1] - r0) < 16 ? (kMaskHeight[1] - r0) : 16;
+                hal.maskWrite(slot, (uint32_t)(r0 * kMaskStride), zero, (uint32_t)(rows * kMaskStride));
+            }
+            maskOk[track] = false; // the lane's finished picture is replaced when the take ends
+        }
+        if (cols > from)
+        {
+            const int b0 = from >> 3, b1 = (cols - 1) >> 3;
+            const int mid = kMaskHeight[1] / 2;
+            uint8_t row[kMaskStride];
+            for (int r = 0; r < kMaskHeight[1]; r++)
+            {
+                const int dist = r < mid ? mid - 1 - r : r - mid;
+                for (int b = b0; b <= b1; b++)
+                {
+                    uint8_t v = 0;
+                    for (int k = 0; k < 8; k++)
+                    {
+                        const int c = b * 8 + k;
+                        if (c < cols && dist < 1 + (live600[c] * 89) / 255) v |= (uint8_t)(0x80 >> k);
+                    }
+                    row[b - b0] = v;
+                }
+                hal.maskWrite(slot, (uint32_t)(r * kMaskStride + b0), row, (uint32_t)(b1 - b0 + 1));
+            }
+        }
+        L.liveBitmap = true;
     }
     liveDone = cols;
-    L.liveCount = (uint8_t)cols;
 }
 
 void App::fillView()
@@ -1162,7 +1209,7 @@ void App::fillView()
         }
     }
 
-    for (int t = 0; t < FourTrackSession::kTracks; t++) v.lane[t].liveCount = 0;
+    for (int t = 0; t < FourTrackSession::kTracks; t++) { v.lane[t].liveCount = 0; v.lane[t].liveBitmap = false; }
     if (recTrack >= 0 && (mode == FourTrackSession::Mode::RecordingFirst || mode == FourTrackSession::Mode::RecordingPart) && !waitingSound) computeLive(recTrack);
     else liveDone = 0;
 

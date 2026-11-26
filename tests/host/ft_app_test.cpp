@@ -632,6 +632,24 @@ static void pagesAndProjects()
         for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
         CHECK(!hal.masks.count(kPageMaskSlot), "and does not send it again while the sample is the same");
     }
+    {   // the take being recorded grows as a bitmap in the lane's own picture
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kRec);
+        hal.advance(app, 100000); // the count-in
+        hal.advance(app, FakeHal::kRate * 3);
+        CHECK(app.view().lane[0].liveBitmap, "the take is drawn from the lane's picture");
+        int bits = 0;
+        for (uint8_t b : hal.masks[1]) for (int k = 0; k < 8; k++) bits += (b >> k) & 1;
+        CHECK(bits > 100, "the picture has the take in it");
+        hal.advance(app, FakeHal::kRate * 3);
+        int bits2 = 0;
+        for (uint8_t b : hal.masks[1]) for (int k = 0; k < 8; k++) bits2 += (b >> k) & 1;
+        CHECK(bits2 > bits, "and it grows as the take goes on");
+        for (int l = 0; l < 2; l++) for (int st = 0; st < app.stagesOf(l); st++) app.draw(l, st, gfx);
+    }
     {   // the Pattern button is home
         FakeHal hal;
         App app(hal, palette());

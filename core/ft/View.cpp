@@ -400,7 +400,12 @@ void Painter::drawDynamic()
                 fmt(b, sizeof b, "Recording one Loop - %s", L.msg2);
                 T(184, y + 11, b, kF14, pal.text);
             }
-            if (v.statusKind == 2 && L.liveCount > 0)
+            if (v.statusKind == 2 && L.liveBitmap)
+            {
+                g.color(pal.rec);
+                g.mask(i * 3 + 1, kWaveX, y, 600, h);
+            }
+            else if (v.statusKind == 2 && L.liveCount > 0)
             {
                 uint8_t heights[120];
                 for (int c = 0; c < L.liveCount; c++) heights[c] = (uint8_t)(2 + (L.live[c] * 118) / 255);

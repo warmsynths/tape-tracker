@@ -241,3 +241,6 @@ The Part Editor and the Pad sample page draw their big waveform as a bitmap too 
 
 ## FT41 (not sent)
 Fix: Device settings, Firmware found no update files. The stock list call skips names that fill its length limit, and `PolyendTracker_FT38_full.ptf` is 28 characters, exactly the limit I passed. Now 48. The list also follows the stock updater's rule: the name starts with `PolyendTrac`, ends `.ptf` and is at least 15 characters long. The same limit hid sample files with long names in Load samples; names up to 47 characters now list.
+
+## FT42 (not sent)
+The take being recorded is a bitmap too (it was 120 red columns). It grows at one pixel per column in the lane's own 250 px picture; only the newest columns are written to the display chip each update (about 250 short writes of 1 to 2 bytes, an estimated 1.5 ms every 100 ms). The picture is cleared once when a take starts and replaced by the finished waveform when it ends. With Waveforms on Columns the old red columns are used.

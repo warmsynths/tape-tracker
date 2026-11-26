@@ -353,6 +353,7 @@ class App
     bool glitchLatched[FourTrackSession::kTracks]{};
     int appliedSource = -1;
     bool focusUser = false;       // the selected track is open in focus (pressed twice)
+    uint8_t live600[600] = {};
     int liveDone = 0;             // columns of the take being recorded that are final
     // Copy and Clear (C8, C9), with one undo step for the last of either (Shift + Copy)
     struct LastOp
