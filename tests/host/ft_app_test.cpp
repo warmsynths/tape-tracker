@@ -3,6 +3,7 @@
 #include "App.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <string>
@@ -559,6 +560,35 @@ static void pagesAndProjects()
         CHECK(bytes() < 7500, "the overview with four Parts is under 7.5 KB");
         app.key(kB5); hal.advance(app, 2000);
         CHECK(app.view().focusLane == 0 && bytes() < 7500, "the focus layout is under 7.5 KB");
+    }
+    {   // the chord and sound pages stay well under the display chip's limit, and the sizes are printed for the design notes
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        auto bytes = [&]()
+        {
+            int total = 0;
+            for (int layer = 0; layer < 6; layer++)
+                if (app.layerVisible(layer))
+                for (int st = 0; st < app.stagesOf(layer); st++) { Canvas c; c.setMeasure(&gfx); app.draw(layer, st, c); total += c.estimatedBytes(); }
+            return total;
+        };
+        struct Row { const char* name; int bytes; };
+        Row rows[8];
+        int n = 0;
+        app.key(kNote); hal.advance(app, 2000); rows[n++] = Row{ "Chords 1", bytes() };
+        app.key(kB7); hal.advance(app, 2000); rows[n++] = Row{ "Chords 2", bytes() };
+        app.key(kB7); hal.advance(app, 2000); rows[n++] = Row{ "Chords 3", bytes() };
+        app.pad(0, true); hal.advance(app, 2000); rows[n++] = Row{ "Chords 3, a pad held", bytes() };
+        app.pad(0, false);
+        app.key(kInstr); hal.advance(app, 2000); rows[n++] = Row{ "Sound", bytes() };
+        app.key(kB7); hal.advance(app, 2000); rows[n++] = Row{ "Sound, every setting", bytes() };
+        for (int i = 0; i < n; i++)
+        {
+            if (std::getenv("FT_PRINT_COSTS")) std::printf("cost %-24s %5d bytes\n", rows[i].name, rows[i].bytes);
+            CHECK(rows[i].bytes < 7500, "a chord or sound page is under 7.5 KB");
+        }
     }
     {   // waveform bitmaps: one-bit pictures of the loop, drawn once per Part
         FakeHal hal;
