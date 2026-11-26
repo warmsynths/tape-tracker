@@ -31,7 +31,7 @@ Port the data and the small logic from `warmsynths/chroma-chords` (`src/services
 Port:
 - Theory: 12 roots, about 12 chord qualities (maj, min, 7, maj7, m7, m7b5, dim, aug, sus2, sus4, 6, add9, 9), scales and modes, the chords of each degree, and voicings (close, open, spread, inversions). From `buildVoicingNotes`, `SCALE_DEGREE_*`, `QUALITY_INTERVALS`.
 - Chord sets: a small number of ready-made sets ("Lo-fi", "Pop", "Jazz-ish", "Synthwave", "Soul") made from the genre and mood rules, each giving the chords for the 12 pad columns.
-- Next-chord suggestion: the Markov transition weights (`getMarkovTransitionWeight`) boiled down to a small table per set (about 1 to 2 KB in total).
+- Shuffle: the genre and mood weights (from `GENRES`, `getMarkovTransitionWeight`) boiled down to a small table, used to roll the 5 colour chords and the extensions of a set. No next-chord suggestion: the whole set is on the pads, so it has little to add (owner, 2026-11-26).
 
 Leave out: the vibe prompt and AI classifier, the melody engine, Band DNA, the song arranger, storage, sign-in and sync, exports. Estimated flash 8 to 15 KB, no CPU worth counting.
 
@@ -43,12 +43,13 @@ Licence: chroma-chords and circuit-chords are GPL v3. This repo has its own lice
 The Note button opens Chords (design C10). The 48 pads (12 columns by 4 rows) become chord pads for a chosen key, scale and set:
 - 12 columns: the 7 degrees of the scale plus 5 colour chords (borrowed and secondary), in the order of the chosen set.
 - 4 rows: triads, 7ths, 9ths and suspended, open voicings. (Layout to confirm with the owner.)
-- Pad lights: the tonic marked, and the two or three most likely next chords lit after each chord (needs a check of what the pad lights can show: the code has a front and a back layer with a brightness, not obviously colours).
+- Fixed layout: a pad is always the same degree for a key and scale, so playing by muscle memory works. The 7 degree columns never move. Styles (Lo-fi, Pop, Jazz-ish, Synthwave, Soul) change the chord qualities and the 5 colour chords. A Shuffle re-rolls only the colour chords and extensions, with a lock.
+- Pad lights: the tonic marked (needs a check of what the pad lights can show: the code has a front and a back layer with a brightness, not obviously colours).
 - A chord plays through the chosen sound: a sample on a pad slot (3 to 4 of the 8 voices, pitched) or the synth. Chords are recorded from the home screen with Source: Pads, like any pad sound.
 
 ## Order of work
-1. **Chords with samples (no synth yet).** Theory core and sets in `core/ft`, host tests, the Chords page, chord playback through the existing sample voices, recording from the home screen. Delivers the MVP.
-2. **Pad lights and suggest-next.** After the pad-light check.
+1. **Chords with samples (no synth yet).** Theory core and styles in `core/ft`, host tests, the Chords page, chord playback through the existing sample voices, recording from the home screen. Delivers the MVP.
+2. **Styles, Shuffle and pad lights.** After the pad-light check. Later, if wanted: a progression starter that plays a short progression in time while you record.
 3. **CPU measurement on the device.** Build a readout of audio load into Device settings (About) using the stock profiler (needs an empty `/.develop` file on the SD card). Four Parts playing with delay and reverb on, then a 4-voice test synth. This decides the voice count.
 4. **Synth spike:** 4 voices, saw and pulse, filter, ADSR, in the emulator and on the device, feeding the pad bus.
 5. **Juno voice:** sub, high-pass, LFO and PWM, chorus, presets, and the Sound screen (Instr button, design C11).
