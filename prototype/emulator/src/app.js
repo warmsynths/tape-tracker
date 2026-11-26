@@ -171,17 +171,24 @@
 
   // ------------------------------------------------------------------------------------------
   // The device: screen scaling, buttons, jog wheel, pads
-  function press(key) { start().then(() => send({ type: 'key', key })); }
+  function press(key) {
+    start().then(() => {
+      send({ type: 'key', key });
+      // the on-screen Shift button is a latch: it counts for one button, then lets go
+      if (shiftOn && shiftFromClick) { shiftFromClick = false; setShift(false); }
+    });
+  }
   function release(key) { send({ type: 'keyup', key }); }
 
   let shiftOn = false;
+  let shiftFromClick = false;
   function setShift(on) {
     if (shiftOn === on) return;
     shiftOn = on;
     document.getElementById('shift').classList.toggle('on', on);
     send({ type: 'shift', on });
   }
-  document.getElementById('shift').addEventListener('click', () => start().then(() => setShift(!shiftOn)));
+  document.getElementById('shift').addEventListener('click', () => start().then(() => { shiftFromClick = !shiftOn; setShift(!shiftOn); }));
 
   document.getElementById('overlay').addEventListener('click', start);
   document.querySelectorAll('[data-key]').forEach((el) => {

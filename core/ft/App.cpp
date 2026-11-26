@@ -661,6 +661,14 @@ void App::pressRecord()
         return;
     }
     replaceConfirmed = false;
+    // With the chord pads on, Rec records them: the track's source becomes Pads (change it back in Input)
+    if (padsChords && trackSource[t] != Source::Pads)
+    {
+        trackSource[t] = Source::Pads;
+        applySource(Source::Pads);
+        unsaved = true;
+        fmt(noteHint, sizeof noteHint, "Track %d records the chord pads (source: Pads).", t + 1);
+    }
     // A first take at a set tempo starts with a bar of clicks
     const bool firstTake = session.loopFrames() == 0 || (session.partCount() == 1 && session.hasPart(t));
     if (firstTake && set.countBeats() > 0 && set.tempoTenths < 2400)

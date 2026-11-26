@@ -1068,6 +1068,15 @@ int main()
         for (int k = 0; k < 6; k++) { app.pad(0, true); hal.advance(app, 128 * 20); app.pad(0, false); }
         CHECK(hal.vmax <= 100 && hal.vmin >= 65 && hal.vmin < hal.vmax, "humanised velocities vary but stay within a third of the base");
     }
+    {   // Rec with the chord pads on records them
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        app.key(kNote);
+        app.key(kB8);
+        app.key(kRec);
+        CHECK(hal.applied == Source::Pads, "Rec with the chord pads on sets the source to Pads");
+    }
     {   // Shift + Play switches the click; Play alone still plays
         FakeHal hal;
         App app(hal, palette());
