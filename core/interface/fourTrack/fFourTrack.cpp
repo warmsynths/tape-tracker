@@ -60,7 +60,6 @@ static void functSampleRec() { functKey(ft::kSampleRec); } // resample the mix
 static void functSampleLoad() { functKey(ft::kSampleLoad); } // load samples from the card
 static void functNote() { functKey(ft::kNote); } // chords and scale notes on the pads
 static void functInstr() { functKey(ft::kInstr); } // the sound of the chord pads
-static void functSong() { functKey(ft::kSong); } // the Song button switches the click on or off
 static void functEncoder(int16_t value) { FT->application().jog(value); }
 static void functPads(uint8_t pad, uint8_t state, int16_t velo)
 {
@@ -116,7 +115,6 @@ void cFourTrack::start(uint32_t options)
     ip->setButtonObj(interfaceButtonSampleLoad, buttonPress, functSampleLoad);
     ip->setButtonObj(interfaceButtonCopy, buttonPress, functCopy);
     ip->setButtonObj(interfaceButtonDelete, buttonPress, functDelete);
-    ip->setButtonObj(interfaceButtonSong, buttonPress, functSong);
     ip->setButtonObj(interfaceButtonNote, buttonPress, functNote);
     ip->setButtonObj(interfaceButtonInstr, buttonPress, functInstr);
     ip->setButtonObj(interfaceButtonPattern, buttonPress, functPattern);

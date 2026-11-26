@@ -243,7 +243,7 @@
     if (e.repeat || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     if (e.key === 'Shift') { start().then(() => setShift(true)); return; }
     if (e.key === 'Enter' || e.key === 'i') { press(K.Jog); return; }
-    if (e.key === 'c') { press(K.Song); return; }
+    if (e.key === 'c') { start().then(() => { send({ type: 'shift', on: true }); send({ type: 'key', key: K.Play }); send({ type: 'shift', on: shiftOn }); }); return; }
     if (e.key === 'h') { press(K.Pattern); return; }
     if (e.key === 'p') { press(K.Params); return; }
     if (e.key === 'l') { press(K.SamplePlay); return; }

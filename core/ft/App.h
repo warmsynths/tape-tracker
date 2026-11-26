@@ -26,7 +26,7 @@ enum Key
     kPerformance,  // opens Glitch and live effects
     kMaster,       // opens the lo-fi master
     kFile,         // opens Project
-    kSong,         // switches the click (metronome) on or off
+    kSong,         // not used (the click is Shift + Play)
     kPattern,      // back to the main screen from any page
     kParams,       // the track mixer
     kSamplePlay,   // settings of the pad sample

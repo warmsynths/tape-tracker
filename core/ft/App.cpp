@@ -121,6 +121,15 @@ void App::key(int k)
         else refresh(true);
         return;
     }
+    if (k == kPlay && shift && job == Job::None && !fwUpdating && current != Screen::NameEntry && current != Screen::Tempo)
+    {
+        // Shift + Play switches the click (metronome) on or off
+        set.click = !set.click;
+        unsaved = true;
+        lastClickBeat = -1;
+        refresh(true);
+        return;
+    }
     if (noteHint[0] != 0) { noteHint[0] = 0; refresh(true); } // a note in the hint line lasts until the next button
     if ((k == kCopy || k == kDelete) && current != Screen::Main && job == Job::None && !fwUpdating && current != Screen::NameEntry && current != Screen::Tempo)
     {
@@ -226,7 +235,6 @@ void App::key(int k)
             refresh(true);
             break;
         }
-        case kSong: set.click = !set.click; unsaved = true; lastClickBeat = -1; refresh(true); break;
         case kB5: selectTrack(0); break;
         case kB6: selectTrack(1); break;
         case kB7: selectTrack(2); break;

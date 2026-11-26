@@ -978,6 +978,19 @@ int main()
         CHECK(hal.padsOn == 1, "with chord pads off, the pads are the normal pads again");
         app.pad(3, false);
     }
+    {   // Shift + Play switches the click; Play alone still plays
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        CHECK(!app.view().click, "the click starts off");
+        app.setShift(true); app.key(kPlay); app.setShift(false);
+        CHECK(app.view().click, "Shift + Play switches the click on");
+        CHECK(!hal.playing, "and does not start playing");
+        app.key(kSong);
+        CHECK(app.view().click, "the Song button does nothing now");
+        app.setShift(true); app.key(kPlay); app.setShift(false);
+        CHECK(!app.view().click, "Shift + Play switches it off again");
+    }
     {   // sound: patches, knobs, every setting, and keeping them
         FakeHal hal;
         App app(hal, palette());
