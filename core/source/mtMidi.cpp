@@ -6,7 +6,6 @@
 #include "sampleEditor/sampleEditor.h"
 #include "samplePlayback/samplePlayback.h"
 #include "sampleRecorder/sampleRecorder.h"
-#include "songEditor/songEditor.h"
 
 #include "Platform.h"
 #include "TrackerImpl.h"

@@ -20,7 +20,6 @@
 #include "sampleImporter/sampleImporter.h"
 #include "samplePlayback/samplePlayback.h"
 #include "sampleRecorder/sampleRecorder.h"
-#include "songEditor/songEditor.h"
 
 #include "fileManager.h"
 #include "mtConfig.h"
@@ -57,7 +56,7 @@ const hModule Interface::modules[modulesCount] = {
     &sampleImporter,   // 1
     &patternEditor,    // 2
     &samplePlayback,   // 3
-    &songEditor,       // 4
+    nullptr,           // 4 (Song editor removed)
     &instrumentEditor, // 5
     &sampleEditor,     // 6
     &configEditor,     // 7
@@ -255,7 +254,7 @@ void Interface::processStartScreen()
 #ifdef TRACKER_MINI
             initSpecialMiniTrackerButtons();
 #endif
-            activateModule(&patternEditor, 0);
+            activateModule(&fourTrack, 0);
             unmuteAudioOutByKey();
 
 #ifdef TRACKER_MINI
@@ -527,7 +526,7 @@ void Interface::toggleActiveModule(uint8_t state)
 
 bool Interface::isSongScreenActive()
 {
-    return isOnScreenModule(&songEditor);
+    return false;
 }
 
 bool Interface::isPatternScreenActive()
