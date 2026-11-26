@@ -419,6 +419,40 @@ static void pagesAndProjects()
         app.key(kB8);
         CHECK(app.screen() == Screen::Main, "Back goes home");
     }
+    {   // Resample: render the mix into a pad slot
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kSampleRec);
+        app.key(kB1);
+        CHECK(app.popup() == Popup::Message, "resampling with nothing recorded says so");
+        app.key(kB8);
+        app.key(kPattern);
+        recordLoop(hal, app);
+        const uint32_t loop = app.state().loopFrames();
+        app.key(kSampleRec);
+        CHECK(app.screen() == Screen::Resample, "Sample Rec opens Resample");
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        CHECK(!app.pageOverflowed() && app.stagesOf(4) <= 5, "the resample page fits the drawing budget");
+        app.jog(1);
+        app.key(kB1);
+        for (int i = 0; i < 20; i++) { hal.advance(app, 128); }
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        for (int i = 0; i < 4000 && hal.loaded.empty(); i++) hal.advance(app, 128);
+        CHECK(hal.fileSize("/Samples/Resamples/Resample 01.wav") == 44 + loop * 2 * 2, "two loops are written as a WAV");
+        CHECK(hal.loaded.count(0) && hal.loaded[0] == "Resample 01.wav", "the WAV is loaded into the first empty slot");
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        app.key(kB1);
+        for (int i = 0; i < 4000 && hal.loaded.size() < 2; i++) hal.advance(app, 128);
+        CHECK(hal.fileSize("/Samples/Resamples/Resample 02.wav") > 44, "a second resample gets the next name");
+        app.key(kB1);
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Resample, "Back is off while recording");
+        app.key(kB1);
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Main, "Back goes home once the recording is cancelled");
+    }
     {   // the Pattern button is home
         FakeHal hal;
         App app(hal, palette());

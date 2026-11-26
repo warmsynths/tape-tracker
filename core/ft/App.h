@@ -29,12 +29,13 @@ enum Key
     kParams,       // the track mixer
     kSamplePlay,   // settings of the pad sample
     kSampleLoad,   // load samples from the SD card
+    kSampleRec,    // resample the mix into a pad slot
     kKeyCount
 };
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample
 };
 
 enum class Popup : uint8_t
@@ -186,6 +187,23 @@ class App
     uint32_t ldPreviewAt = 0;
     bool ldConfirmed = false;
     int ldAdvance = 0;
+    // C4 Resample: the finished mix, rendered like an export, into a pad slot
+    enum class Rs : uint8_t { Ready, Recording, Saved, Full };
+    void drawResample(class Pen& p);
+    void resampleOpen();
+    void resampleKey(int k);
+    void resampleJog(int delta);
+    void resampleStart();
+    void resampleFinish();
+    void resamplePickName();
+    uint32_t rsFreeBytes() const;
+    Rs rsState = Rs::Ready;
+    int rsLoops = 1, rsSlot = 0;
+    bool rsJogSlot = false, rsNameAuto = true, nameForResample = false;
+    char rsName[17] = "Resample 01";
+    char rsPath[64] = {};
+    int rsLevelL = -60, rsLevelR = -60;
+    uint32_t rsBytesSaved = 0;
     int mxTrack = 0, mxField = 0; // mixer: the column and the control in focus (0 level, 1 pan, 2 tone)
     void drawPopup(class Pen& p);
     void showPopup(Popup kind, int arg = 0);
@@ -275,7 +293,7 @@ class App
     char pendingName[24] = {};
 
     // jobs: saving and loading a project, writing a WAV
-    enum class Job : uint8_t { None, Save, Load, Export, Done };
+    enum class Job : uint8_t { None, Save, Load, Export, Done, Resample };
     Job job = Job::None;
     char jobPath[48] = {};
     uint32_t jobDone = 0, jobTotal = 0, jobStage = 0;

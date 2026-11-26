@@ -71,6 +71,7 @@ void App::buildPage()
         case Screen::Mixer: drawMixer(p); break;
         case Screen::PadSample: drawPadSample(p); break;
         case Screen::Load: drawLoad(p); break;
+        case Screen::Resample: drawResample(p); break;
         default: break;
     }
     if (popupKind != Popup::None)
@@ -493,6 +494,132 @@ void App::drawLoad(Pen& p)
 }
 
 //--------------------------------------------------------------------------------------------
+// C4 Resample (Sample Rec button)
+static int levelPx(int db)
+{
+    const int v = (db + 48) * 772 / 48;
+    return v < 0 ? 0 : (v > 772 ? 772 : v);
+}
+
+void App::drawResample(Pen& p)
+{
+    heading(p, model, "Resample", 41);
+    const uint32_t rate = hal.sampleRate() ? hal.sampleRate() : 44100;
+    const uint32_t loop = session.loopFrames();
+    const uint32_t frames = loop * (uint32_t)rsLoops;
+    uint32_t used = 0, total = 0;
+    hal.sampleMemory(used, total);
+    const uint32_t freeB = rsFreeBytes();
+    Rs st = rsState;
+    if ((st == Rs::Ready || st == Rs::Full)) st = (loop > 0 && frames * 2 > freeB) ? Rs::Full : Rs::Ready;
+    const bool rec = st == Rs::Recording, full = st == Rs::Full, saved = st == Rs::Saved;
+    char b[96];
+    // the state tag next to the title
+    {
+        const char* t = rec ? "RECORDING" : saved ? "SAVED" : full ? "MEMORY FULL" : "READY";
+        const int w = p.width(t, F12) + 6;
+        if (rec)
+        {
+            p.dot(113, 50, 5, pal.rec);
+            p.rect(121, 41, w, 18, pal.rec);
+            p.text(124, 43, t, F12, pal.bg);
+        }
+        else if (saved || full)
+        {
+            p.rect(108, 41, w, 18, saved ? pal.meter : pal.warn);
+            p.text(111, 43, t, F12, pal.bg);
+        }
+        else
+        {
+            p.frame(108, 41, w, 18, pal.dim);
+            p.text(111, 43, t, F12, pal.text);
+        }
+    }
+    // source, slot, name
+    char old[28];
+    const bool used_ = hal.sampleName(rsSlot, old, sizeof old);
+    for (int c = 0; c < 3; c++)
+    {
+        const int x = 14 + c * 258;
+        p.cell(x, 72, 254, 68, c == 1 && !rec, pal.panel);
+        p.text(x + 12, 83, c == 0 ? "Source" : c == 1 ? "To slot" : "Name", F12, pal.dim);
+    }
+    p.text(26, 101, "Mix", F17B, pal.text);
+    p.text(26, 123, "After the lo-fi master", F12, pal.dim);
+    fmt(b, sizeof b, "%d", rsSlot + 1);
+    p.text(284, 101, b, F17B, pal.text);
+    if (used_ && !saved) p.text(284, 123, old, F12, pal.warn);
+    else p.text(284, 123, used_ ? old : "Empty", F12, pal.dim);
+    p.text(542, 101, rsName, F17B, pal.text);
+    p.text(542, 123, "B3 renames", F12, pal.dim);
+    // length
+    p.text(14, 159, "Length", F12, pal.dim);
+    {
+        const uint32_t secT = (uint32_t)((uint64_t)frames * 100 / rate);
+        const uint32_t doneT = (uint32_t)((uint64_t)jobDone * 100 / rate);
+        if (rec) fmt(b, sizeof b, "%u.%02u of %u.%02u s", doneT / 100, doneT % 100, secT / 100, secT % 100);
+        else if (saved)
+        {
+            const uint32_t t10 = rsBytesSaved / 100000;
+            fmt(b, sizeof b, "%u.%02u s - %u.%u MB", secT / 100, secT % 100, t10 / 10, t10 % 10);
+        }
+        else fmt(b, sizeof b, "%d Loop%s - %u.%02u s", rsLoops, rsLoops == 1 ? "" : "s", secT / 100, secT % 100);
+        p.text(14, 177, b, F17B, pal.text);
+    }
+    if (!rec && !saved) p.text(320, 180, rsJogSlot ? "Jog: slot" : "Jog: 1 to 4 Loops", F12, pal.dim);
+    p.rect(14, 206, 772, 6, pal.track);
+    if (rec) p.rect(14, 206, (int)((uint64_t)jobDone * 772 / (jobTotal ? jobTotal : 1)), 6, pal.rec);
+    else if (saved) p.rect(14, 206, 772, 6, pal.text);
+    // level: both channels, from -48 to 0 dB
+    p.text(14, 227, "Level", F12, pal.dim);
+    int dl = -60, dr = -60;
+    if (rec) { dl = rsLevelL; dr = rsLevelR; }
+    else if (!saved && !full && hal.playerPlaying())
+    {
+        for (int t = 0; t < 4; t++) if (session.hasPart(t) && trackDb[t] > dl) dl = dr = trackDb[t];
+    }
+    p.rect(14, 244, 772, 10, pal.track);
+    p.rect(14, 258, 772, 10, pal.track);
+    p.rect(14, 244, levelPx(dl), 10, rec ? pal.rec : pal.meter);
+    p.rect(14, 258, levelPx(dr), 10, rec ? pal.rec : pal.meter);
+    p.rect(690, 240, 1, 32, pal.dim);
+    p.text(696, 277, "-6", F12, pal.dim);
+    // memory
+    p.text(14, 303, "Memory left", F12, pal.dim);
+    {
+        const uint32_t secF = freeB / (rate * 2);
+        char a[16];
+        const uint32_t t1 = freeB / 100000, t2 = total / 100000;
+        if (secF >= 60) fmt(a, sizeof a, "%u min %02u s", secF / 60, secF % 60);
+        else fmt(a, sizeof a, "%u.%u s", secF, (uint32_t)((uint64_t)freeB * 10 / (rate * 2)) % 10);
+        if (full) fmt(b, sizeof b, "%u.%u MB - fits %s", t1 / 10, t1 % 10, a);
+        else fmt(b, sizeof b, "%u.%u of %u.%u MB - fits %s", t1 / 10, t1 % 10, t2 / 10, t2 % 10, a);
+        p.text(14, 321, b, F14, full ? pal.warn : pal.text);
+    }
+    p.rect(14, 346, 772, 6, pal.track);
+    if (total > 0) p.rect(14, 346, full ? 772 : (int)((uint64_t)(total - (freeB < total ? freeB : total)) * 772 / total), 6, full ? pal.warn : pal.text);
+    // hint
+    if (rec) fmt(b, sizeof b, "Recording the mix into slot %d. B1 cancels and keeps nothing.", rsSlot + 1);
+    else if (saved) fmt(b, sizeof b, "Saved to slot %d as %s. It plays on the pads now.", rsSlot + 1, rsName);
+    else if (full)
+    {
+        const uint32_t t = (uint32_t)((uint64_t)loop * 100 / rate);
+        fmt(b, sizeof b, "One Loop needs %u.%02u s. Free memory in Load samples or Memory.", t / 100, t % 100);
+    }
+    else fmt(b, sizeof b, "B1 records the mix from the loop start to the loop end.");
+    p.rect(0, 400, 800, 1, pal.frame);
+    p.text(14, 413, b, F14, full ? pal.warn : pal.text);
+    // buttons: Record or Stop, Slot, Name, Back
+    const char* l[8] = { "", "Slot", "Name", "", "", "", "", "Back" };
+    uint8_t dim = 0;
+    if (rec) dim = (1u << 1) | (1u << 2) | (1u << 7);
+    p.buttons(l, rec ? 1 : 0, -1, dim);
+    const bool b1dim = full;
+    if (rec) { p.rect(17, 455, 10, 10, pal.text); p.text(35, 451, "Cancel", F14, pal.text); }
+    else { if (!b1dim) p.dot(22, 460, 5, pal.rec); p.text(35, 451, "Record", F14, b1dim ? pal.dim : pal.text); }
+}
+
+//--------------------------------------------------------------------------------------------
 // C1 Track mixer (Params button)
 void App::drawMixer(Pen& p)
 {
@@ -730,7 +857,7 @@ void App::drawProject(Pen& p)
 // Rename and Save as: a row of character cells and a picker
 void App::drawNameEntry(Pen& p)
 {
-    heading(p, model, nameForSaveAs ? "Save project as" : "Rename project");
+    heading(p, model, nameForResample ? "Name the sample" : nameForSaveAs ? "Save project as" : "Rename project");
     p.text(14, 70, "Name", F12, pal.dim);
     char b[24];
     fmt(b, sizeof b, "%d of 16", nameCursor + 1);
@@ -765,7 +892,7 @@ void App::drawNameEntry(Pen& p)
     p.rect(0, 297, 800, 1, pal.frame);
     p.text(14, 312, "Saves to", F12, pal.dim);
     char path[48];
-    fmt(path, sizeof path, "SD / FourTrack / Projects / %s", nameEdit);
+    fmt(path, sizeof path, nameForResample ? "SD / Samples / Resamples / %s" : "SD / FourTrack / Projects / %s", nameEdit);
     p.text(14, 330, path, F14, pal.text);
     const char* l[8] = { "Delete", "Space", "", "", "", "", "Cancel", "Save" };
     p.buttons(l);
@@ -975,8 +1102,8 @@ void App::drawPopup(Pen& p)
         case Popup::ReplaceSlot: break; // drawn below
         case Popup::Unsaved: head = "Unsaved changes"; line1 = "This project has changes that are not saved."; line2 = "Save them first?"; b7 = "Don't save"; b8 = "Save"; break;
         case Popup::Message:
-            head = popupArg == 3 ? "Cannot open" : popupArg == 4 ? "Nothing to export" : (popupArg == 1 || popupArg == 5) ? "Memory full" : popupArg == 2 ? "Nothing to undo" : popupArg == 6 ? "Cannot load" : "Notice";
-            line1 = popupArg == 3 ? "This file is not a Four-Track project." : popupArg == 4 ? "Record something first." : popupArg == 1 ? "No room for another Part." : popupArg == 2 ? "There is no earlier take on this track." : popupArg == 5 ? "This sample does not fit in the sample memory." : popupArg == 6 ? "Only 8, 16 and 24 bit PCM WAV files load." : "";
+            head = popupArg == 3 ? "Cannot open" : popupArg == 4 ? "Nothing to export" : (popupArg == 1 || popupArg == 5) ? "Memory full" : popupArg == 2 ? "Nothing to undo" : popupArg == 6 ? "Cannot load" : popupArg == 7 ? "Nothing to resample" : "Notice";
+            line1 = popupArg == 3 ? "This file is not a Four-Track project." : popupArg == 4 ? "Record something first." : popupArg == 1 ? "No room for another Part." : popupArg == 2 ? "There is no earlier take on this track." : popupArg == 5 ? "This sample does not fit in the sample memory." : popupArg == 6 ? "Only 8, 16 and 24 bit PCM WAV files load." : popupArg == 7 ? "Record a Part first." : "";
             break;
         default: break;
     }

@@ -250,6 +250,14 @@ bool FourTrackHal::fileWrite(const char* path, const void* data, uint32_t len, b
     ensureFolders();
     char full[64];
     fullPath(path, full, sizeof full);
+    if (path[0] == '/' && !append)
+    {
+        // a file on the card outside FourTrack/: make its folder first
+        char parent[64];
+        snprintf(parent, sizeof parent, "%s", full);
+        char* cut = strrchr(parent, '/');
+        if (cut != nullptr) { *cut = 0; if (!fs->exists(parent)) fs->mkdir(0, parent, true); }
+    }
     if (readHandle != nullptr) { fs->closeFile(readHandle); readHandle = nullptr; }
     if (writeHandle != nullptr && (!append || strcmp(openPath, full) != 0))
     {
@@ -508,6 +516,7 @@ int FourTrackHal::browse(const char* dir, ft::BrowseEntry* out, int max)
 bool FourTrackHal::loadSampleFile(const char* path, int slot)
 {
     if (slot < 0 || slot >= kSampleInstrumentsCount) return false;
+    closeFiles();
     previewFile("", false);
     char folder[128], name[64];
     const char* cut = strrchr(path, '/');

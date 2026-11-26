@@ -206,3 +206,6 @@ Round 5 so far: 16 s tracks, track mixer on Params (level, pan, tone, mute, solo
 
 ## FT33 (not sent)
 Round 5 C2: Sample Load opens Load samples. Browse SD folders and WAV files, preview, choose the slot, Load or Load next, replace asks first, empty folder and no card states. Emulator: a pretend card with a Samples folder (Drums, Keys) and a way to add your own WAV files in the settings drawer; sample memory now 6 MB. Firmware: uses the stock importer and previewer for the loading and preview (waits for the importer to finish); not tried on a device yet, and a risk to check first.
+
+## FT34 (not sent)
+Round 5 C4: Sample Rec opens Resample. It renders the finished mix (tracks, glitch settings as saved, lo-fi master) for 1 to 4 loops into a WAV at `/Samples/Resamples/Resample NN.wav` on the card and loads it into a pad slot with the same loader as Load samples. Differences from the design: it is rendered, not captured live, so it is the same as an Export (held glitch effects and live moves are not in it) and it runs faster than real time; B1 while it runs cancels and keeps nothing; memory is mono 16-bit, so about 0.7 MB for an 8 s loop, not 1.5 MB. Firmware: untested on a device.

@@ -119,7 +119,7 @@ void App::key(int k)
     {
         // Play and Stop work on the pages that sit beside the recorder
         const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
-                               current == Screen::Input || current == Screen::Pads || current == Screen::Memory || current == Screen::Mixer || current == Screen::PadSample || current == Screen::Load ||
+                               current == Screen::Input || current == Screen::Pads || current == Screen::Memory || current == Screen::Mixer || current == Screen::PadSample || current == Screen::Load || current == Screen::Resample ||
                                current == Screen::Settings;
         if (transport && k == kPlay) { togglePlay(); refresh(true); return; }
         if (transport && k == kStop) { pressStop(); refresh(true); return; }
@@ -208,6 +208,7 @@ void App::key(int k)
         case kParams: mxTrack = session.selected(); open(Screen::Mixer); break;
         case kSamplePlay: psField = 0; open(Screen::PadSample); break;
         case kSampleLoad: open(Screen::Load); loadOpen(); break;
+        case kSampleRec: resampleOpen(); open(Screen::Resample); break;
         case kFile: refreshProjectList(); open(Screen::Project); break;
         default: break;
     }

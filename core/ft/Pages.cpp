@@ -84,6 +84,7 @@ void App::open(Screen s)
 void App::back()
 {
     if (current == Screen::Load) loadStopPreview();
+    if (job == Job::Resample) { job = Job::None; rsState = Rs::Ready; }
     if (auditioning)
     {
         auditioning = false;
@@ -250,6 +251,7 @@ void App::keyScreen(int k)
             for (int i = 0; i < 48; i++) padModeKeys[i] = padsKeysMode;
             break;
         case Screen::Load: loadKey(k); break;
+        case Screen::Resample: resampleKey(k); break;
         case Screen::Glitch: glitchKey(k); break;
         case Screen::Master: masterKey(k); break;
         case Screen::Input:
@@ -386,6 +388,7 @@ void App::jogScreen(int delta)
         }
         case Screen::PadSample: psChange(delta); break;
         case Screen::Load: loadJog(delta); break;
+        case Screen::Resample: resampleJog(delta); break;
         case Screen::Master: masterJog(delta); break;
         case Screen::Input:
         {
@@ -731,13 +734,21 @@ void App::nameKey(int k)
         case kB2:
             if (len < 16) { for (int i = len; i >= nameCursor; i--) nameEdit[i + 1] = nameEdit[i]; nameEdit[nameCursor] = ' '; nameCursor = clampi(nameCursor + 1, 0, 15); }
             break;
-        case kB7: open(Screen::Project); return;
+        case kB7: if (nameForResample) { nameForResample = false; open(Screen::Resample); } else open(Screen::Project); return;
         case kB8:
         {
             int e = 0;
             while (nameEdit[e] != 0) e++;
             while (e > 0 && nameEdit[e - 1] == ' ') nameEdit[--e] = 0;
             if (e == 0) break;
+            if (nameForResample)
+            {
+                fmt(rsName, sizeof(rsName), "%s", nameEdit);
+                rsNameAuto = false;
+                nameForResample = false;
+                open(Screen::Resample);
+                return;
+            }
             fmt(projectName, sizeof(projectName), "%s", nameEdit);
             unsaved = true;
             if (nameForSaveAs) { open(Screen::Project); startSave(); }
@@ -911,8 +922,9 @@ uint32_t App::partOffset(int track) const
 void App::serviceJob()
 {
     if (job == Job::None || job == Job::Done) return;
-    if (job == Job::Export)
+    if (job == Job::Export || job == Job::Resample)
     {
+        const char* outFile = job == Job::Export ? exportFile : rsPath;
         constexpr int kChunk = 1024;
         float l[kChunk], r[kChunk];
         int16_t out[kChunk];
@@ -921,18 +933,32 @@ void App::serviceJob()
             const uint32_t n = (jobTotal - jobDone) < (uint32_t)kChunk ? (jobTotal - jobDone) : (uint32_t)kChunk;
             exportBank.render(jobDone % exportBank.loop, (int)n, l, r);
             exportLofi.process(l, r, (int)n, hal.sampleRate());
+            float pl = 0, pr = 0;
             for (uint32_t i = 0; i < n; i++)
             {
+                const float al = l[i] < 0 ? -l[i] : l[i], ar = r[i] < 0 ? -r[i] : r[i];
+                if (al > pl) pl = al;
+                if (ar > pr) pr = ar;
                 float m = (l[i] + r[i]) * 0.5f;
                 if (m > 1.0f) m = 1.0f;
                 if (m < -1.0f) m = -1.0f;
                 out[i] = (int16_t)(m * 32767.0f);
             }
-            hal.fileWrite(exportFile, out, n * 2, true);
+            hal.fileWrite(outFile, out, n * 2, true);
             jobDone += n;
+            if (job == Job::Resample)
+            {
+                const int dl = pl > 0.0001f ? ampToDb(pl) : -60, dr = pr > 0.0001f ? ampToDb(pr) : -60;
+                rsLevelL = dl > rsLevelL ? dl : rsLevelL - 4;
+                rsLevelR = dr > rsLevelR ? dr : rsLevelR - 4;
+            }
         }
         exportPercent = (int)((uint64_t)jobDone * 100 / (jobTotal ? jobTotal : 1));
-        if (jobDone >= jobTotal) job = Job::Done;
+        if (jobDone >= jobTotal)
+        {
+            if (job == Job::Resample) resampleFinish();
+            else job = Job::Done;
+        }
         redraw[4] = true;
         return;
     }
@@ -1204,5 +1230,109 @@ void App::loadKey(int k)
 void App::loadJog(int delta)
 {
     loadSelect(ldSel + (delta > 0 ? kLdRows : -kLdRows));
+}
+
+//--------------------------------------------------------------------------------------------
+// C4 Resample (Sample Rec button): the mix, after the lo-fi master, rendered into a pad slot
+
+uint32_t App::rsFreeBytes() const
+{
+    uint32_t used = 0, total = 0;
+    hal.sampleMemory(used, total);
+    PadSample was;
+    const uint32_t freed = hal.padSample(rsSlot, was) ? was.bytes : 0;
+    const int64_t f = (int64_t)total - (int64_t)used + (int64_t)freed;
+    return f > 0 ? (uint32_t)f : 0;
+}
+
+void App::resamplePickName()
+{
+    if (!rsNameAuto) return;
+    for (int n = 1; n < 100; n++)
+    {
+        char path[64];
+        fmt(rsName, sizeof rsName, "Resample %02d", n);
+        fmt(path, sizeof path, "/Samples/Resamples/%s.wav", rsName);
+        if (hal.fileSize(path) == 0) return;
+    }
+}
+
+void App::resampleOpen()
+{
+    if (job != Job::Resample) rsState = Rs::Ready;
+    rsJogSlot = false;
+    rsLevelL = rsLevelR = -60;
+    rsSlot = 0;
+    for (int i = 0; i < 48; i++)
+    {
+        char n[4];
+        if (!hal.sampleName(i, n, sizeof n)) { rsSlot = i; break; }
+    }
+    resamplePickName();
+}
+
+void App::resampleStart()
+{
+    if (session.loopFrames() == 0) { showPopup(Popup::Message, 7); return; }
+    if (!hal.sdPresent()) { showPopup(Popup::SdMissing); return; }
+    const uint32_t frames = session.loopFrames() * (uint32_t)rsLoops;
+    if (frames * 2 > rsFreeBytes()) { rsState = Rs::Full; return; }
+    if (rsState == Rs::Saved) resamplePickName();
+    fmt(rsPath, sizeof rsPath, "/Samples/Resamples/%s.wav", rsName);
+    exportBank = hal.bank();
+    exportLofi.cfg = hal.lofi().cfg;
+    exportLofi.reset();
+    exportBank.resetState();
+    for (int t = 0; t < 4; t++) { exportBank.data[t] = session.hasPart(t) ? partData[t] : nullptr; for (int s = 0; s < 4; s++) exportBank.cfg[t].held[s] = false; }
+    exportBank.loop = session.loopFrames();
+    jobTotal = frames;
+    uint8_t wh[44];
+    wavHeader(wh, frames * 2, hal.sampleRate());
+    if (!hal.fileWrite(rsPath, wh, 44, false)) { showPopup(Popup::SdMissing); return; }
+    job = Job::Resample;
+    jobDone = 0;
+    exportPercent = 0;
+    rsState = Rs::Recording;
+    rsLevelL = rsLevelR = -60;
+}
+
+void App::resampleFinish()
+{
+    job = Job::None;
+    rsLevelL = rsLevelR = -60;
+    if (!hal.loadSampleFile(rsPath, rsSlot)) { rsState = Rs::Ready; showPopup(Popup::Message, 5); return; }
+    hal.setCurrentSample(rsSlot);
+    rsBytesSaved = jobTotal * 2;
+    rsState = Rs::Saved;
+    unsaved = true;
+}
+
+void App::resampleKey(int k)
+{
+    if (rsState == Rs::Recording)
+    {
+        if (k == kB1) { job = Job::None; rsState = Rs::Ready; }
+        return;
+    }
+    switch (k)
+    {
+        case kB1: resampleStart(); break;
+        case kB2: rsJogSlot = !rsJogSlot; break;
+        case kB3: nameForResample = true; nameForSaveAs = false; fmt(nameEdit, sizeof(nameEdit), "%s", rsName); nameCursor = 0; nameChar = 0; open(Screen::NameEntry); return;
+        case kLeft: resampleJog(-1); break;
+        case kRight: resampleJog(1); break;
+        case kB8:
+        case kSampleRec: back(); return;
+        default: break;
+    }
+}
+
+void App::resampleJog(int delta)
+{
+    if (rsState == Rs::Recording) return;
+    const int d = delta > 0 ? 1 : -1;
+    if (rsJogSlot) rsSlot = clampi(rsSlot + d, 0, 47);
+    else rsLoops = clampi(rsLoops + d, 1, 4);
+    if (rsState == Rs::Saved) rsState = Rs::Ready;
 }
 } // namespace ft
