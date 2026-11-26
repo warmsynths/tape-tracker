@@ -277,8 +277,6 @@ void handleJackControlChange(byte channel, byte number, byte value)
         if (mtInterface.isPerformanceModeScreenActive())
             peformanceModeOnMidiCC(number, value);
 
-        changeMixerOnMidiCC(number, value);
-
         IE->onControlChangeReceive(number, value);
         SP->onControlChangeReceive(number, value);
     }
@@ -293,8 +291,6 @@ void handleUSBControlChange(byte channel, byte number, byte value)
     {
         if (mtInterface.isPerformanceModeScreenActive())
             peformanceModeOnMidiCC(number, value);
-
-        changeMixerOnMidiCC(number, value);
 
         IE->onControlChangeReceive(number, value);
         SP->onControlChangeReceive(number, value);

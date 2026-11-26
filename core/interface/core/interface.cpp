@@ -10,7 +10,6 @@
 
 #include "fourTrack/fourTrack.h"
 #include "instrumentEditor/instrumentEditor.h"
-#include "masterParams/masterParams.h"
 #include "patternEditor/patternEditor.h"
 #include "performanceMode/performanceMode.h"
 #include "projectEditor/projectEditor.h"
@@ -62,7 +61,7 @@ const hModule Interface::modules[modulesCount] = {
     &performanceMode,  // 9
     nullptr,           // 10 (Image viewer removed)
     nullptr,           // 11
-    &masterParams,     // 12
+    nullptr,           // 12 (Master screen removed)
     &fourTrack,        // 13 (test build: opened with the Song button)
 };
 
@@ -538,7 +537,7 @@ bool Interface::isPerformanceModeScreenActive()
 
 bool Interface::isMasterScreenActive()
 {
-    return isOnScreenModule(&masterParams);
+    return false;
 }
 
 bool Interface::isInstrumentParamsScreenActive()
