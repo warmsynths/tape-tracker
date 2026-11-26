@@ -50,6 +50,9 @@ The Note button opens Chords (design C10). The 48 pads (12 columns by 4 rows) be
 - Pad lights: the tonic marked (needs a check of what the pad lights can show: the code has a front and a back layer with a brightness, not obviously colours).
 - A chord plays through the chosen sound: a sample on a pad slot (3 to 4 of the 8 voices, pitched) or the synth. Chords are recorded from the home screen with Source: Pads, like any pad sound.
 
+## Pad lights
+Read from the code (not seen on the hardware): one LED channel per pad on the Original, 32 brightness levels, a shared software blink, front and back layers (the brighter wins). So brightness and timing only, no colours. Ideas, from the owner's question 2026-11-26: tiers (tonic, chord tones, other scale notes), chord-tone follow, hit feedback with a fade and a ripple to the neighbours, strum flashes, a beat pulse as a visual metronome, breathing while recording, a loop playhead along a row. MVP: tiers, hit feedback, beat pulse. Keep updates to about 30 a second and measure the cost of the LED driver traffic.
+
 ## Order of work
 1. **Chords with samples (no synth yet).** Theory core and styles in `core/ft`, host tests, the Chords page, chord playback through the existing sample voices, recording from the home screen. Delivers the MVP.
 2. **Styles, Shuffle and pad lights.** After the pad-light check. Later, if wanted: a progression starter that plays a short progression in time while you record.
