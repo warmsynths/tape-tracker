@@ -42,6 +42,7 @@ static void functSampleEdit() { functKey(ft::kSampleEdit); }
 static void functPerformance() { functKey(ft::kPerformance); }
 static void functMaster() { functKey(ft::kMaster); }
 static void functFile() { functKey(ft::kFile); }
+static void functSong() { functKey(ft::kSong); } // the Song button switches the click on or off
 static void functEncoder(int16_t value) { FT->application().jog(value); }
 static void functPads(uint8_t pad, uint8_t state, int16_t velo)
 {
@@ -95,7 +96,7 @@ void cFourTrack::start(uint32_t options)
     ip->setButtonObj(interfaceButtonFile, buttonPress, functFile);
     ip->setButtonObj(interfaceButtonSampleRec, buttonPress, functSwitchModule);
     ip->setButtonObj(interfaceButtonSampleLoad, buttonPress, functSwitchModule);
-    ip->setButtonObj(interfaceButtonSong, buttonPress, functSwitchModule);
+    ip->setButtonObj(interfaceButtonSong, buttonPress, functSong);
     ip->setButtonObj(interfaceButtonPattern, buttonPress, functSwitchModule);
 
 #ifndef TRACKER_MINI

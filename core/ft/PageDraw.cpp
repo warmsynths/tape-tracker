@@ -366,7 +366,7 @@ void App::drawInput(Pen& p)
     }
     p.rect(0, 213, 800, 1, pal.frame);
     p.text(14, 228, "Monitoring", F12, pal.dim);
-    p.text(14, 246, set.monitorLine ? "On" : "Off", F17B, pal.text);
+    p.text(14, 246, monitorFor(s) ? "On" : "Off", F17B, pal.text);
     p.text(14, 272, "Line starts with monitoring on.", F12, pal.dim);
     p.text(14, 288, "Both mic sources start with it off.", F12, pal.dim);
     const int red = hal.monitorReductionDb();
@@ -381,7 +381,7 @@ void App::drawInput(Pen& p)
     fmt(b, sizeof b, "%d dB", red);
     p.text(656, 332, b, F17, pal.text);
     const char* lab[8] = { "Line", "Mic low", "Mic high", "Monitor", "Pads", "", "", "Done" };
-    p.buttons(lab, (uint8_t)((s == Source::Pads ? 16 : (1u << (int)s)) | (set.monitorLine ? 8 : 0)));
+    p.buttons(lab, (uint8_t)((s == Source::Pads ? 16 : (1u << (int)s)) | (monitorFor(s) ? 8 : 0)));
 }
 
 //--------------------------------------------------------------------------------------------
@@ -480,7 +480,7 @@ void App::drawSettings(Pen& p)
     const Source s = trackSource[session.selected()];
     if (s == Source::Pads) fmt(v[8], 24, "-");
     else fmt(v[8], 24, "+%d dB", hal.gain(s) * (s == Source::Line ? 22 : s == Source::MicLow ? 25 : 44) / 100);
-    fmt(v[9], 24, "%s", set.monitorLine ? "Line on - Mic off" : "Off");
+    fmt(v[9], 24, "Line %s - Mic %s", set.monitorLine ? "on" : "off", set.monitorMic ? "on" : "off");
     for (int i = 0; i < 10; i++)
     {
         if (i == 4) { p.text(14, 212, "This device - every project", F12, pal.dim); p.rect(0, 231, 800, 1, pal.frame); }

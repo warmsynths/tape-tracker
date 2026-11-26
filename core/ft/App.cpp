@@ -74,7 +74,7 @@ void App::enter()
     current = Screen::Main;
     appliedSource = -1;
     applySource(trackSource[session.selected()]);
-    hal.setMonitor(set.monitorLine);
+    hal.setMonitor(monitorFor(trackSource[session.selected()]));
     staticSignature = 0;
     for (int t = 0; t < FourTrackSession::kTracks; t++) waveDirty[t] = true;
     pushBank();
@@ -168,7 +168,16 @@ void App::key(int k)
             break;
         case kPlay:
         case kB3: pressPlay(); break;
-        case kB4: set.monitorLine = !set.monitorLine; hal.setMonitor(set.monitorLine); refresh(true); break;
+        case kB4:
+        {
+            const Source s = trackSource[session.selected()];
+            if (s == Source::Line) set.monitorLine = !set.monitorLine;
+            else if (s != Source::Pads) set.monitorMic = !set.monitorMic;
+            hal.setMonitor(monitorFor(s));
+            refresh(true);
+            break;
+        }
+        case kSong: set.click = !set.click; unsaved = true; lastClickBeat = -1; refresh(true); break;
         case kB5: selectTrack(0); break;
         case kB6: selectTrack(1); break;
         case kB7: selectTrack(2); break;
@@ -241,6 +250,7 @@ void App::applySource(Source source)
     if (appliedSource == (int)source) return;
     appliedSource = (int)source;
     hal.applySource(source);
+    hal.setMonitor(monitorFor(source));
 }
 
 void App::promptMove(int delta)
@@ -372,6 +382,7 @@ void App::pressRecord()
 
 void App::startRecording()
 {
+    lastClickBeat = -1;
     const int t = session.selected();
     // Keep the take that is about to be replaced, so it can be brought back
     if (session.hasPart(t) && session.loopFrames() > 0 && hal.sdPresent())
@@ -640,6 +651,19 @@ void App::servicePartRecording()
 
 void App::serviceClick()
 {
+    if (set.click && session.mode() == FourTrackSession::Mode::RecordingFirst && session.loopFrames() == 0)
+    {
+        // the first take has no loop yet: the click follows the starting tempo, or 120 BPM when it is Free
+        const uint32_t tenths = set.tempoTenths > 0 ? set.tempoTenths : 1200u;
+        const uint32_t beatFrames = (uint32_t)((uint64_t)hal.sampleRate() * 600 / tenths);
+        const int idx = beatFrames > 0 ? (int)(hal.recordLength() / beatFrames) : 0;
+        if (idx != lastClickBeat)
+        {
+            lastClickBeat = idx;
+            hal.click(idx % 4 == 0);
+        }
+        return;
+    }
     if (!set.click || !hal.playerPlaying() || session.bars() <= 0 || session.loopFrames() == 0) return;
     const uint32_t beat = session.loopFrames() / ((uint32_t)session.bars() * 4);
     if (beat == 0) return;
@@ -787,7 +811,8 @@ void App::fillView()
         fmt(v.bars, sizeof(v.bars), "?");
     }
     fmt(v.input, sizeof(v.input), "%s", sourceName(trackSource[session.selected()]));
-    v.monitor = (trackSource[session.selected()] == Source::Line) && set.monitorLine;
+    v.monitor = monitorFor(trackSource[session.selected()]);
+    v.click = set.click;
     {
         float l = 0.0f, r = 0.0f;
         hal.inputLevels(l, r);

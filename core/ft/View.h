@@ -54,6 +54,7 @@ struct View
     char inputLevels[20];
     char fb[12]; // feedback protection, for example FB -6 dB; empty when it is not acting
     bool monitor;
+    bool click;   // the metronome is on
     char status[20];
     uint8_t statusKind; // 0 stopped, 1 playing, 2 recording, 3 armed
     char statusNote[24];

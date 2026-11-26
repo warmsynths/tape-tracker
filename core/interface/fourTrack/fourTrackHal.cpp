@@ -86,7 +86,7 @@ void FourTrackHal::applySource(ft::Source source)
                                                            : mtProject.values.gainMicHigh * 44.0f / 100.0f);
             micTimer = 0;
             micUnmutePending = true;
-            engine.forceLineInStreamVolume(0);
+            engine.forceLineInStreamVolume(monitorOn ? DEFAULT_LINE_IN_VOLUME : 0);
             break;
         case ft::Source::Pads:
             // Records the pads, not the input: do not hear the line input meanwhile.
@@ -207,7 +207,7 @@ void FourTrackHal::setGain(ft::Source source, int percent)
 void FourTrackHal::setMonitor(bool on)
 {
     monitorOn = on;
-    if (current == ft::Source::Line) engine.forceLineInStreamVolume(on ? DEFAULT_LINE_IN_VOLUME : 0);
+    if (current != ft::Source::Pads) engine.forceLineInStreamVolume(on ? DEFAULT_LINE_IN_VOLUME : 0);
 }
 
 void FourTrackHal::click(bool accent) { engine.makeMetronomeTick(accent ? 1 : 0); }

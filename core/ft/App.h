@@ -22,6 +22,7 @@ enum Key
     kPerformance,  // opens Glitch and live effects
     kMaster,       // opens the lo-fi master
     kFile,         // opens Project
+    kSong,         // switches the click (metronome) on or off
     kKeyCount
 };
 
@@ -45,6 +46,7 @@ struct Settings
     uint16_t tempoTenths = 0;  // starting tempo in tenths of a BPM, 0: Free
     bool countIn = true;
     bool monitorLine = true;   // device: monitoring default for line
+    bool monitorMic = false;   // device: monitoring default for the mics
     uint8_t gridIdx = 4;       // project: move and snap grid: 0 Off (1 ms), 1 Bar, 2 1/4, 3 1/8, 4 1/16
     bool snapZero = true;      // project: cut points land on a zero crossing
 };
@@ -104,6 +106,7 @@ class App
     void muteTrack(int track);
     void undoTake();
     void applySource(Source source);
+    bool monitorFor(Source source) const { return source == Source::Line ? set.monitorLine : (source == Source::Pads ? false : set.monitorMic); }
     void startPlayer();
     void syncPlayer();
     void onFirstTakeFinished();

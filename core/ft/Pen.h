@@ -109,6 +109,11 @@ class Pen
             frame(540, 7, width("MON OFF", F12) + 5, 18, p.dim);
             text(542, 9, "MON OFF", F12, p.dim);
         }
+        if (v.click)
+        {
+            rect(610, 7, width("CLICK", F12) + 11, 18, p.meter);
+            text(615, 9, "CLICK", F12, p.bg);
+        }
         if (v.fb[0] != 0)
         {
             rect(716, 7, width(v.fb, F12) + 12, 18, p.warn);

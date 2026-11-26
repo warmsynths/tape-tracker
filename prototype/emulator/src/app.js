@@ -8,7 +8,7 @@
   const WORKLET = document.getElementById('worklet-src').textContent;
 
   // Key ids, same order as core/ft/App.h
-  const K = { B1: 0, B2: 1, B3: 2, B4: 3, B5: 4, B6: 5, B7: 6, B8: 7, Up: 8, Down: 9, Left: 10, Right: 11, Rec: 12, Play: 13, Stop: 14, Jog: 15, Sample: 16, Perf: 17, Master: 18, File: 19 };
+  const K = { B1: 0, B2: 1, B3: 2, B4: 3, B5: 4, B6: 5, B7: 6, B8: 7, Up: 8, Down: 9, Left: 10, Right: 11, Rec: 12, Play: 13, Stop: 14, Jog: 15, Sample: 16, Perf: 17, Master: 18, File: 19, Song: 20 };
 
   // Colours, in the order of the Palette in core/ft/Gfx.h: bg, top, topText, frame, text, dim,
   // cell, sel, panel, rec, meter, track, wave, waveBg, waveOff, marker, warn
@@ -122,10 +122,6 @@
   async function setInput(kind) {
     document.querySelectorAll('[name=input]').forEach((r) => (r.checked = r.value === kind));
     if (micSource) { micSource.disconnect(); micSource = null; }
-    // Hearing a microphone through speakers feeds back, so monitoring starts off for it.
-    const mon = document.getElementById('monitor');
-    mon.checked = kind === 'demo';
-    send({ type: 'monitor', on: mon.checked });
     if (kind === 'demo') { send({ type: 'demo', on: true }); return; }
     send({ type: 'demo', on: false });
     if (kind === 'mic') {
@@ -169,7 +165,6 @@
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); turn(e.deltaY > 0 ? 1 : -1); }, { passive: false });
   document.getElementById('jogL').addEventListener('click', () => turn(-1));
   document.getElementById('jogR').addEventListener('click', () => turn(1));
-  document.getElementById('jogPress').addEventListener('click', () => press(K.Jog));
 
   const padGrid = document.getElementById('pads');
   for (let i = 0; i < 48; i++) {
@@ -195,7 +190,8 @@
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     if (e.key === 'Shift') { start().then(() => setShift(true)); return; }
-    if (e.key === 'Enter') { press(K.Jog); return; }
+    if (e.key === 'Enter' || e.key === 'i') { press(K.Jog); return; }
+    if (e.key === 'c') { press(K.Song); return; }
     if (e.key === 'e') { press(K.Sample); return; }
     if (e.key === 'g') { press(K.Perf); return; }
     if (e.key === 'm') { press(K.Master); return; }
@@ -213,7 +209,6 @@
     if (audio.state === 'running') { await audio.suspend(); soundBtn.textContent = 'Sound off (click to turn on)'; }
     else { await audio.resume(); soundBtn.textContent = 'Sound on (click to turn off)'; }
   });
-  document.getElementById('monitor').addEventListener('change', (e) => send({ type: 'monitor', on: e.target.checked }));
   document.getElementById('font').addEventListener('change', (e) => { fontSet = e.target.value; glyphs = {}; if (node) node.port.postMessage({ type: 'init-fonts', advances: advances() }); });
 
   document.getElementById('theme').addEventListener('change', (e) => {

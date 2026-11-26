@@ -21,7 +21,6 @@
       <div class="group">
         <button data-key="Rec" class="rec">Rec</button>
         <button data-key="Play">Play</button>
-        <button data-key="Stop">Stop</button>
       </div>
       <div class="group">
         <button id="shift" type="button" title="Hold the Shift key, or click to latch">Shift</button>
@@ -29,6 +28,8 @@
         <button data-key="Perf" title="Performance: Glitch (G)">Performance</button>
         <button data-key="Master" title="Master: lo-fi (M)">Master</button>
         <button data-key="File" title="File: Project (F)">File</button>
+        <button data-key="Song" title="Song: click on or off (C)">Song</button>
+        <button data-key="Jog" title="Insert (Enter or I)">Insert</button>
       </div>
       <div class="group">
         <div class="arrows">
@@ -37,7 +38,7 @@
           <button data-key="Down">&#9660;</button>
           <button data-key="Right">&#9654;</button>
         </div>
-        <div class="jogwrap"><button id="jogL">&#8634;</button><div id="jog" title="Jog wheel: scroll on it or on the screen"><i></i></div><button id="jogR">&#8635;</button><button id="jogPress" title="Press the jog wheel (Enter). On the Tracker this is the Insert button.">Press</button></div>
+        <div class="jogwrap"><button id="jogL">&#8634;</button><div id="jog" title="Jog wheel: scroll on it or on the screen"><i></i></div><button id="jogR">&#8635;</button></div>
       </div>
     </div>
     <div id="pads" class="pads" aria-label="Pads"></div>
@@ -49,7 +50,6 @@
     <button id="sound" type="button">Sound on (click to turn off)</button>
     <label><input type="radio" name="input" value="demo" checked> Demo instrument (plays only while you record)</label>
     <label><input type="radio" name="input" value="mic"> Microphone</label>
-    <label><input type="checkbox" id="monitor" checked> Hear the input while recording</label>
     <p class="small">Sample rate: <span id="rate">-</span>. Use headphones with the microphone to avoid feedback.</p>
     <p class="small" id="note"></p>
     <h2>Look</h2>
@@ -65,10 +65,11 @@
     <h2>Keys</h2>
     <table class="keys">
       <tr><td>1 to 8</td><td>the eight buttons under the screen</td></tr>
-      <tr><td>R, Space, S</td><td>Rec, Play, Stop</td></tr>
+      <tr><td>R, Space</td><td>Rec, Play (Stop is button 2)</td></tr>
       <tr><td>Arrows</td><td>arrow buttons</td></tr>
       <tr><td>[ ] or scroll</td><td>jog wheel</td></tr>
-      <tr><td>Enter</td><td>press the jog wheel</td></tr>
+      <tr><td>Enter or I</td><td>Insert</td></tr>
+      <tr><td>C</td><td>Song (click on or off)</td></tr>
       <tr><td>Shift (hold)</td><td>Shift</td></tr>
       <tr><td>E, G, M, F</td><td>Sample Edit, Performance, Master, File</td></tr>
     </table>

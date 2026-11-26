@@ -89,7 +89,6 @@ class FourTrackProcessor extends AudioWorkletProcessor {
         this.outR = new Float32Array(mem, this.x.ft_out_r_ptr(), 128);
         this.cmd = new Int32Array(mem, this.x.ft_cmd_ptr(), 4096 * 7);
         this.pool = new Uint8Array(mem, this.x.ft_pool_ptr(), 32768);
-        this.x.ft_set_monitor(0);
         this.ready = true;
         this.port.postMessage({ type: 'ready', sampleRate });
       });

@@ -217,7 +217,7 @@ void App::keyScreen(int k)
             else if (k == kB2) { trackSource[t] = Source::MicLow; applySource(Source::MicLow); }
             else if (k == kB3) { trackSource[t] = Source::MicHigh; applySource(Source::MicHigh); }
             else if (k == kB5) { trackSource[t] = Source::Pads; applySource(Source::Pads); }
-            else if (k == kB4) { set.monitorLine = !set.monitorLine; hal.setMonitor(set.monitorLine); }
+            else if (k == kB4) { const Source s = trackSource[t]; if (s == Source::Line) set.monitorLine = !set.monitorLine; else if (s != Source::Pads) set.monitorMic = !set.monitorMic; hal.setMonitor(monitorFor(s)); }
             else if (k == kB8) { back(); return; }
             else if (k == kUp) jogScreen(1);
             else if (k == kDown) jogScreen(-1);
@@ -554,7 +554,7 @@ void App::settingsJog(int delta)
         case 6: set.roundIdx = (uint8_t)clampi(set.roundIdx + delta, 0, 2); break;
         case 7: trackSource[session.selected()] = (Source)(((int)trackSource[session.selected()] + (delta > 0 ? 1 : 3)) % 4); applySource(trackSource[session.selected()]); break;
         case 8: { const Source s = trackSource[session.selected()]; if (s != Source::Pads) hal.setGain(s, clampi(hal.gain(s) + delta * 5, 0, 100)); break; }
-        case 9: set.monitorLine = !set.monitorLine; hal.setMonitor(set.monitorLine); break;
+        case 9: if (delta > 0) set.monitorLine = !set.monitorLine; else set.monitorMic = !set.monitorMic; hal.setMonitor(monitorFor(trackSource[session.selected()])); break;
         default: break;
     }
     unsaved = true;

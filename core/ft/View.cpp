@@ -118,6 +118,11 @@ void Painter::drawTop()
         frame(540, 7, ow, 18, dim);
         T(542, 9, "MON OFF", kF12, dim);
     }
+    if (v.click)
+    {
+        rect(610, 7, textWidth("CLICK", kF12) + 11, 18, pal.meter);
+        T(615, 9, "CLICK", kF12, pal.bg);
+    }
     if (v.fb[0] != 0)
     {
         const int w = textWidth(v.fb, kF12) + 12;
