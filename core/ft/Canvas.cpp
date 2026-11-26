@@ -93,6 +93,7 @@ void Canvas::replay(int stage, Gfx& g) const
         switch (m.op)
         {
             case kColor: g.color(((uint32_t)pool[m.off] << 16) | ((uint32_t)pool[m.off + 1] << 8) | pool[m.off + 2]); break;
+            case kAlpha: g.alpha(m.a); break;
             case kRect: g.rect(m.a, m.b, m.c, m.d); break;
             case kLine: g.line(m.a, m.b, m.c, m.d); break;
             case kDot: g.dot(m.a, m.b, m.c); break;

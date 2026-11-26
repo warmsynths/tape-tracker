@@ -60,6 +60,7 @@ struct Settings
     bool monitorMic = false;   // device: monitoring default for the mics
     uint8_t gridIdx = 4;       // project: move and snap grid: 0 Off (1 ms), 1 Bar, 2 1/4, 3 1/8, 4 1/16
     bool snapZero = true;      // project: cut points land on a zero crossing
+    uint8_t homeGrid = 2;      // device: lines over the lanes: 0 off, 1 bars, 2 bars and beats, 3 also sixteenths
 };
 
 // The Four-Track application: every screen and everything behind them. No hardware in here: it
@@ -344,6 +345,11 @@ class App
     bool hasUndoTake[FourTrackSession::kTracks]{};
     bool glitchLatched[FourTrackSession::kTracks]{};
     int appliedSource = -1;
+    bool focusUser = false;       // the selected track is open in focus (pressed twice)
+    int liveDone = 0;             // columns of the take being recorded that are final
+    void computeLive(int track);
+    uint32_t blinkAt = 0;
+    bool blinkOn = false;
     bool padsKeysMode = true;
     bool padModeKeys[48];
 

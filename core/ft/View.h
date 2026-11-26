@@ -27,6 +27,8 @@ struct Lane
     char side2[16];    // first take: time left
     uint8_t progress;  // first take: 0..100, 255 when not shown
     bool warn;         // memory warning on the side notes
+    uint8_t liveCount; // columns of the take being recorded (drawn in the record colour)
+    uint8_t live[120];
 };
 
 // The "How many bars?" question shown over the main screen after a first take.
@@ -70,6 +72,13 @@ struct View
     int8_t btnSelected; // -1 none
     uint8_t btnMask;    // buttons shown as on (bit per button), besides the selected one
     uint8_t master;     // overall level, 0..100
+    // Layout: -1 is the overview (four 84 px lanes); 0 to 3 opens that lane to 250 px and shrinks the others to strips
+    int8_t focusLane;
+    uint8_t gridMode;   // 0 off, 1 bars, 2 bars and beats, 3 also sixteenths when they fit
+    bool blink;         // the armed circle
+    uint8_t inL, inR;   // input level 0..100 for the armed lane's meters
+    int8_t waitDb;      // where the wait level tick sits, 0 when not waiting
+    char inputName[12];
     Lane lane[4];
     Prompt prompt;
 };

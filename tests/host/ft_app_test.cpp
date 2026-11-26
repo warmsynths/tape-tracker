@@ -522,6 +522,25 @@ static void pagesAndProjects()
         app.key(kParams);
         CHECK(app.screen() == Screen::Mixer, "Params opens from the pad sample page");
     }
+    {   // the home screen with four Parts stays under the display chip's limit (8172 bytes), overview and focus
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        for (int t = 1; t < 4; t++) { app.key(kB5 + t); app.key(kRec); hal.advance(app, hal.loop * 3); }
+        auto bytes = [&]()
+        {
+            int total = 0;
+            for (int layer = 0; layer < 3; layer++)
+                for (int st = 0; st < app.stagesOf(layer); st++) { Canvas c; c.setMeasure(&gfx); app.draw(layer, st, c); total += c.estimatedBytes(); }
+            return total;
+        };
+        app.key(kB5); hal.advance(app, 2000);
+        CHECK(bytes() < 7500, "the overview with four Parts is under 7.5 KB");
+        app.key(kB5); hal.advance(app, 2000);
+        CHECK(app.view().focusLane == 0 && bytes() < 7500, "the focus layout is under 7.5 KB");
+    }
     {   // the Pattern button is home
         FakeHal hal;
         App app(hal, palette());
@@ -707,10 +726,15 @@ int main()
         CHECK(app.state().mode() == Mode::Idle && app.state().hasPart(1), "the second Part is recorded");
         CHECK(app.state().loopFrames() == hal.loop, "the loop length is unchanged");
 
-        // Same track again cycles its source.
+        // Same track again opens it in focus, and again closes it; Stop closes it too.
+        CHECK(app.view().focusLane == -1, "the overview shows four lanes");
         app.key(kB6);
-        CHECK(hal.applied == Source::MicLow, "pressing the selected track again changes its source");
-        CHECK(std::strcmp(app.view().lane[1].tag, "MIC LOW") == 0, "the tag shows the source");
+        CHECK(app.view().focusLane == 1, "pressing the selected track again opens it in focus");
+        app.key(kB6);
+        CHECK(app.view().focusLane == -1, "and again returns to the overview");
+        app.key(kB6);
+        app.key(kStop);
+        CHECK(app.view().focusLane == -1, "Stop returns to the overview");
 
         // Drawing produces something for every layer and stage.
         int redrawn = 0;

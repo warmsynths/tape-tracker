@@ -215,3 +215,12 @@ Round 5 C5: the Config button opens Device settings instead of the stock Config 
 
 ## FT36 (not sent)
 Fix: a page button (Params, Sample Load, Sample Play, Sample Rec, Config, Sample Edit, Performance, Master, File) now opens its page straight from another page. Before, it worked only from the home screen, so you had to press Pattern first.
+
+## FT37 (not sent)
+Home screen redesign (round 5 design, 4.1), with waveform columns (plan A):
+- Each track has its own colour on its number, header edge, level meter and waveform; the header and lane get a faint tint (10%, 22% on the selected header). Uses a see-through fill (`Gfx::alpha`, the chip's colour alpha): never tried on this firmware before, so check the tints and the dark "ahead of the playhead" shading first.
+- The part of each lane the playhead has not reached is darker (one see-through rectangle per lane, in the live layer); a muted lane is darker still.
+- Two layouts: overview (four 84 px lanes, 60 columns) and focus (the armed, recording or chosen track at 250 px with 120 columns, the others as 28 px strips with 30 columns). Focus opens on arming or recording, and when you press the selected track button again; Stop or the button again closes it. Pressing the selected track no longer changes its source (use Shift+B4 Input setup).
+- Grid lines over the lanes: bars, beats and optionally sixteenths, set in Device settings, Display, Grid. Default Bars and beats.
+- The armed lane shows the live input meters and the Wait level mark; the take being recorded grows as red columns.
+- Home with four Parts is about 7.0 KB by the cost model, under the 8,172 byte limit (a test keeps it under 7.5 KB).

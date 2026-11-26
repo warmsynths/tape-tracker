@@ -22,6 +22,8 @@ class Gfx
     // Draws many equal-width vertical bars with the current colour (a waveform). `heights` are
     // pixel heights, centred on `cy`, bar `i` is at x0 + i * step, `barWidth` wide.
     virtual void bars(int x0, int cy, int step, int barWidth, const uint8_t* heights, int count) = 0;
+    // How see-through the next fills are, 0 to 255. Always put it back to 255 straight after use.
+    virtual void alpha(int /*a*/) {}
 };
 
 // Colour roles used by the screens: the design's 17 roles (docs/design). Filled from the
@@ -45,6 +47,7 @@ struct Palette
     uint32_t waveOff;  // muted or trimmed audio
     uint32_t marker;   // loop region and markers, mute on
     uint32_t warn;     // memory and feedback warnings, unsaved mark, bypass
+    uint32_t t[4];     // the four track colours
 };
 
 // The design places text by the top of its line box; the Tracker's font bitmaps have their own
@@ -60,7 +63,8 @@ inline int textDy(int font)
 inline Palette designPalette()
 {
     return Palette{ 0x15130f, 0x221f19, 0xd3c8ae, 0x3a342a, 0xe6dcc3, 0x91876f, 0x211e18, 0x332e25, 0x1c1a15,
-                    0xc4452e, 0x93a66a, 0x2c2922, 0x8d826c, 0x191712, 0x575043, 0xd8873a, 0xd2a94f };
+                    0xc4452e, 0x93a66a, 0x2c2922, 0x8d826c, 0x191712, 0x575043, 0xd8873a, 0xd2a94f,
+                    { 0xd0a35a, 0x7fa996, 0x8e9fc6, 0xb394c2 } };
 }
 } // namespace ft
 

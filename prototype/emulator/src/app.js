@@ -11,10 +11,10 @@
   const K = { B1: 0, B2: 1, B3: 2, B4: 3, B5: 4, B6: 5, B7: 6, B8: 7, Up: 8, Down: 9, Left: 10, Right: 11, Rec: 12, Play: 13, Stop: 14, Jog: 15, Sample: 16, Perf: 17, Master: 18, File: 19, Song: 20, Pattern: 21, Params: 22, SamplePlay: 23, SampleLoad: 24, SampleRec: 25, Config: 26 };
 
   // Colours, in the order of the Palette in core/ft/Gfx.h: bg, top, topText, frame, text, dim,
-  // cell, sel, panel, rec, meter, track, wave, waveBg, waveOff, marker, warn
+  // cell, sel, panel, rec, meter, track, wave, waveBg, waveOff, marker, warn, t1, t2, t3, t4
   const THEMES = {
-    design: [0x15130f, 0x221f19, 0xd3c8ae, 0x3a342a, 0xe6dcc3, 0x91876f, 0x211e18, 0x332e25, 0x1c1a15, 0xc4452e, 0x93a66a, 0x2c2922, 0x8d826c, 0x191712, 0x575043, 0xd8873a, 0xd2a94f],
-    original: [0x000000, 0x222222, 0xffffff, 0x3f3f3f, 0xffffff, 0x575757, 0x222222, 0x3f3f3f, 0x222222, 0xcd1818, 0x30cb3f, 0x222222, 0x777777, 0x0c0c0c, 0x3f3f3f, 0xd67022, 0xd67022],
+    design: [0x15130f, 0x221f19, 0xd3c8ae, 0x3a342a, 0xe6dcc3, 0x91876f, 0x211e18, 0x332e25, 0x1c1a15, 0xc4452e, 0x93a66a, 0x2c2922, 0x8d826c, 0x191712, 0x575043, 0xd8873a, 0xd2a94f, 0xd0a35a, 0x7fa996, 0x8e9fc6, 0xb394c2],
+    original: [0x000000, 0x222222, 0xffffff, 0x3f3f3f, 0xffffff, 0x575757, 0x222222, 0x3f3f3f, 0x222222, 0xcd1818, 0x30cb3f, 0x222222, 0x777777, 0x0c0c0c, 0x3f3f3f, 0xd67022, 0xd67022, 0xffffff, 0xffffff, 0xffffff, 0xffffff],
   };
   let PALETTE = THEMES.design;
 
@@ -54,6 +54,7 @@
   function advances() { return FONTS[fontSet].map((f) => f.adv); }
 
   function draw(f) {
+    ctx.globalAlpha = 1;
     ctx.fillStyle = css(PALETTE[0]);
     ctx.fillRect(0, 0, 800, 480);
     let color = 0xffffff;
@@ -74,6 +75,7 @@
           ctx.drawImage(g, x, b);
           x += FONTS[fontSet][c].adv[ch & 127];
         }
+      } else if (op === 7) { ctx.globalAlpha = a / 255;
       } else if (op === 6) {
         for (let k = 0; k < n; k++) {
           const h = pool[e + k];

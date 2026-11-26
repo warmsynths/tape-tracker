@@ -30,12 +30,12 @@ float saw(float ph) { return frac(ph) * 2.0f - 1.0f; }
 float triangle(float ph) { const float f = frac(ph); return f < 0.5f ? f * 4.0f - 1.0f : 3.0f - f * 4.0f; }
 
 float g_inL[kBlock], g_inR[kBlock], g_outL[kBlock], g_outR[kBlock];
-uint32_t g_palette[17];
+uint32_t g_palette[21];
 uint8_t g_adv[5][128];
 
 //------------------------------------------------------------------------------------------
 // Commands for the canvas: 7 ints each.
-enum Op { kColor = 1, kRect = 2, kLine = 3, kDot = 4, kText = 5, kBars = 6 };
+enum Op { kColor = 1, kRect = 2, kLine = 3, kDot = 4, kText = 5, kBars = 6, kAlpha = 7 };
 constexpr int kMaxCommands = 4096;
 constexpr int kPoolSize = 32768;
 int32_t g_cmd[kMaxCommands * 7];
@@ -47,6 +47,7 @@ class BufferGfx : public Gfx
 {
   public:
     void color(uint32_t rgb) override { push(kColor, (int)rgb, 0, 0, 0, 0, 0); }
+    void alpha(int a) override { push(kAlpha, a, 0, 0, 0, 0, 0); }
     void rect(int x, int y, int w, int h) override { push(kRect, x, y, w, h, 0, 0); }
     void line(int x0, int y0, int x1, int y1) override { push(kLine, x0, y0, x1, y1, 0, 0); }
     void dot(int x, int y, int radius) override { push(kDot, x, y, radius, 0, 0, 0); }
@@ -517,7 +518,7 @@ App* g_app = nullptr;
 void loadPalette()
 {
     uint32_t* d = (uint32_t*)&g_pal;
-    for (int i = 0; i < 17; i++) d[i] = g_palette[i];
+    for (int i = 0; i < 21; i++) d[i] = g_palette[i];
 }
 
 // A small built-in kit so the pads have real sounds to play without any files.

@@ -30,12 +30,13 @@ class Canvas : public Gfx
     void text(int x, int y, const char* s, int font) override;
     int textWidth(const char* s, int font) override { return measure ? measure->textWidth(s, font) : 0; }
     void bars(int x0, int cy, int step, int bw, const uint8_t* heights, int count) override;
+    void alpha(int a) override { add(kAlpha, a, 0, 0, 0, 0, 4); }
 
     // Text widths come from the real display (or the emulator's font tables).
     void setMeasure(Gfx* g) { measure = g; }
 
   private:
-    enum Op : uint8_t { kColor, kRect, kLine, kDot, kText, kBars };
+    enum Op : uint8_t { kColor, kRect, kLine, kDot, kText, kBars, kAlpha };
     struct Cmd
     {
         Op op;

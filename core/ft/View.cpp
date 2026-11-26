@@ -66,8 +66,17 @@ class Painter
         return x + g.textWidth(s, font);
     }
 
+    void tint(int x, int y, int w, int h, uint32_t color, int a)
+    {
+        g.color(color);
+        g.alpha(a);
+        g.rect(x, y, w, h);
+        g.alpha(255);
+    }
+    void laneGeom(int i, int& y, int& h) const;
+    void columns(const Lane& L, int y, int h, int cols, uint32_t color);
     void drawTop();
-    void drawLane(int index, int y0);
+    void drawLane(int index);
     void drawHint();
     void drawButtons();
     void drawDynamic();
@@ -177,72 +186,140 @@ void Painter::drawHint()
     T(712, 412, v.padsMode, kF12, pal.text);
 }
 
-void Painter::drawLane(int i, int y0)
+// Where a lane sits: the overview has four 84 px lanes; in focus one lane opens to 250 px and the
+// others become 28 px strips, always in track order
+void Painter::laneGeom(int i, int& y, int& h) const
+{
+    if (v.focusLane < 0) { y = kLanesY + i * kLaneH; h = 84; return; }
+    int yy = kLanesY;
+    for (int k = 0; k < i; k++) yy += (k == v.focusLane) ? 252 : 30;
+    y = yy;
+    h = (i == v.focusLane) ? 250 : 28;
+}
+
+// The Part's waveform as columns: 60 in the overview, 120 in focus, 30 in a strip (plan A)
+void Painter::columns(const Lane& L, int y, int h, int cols, uint32_t color)
+{
+    uint8_t heights[120];
+    const int group = 120 / cols;
+    for (int c = 0; c < cols; c++)
+    {
+        int peak = 0;
+        for (int k = 0; k < group; k++) { const int idx = c * group + k; if (idx < L.waveCount && L.wave[idx] > peak) peak = L.wave[idx]; }
+        heights[c] = (uint8_t)(2 + (peak * (h - 4)) / 255);
+    }
+    const int step = 600 / cols;
+    g.color(color);
+    g.bars(kWaveX, y + h / 2, step, step * 4 / 5, heights, cols);
+}
+
+void Painter::drawLane(int i)
 {
     const Lane& L = v.lane[i];
     const uint32_t dim = pal.dim;
+    const uint32_t tc = pal.t[i];
+    int y, h;
+    laneGeom(i, y, h);
+    const bool focus = v.focusLane == i;
+    const bool strip = v.focusLane >= 0 && !focus;
 
-    rect(0, y0, 164, 84, L.selected ? pal.sel : pal.panel);
-    if (L.selected) rect(0, y0, 4, 84, pal.text);
-    rect(168, y0, 604, 84, pal.waveBg);
-    if (L.active && v.statusKind == 3) rect(170, y0, 2, 84, pal.rec); // armed: waiting for the loop start
+    // header and audio area, each with a faint tint of the track colour; the selected header is stronger
+    rect(0, y, 164, h, pal.panel);
+    tint(0, y, 164, h, tc, L.selected ? 56 : 26);
+    rect(0, y, L.selected ? 6 : 3, h, tc);
+    rect(168, y, 604, h, pal.waveBg);
+    tint(168, y, 604, h, tc, 26);
+    if (L.active && v.statusKind == 3) rect(168, y, 3, h, pal.rec); // armed: where recording will begin
 
     // number, name and mute box
-    const uint32_t nameColor = pal.text;
     char num[2] = { (char)('1' + i), 0 };
-    T(14, y0 + 9, num, kF17Bold, nameColor);
-    T(32, y0 + 9, L.name, kF17Bold, nameColor);
-    if (L.muted)
+    const int by = strip ? y + 4 : y + 9;
+    if (strip)
     {
-        rect(134, y0 + 9, 20, 20, pal.marker);
-        T(138, y0 + 11, "M", kF14, pal.bg);
+        T(14, y + 5, num, kF17Bold, tc);
+        T(32, y + 7, L.name, kF14, pal.text);
     }
     else
     {
-        frame(134, y0 + 9, 20, 20, dim);
-        T(138, y0 + 11, "M", kF14, dim);
+        T(14, y + 10, num, kF17Bold, tc);
+        T(32, y + 10, L.name, kF17Bold, pal.text);
+    }
+    if (L.muted)
+    {
+        rect(134, by, 20, 20, pal.marker);
+        T(138, by + 2, "M", kF14, pal.bg);
+    }
+    else
+    {
+        frame(134, by, 20, 20, dim);
+        T(138, by + 2, "M", kF14, dim);
     }
 
-    // tags: source, glitch
-    int tx = 14;
-    if (L.tag[0] != 0)
+    if (!strip)
     {
-        const int tagW = textWidth(L.tag, kF12) + 13;
-        frame(tx, y0 + 36, tagW, 18, dim);
-        T(tx + 7, y0 + 38, L.tag, kF12, pal.text);
-        tx += tagW + 4;
+        // tags: source, glitch
+        int tx = 14;
+        if (L.tag[0] != 0)
+        {
+            const int tagW = textWidth(L.tag, kF12) + 13;
+            frame(tx, y + 36, tagW, 18, dim);
+            T(tx + 7, y + 38, L.tag, kF12, pal.text);
+            tx += tagW + 4;
+        }
+        if (L.glitch)
+        {
+            rect(tx, y + 36, textWidth("GLT", kF12) + 11, 18, pal.meter);
+            T(tx + 5, y + 38, "GLT", kF12, pal.bg);
+        }
+        if (L.info[0] != 0) T(14, y + 59, L.info, kF12, dim);
+        rect(14, y + h - 8, 140, 3, pal.track); // the filled part is in the dynamic layer
     }
-    if (L.glitch)
-    {
-        rect(tx, y0 + 36, textWidth("GLT", kF12) + 11, 18, pal.meter);
-        T(tx + 5, y0 + 38, "GLT", kF12, pal.bg);
-    }
-    if (L.active && v.statusKind == 2) dot(tx + 6, y0 + 45, 5, pal.rec); // recording
-    if (L.info[0] != 0) T(14, y0 + 59, L.info, kF12, dim);
-    rect(14, y0 + 76, 140, 3, pal.track); // the filled part is in the dynamic layer
 
-    // waveform or message
-    if (L.hasPart && L.waveCount > 0)
+    // waveform, or what the lane says
+    if (L.hasPart && !L.active && L.waveCount > 0)
     {
-        uint8_t heights[120];
-        for (int c = 0; c < L.waveCount; c++) heights[c] = (uint8_t)(2 + (L.wave[c] * 82) / 255);
-        g.color(L.muted ? pal.waveOff : pal.wave);
-        g.bars(kWaveX, y0 + 42, 5, 4, heights, L.waveCount); // 120 columns of 5 px
+        columns(L, y, h, strip ? 30 : (focus ? 120 : 60), tc);
+        if (L.muted) tint(168, y, 604, h, 0x000000, 153); // a muted lane is darker still
+    }
+    else if (focus && L.active)
+    {
+        if (v.statusKind == 3)
+        {
+            // armed or waiting: the input meters stand ready
+            T(190, y + 41, L.msg1, kF17Bold, pal.text);
+            char b[24];
+            fmt(b, sizeof b, "Input - %s", v.inputName);
+            T(190, y + 119, b, kF12, dim);
+            rect(190, y + 136, 560, 10, pal.track);
+            rect(190, y + 150, 560, 10, pal.track);
+            rect(680, y + 130, 1, 34, dim);
+            T(686, y + 169, "-6", kF12, dim);
+            if (v.waitDb != 0)
+            {
+                const int wx = 190 + 560 * (v.waitDb + 48) / 48;
+                rect(wx, y + 130, 1, 34, pal.marker);
+                T(wx + 6, y + 169, "Wait level", kF12, dim);
+            }
+        }
+        else if (v.loopFrames == 0)
+        {
+            T(184, y + 11, "First take", kF12, dim);
+            if (L.side1[0] != 0) T(290, y + 30, L.side1, kF12, L.warn ? pal.warn : dim);
+            rect(170, y + 236, 600, 4, pal.track);
+        }
     }
     else if (L.active || L.msg1[0] != 0)
     {
-        if (L.active)
+        if (L.msg1[0] != 0 && L.msg2[0] != 0)
         {
-            T(184, y0 + 12, L.msg1, kF12, dim);
-            if (L.side1[0] != 0) T(368, y0 + 14, L.side1, kF12, L.warn ? pal.warn : dim);
-            if (L.progress != 255 && !L.warn) rect(368, y0 + 40, 360, 4, pal.track);
-            if (L.side2[0] != 0) T(368, y0 + 52, L.side2, L.warn ? kF17Bold : kF12, L.warn ? pal.warn : dim);
+            T(184, y + 22, L.msg1, kF14, pal.text);
+            T(184, y + 46, L.msg2, kF14, dim);
         }
-        else T(184, y0 + 33, L.msg1, kF14, pal.text);
+        else if (L.msg1[0] != 0) T(184, y + 33, L.msg1, kF14, pal.text);
     }
     else if (L.msg2[0] != 0)
     {
-        T(184, y0 + 33, L.msg2, kF14, dim);
+        T(184, y + (strip ? 8 : 33), L.msg2, strip ? kF12 : kF14, dim);
     }
 }
 
@@ -275,27 +352,73 @@ void Painter::drawButtons()
     }
 }
 
+namespace
+{
+int levelX(int db, int width)
+{
+    const int v = (db + 48) * width / 48;
+    return v < 0 ? 0 : (v > width ? width : v);
+}
+} // namespace
+
 void Painter::drawDynamic()
 {
     // position readout in the top bar
     T(362, 7, v.pos, kF17Bold, pal.topText);
 
-    // counters of the lanes being recorded or armed
     for (int i = 0; i < 4; i++)
     {
-        const int y0 = kLanesY + i * kLaneH;
-        if (v.lane[i].active && v.lane[i].msg2[0] != 0) T(184, y0 + 30, v.lane[i].msg2, kF17Bold, pal.text);
-        if (v.lane[i].active && !v.lane[i].warn && v.lane[i].progress != 255 && v.lane[i].progress > 0)
-            rect(368, y0 + 40, 360 * v.lane[i].progress / 100, 4, pal.text);
+        const Lane& L = v.lane[i];
+        int y, h;
+        laneGeom(i, y, h);
+        const bool focus = v.focusLane == i;
+        if (focus && L.active)
+        {
+            if (v.statusKind == 3)
+            {
+                // armed: the headline's second line and the live input meters
+                if (L.msg2[0] != 0) T(190, y + 67, L.msg2, kF14, pal.text);
+                rect(190, y + 136, levelX(v.inL, 560), 10, pal.meter);
+                rect(190, y + 150, levelX(v.inR, 560), 10, pal.meter);
+                const int bx = 190 + 560 * (v.waitDb + 48) / 48;
+                if (v.waitDb != 0) rect(bx, y + 130, 1, 34, pal.marker);
+            }
+            else if (v.loopFrames == 0)
+            {
+                T(184, y + 27, L.msg2, kF17Bold, pal.text);
+                if (L.side2[0] != 0) T(766 - textWidth(L.side2, kF14), y + 27, L.side2, kF14, L.warn ? pal.warn : pal.dim);
+                if (L.progress != 255) rect(170, y + 236, 600 * L.progress / 100, 4, pal.text);
+            }
+            else
+            {
+                char b[48];
+                fmt(b, sizeof b, "Recording one Loop - %s", L.msg2);
+                T(184, y + 11, b, kF14, pal.text);
+            }
+            if (v.statusKind == 2 && L.liveCount > 0)
+            {
+                uint8_t heights[120];
+                for (int c = 0; c < L.liveCount; c++) heights[c] = (uint8_t)(2 + (L.live[c] * 118) / 255);
+                g.color(pal.rec);
+                g.bars(kWaveX, y + 134, 5, 4, heights, L.liveCount);
+            }
+            // the circle by the source tag: red while recording, blinking while armed
+            const int tw = L.tag[0] != 0 ? textWidth(L.tag, kF12) + 13 + 4 : 0;
+            dot(14 + tw + 5, y + 45, 5, (v.statusKind == 2 || v.blink) ? pal.rec : pal.track);
+        }
+        else if (L.active && L.msg2[0] != 0) T(184, y + 30, L.msg2, kF17Bold, pal.text);
     }
 
-    // level bars (red on the lane being recorded)
+    // level bars in the track colour (red on the lane being recorded)
     for (int i = 0; i < 4; i++)
     {
+        int y, h;
+        laneGeom(i, y, h);
+        if (v.focusLane >= 0 && v.focusLane != i) continue;
         const int w = (v.lane[i].meter * 140) / 100;
         if (w <= 0) continue;
-        g.color(v.lane[i].active && v.statusKind == 2 ? pal.rec : pal.meter);
-        g.rect(14, kLanesY + i * kLaneH + 76, w, 3);
+        g.color(v.lane[i].active && v.statusKind == 2 ? pal.rec : pal.t[i]);
+        g.rect(14, y + h - 8, w, 3);
     }
 
     // overall level on the right edge, growing from the bottom
@@ -305,14 +428,61 @@ void Painter::drawDynamic()
         rect(784, 398 - h, 6, h, pal.meter);
     }
 
-    // playhead across all lanes
-    if (v.loopFrames > 0)
+    if (v.loopFrames == 0) return;
+    const uint32_t pos = v.posFrames % v.loopFrames;
+    const int px = kWaveX + (int)(((uint64_t)pos * kWaveW) / v.loopFrames);
+
+    // the part of each lane the playhead has not reached yet is darker: one see-through rectangle each
+    g.color(0x000000);
+    g.alpha(148);
+    for (int i = 0; i < 4; i++)
     {
-        const uint32_t pos = v.posFrames % v.loopFrames;
-        const int px = kWaveX + (int)(((uint64_t)pos * kWaveW) / v.loopFrames);
-        rect(px, 32, 1, 368, pal.text);
-        rect(px - 3, 32, 7, 4, pal.text);
+        if (!v.lane[i].hasPart || v.lane[i].active) continue;
+        int y, h;
+        laneGeom(i, y, h);
+        if (px < 770) g.rect(px, y, 770 - px, h);
     }
+    g.alpha(255);
+
+    // grid over all four lanes: bar lines, fainter beat lines, fainter still sixteenths
+    const int bars = v.barCount;
+    if (v.gridMode > 0 && bars > 0)
+    {
+        const int beats = bars * 4;
+        g.color(pal.text);
+        g.alpha(56);
+        for (int b = 1; b < bars; b++) g.rect(kWaveX + (1200 * b + bars) / (2 * bars), kLanesY, 1, 342);
+        if (v.gridMode >= 2 && beats <= 48)
+        {
+            g.alpha(20);
+            for (int b = 1; b < beats; b++) if (b % 4 != 0) g.rect(kWaveX + (1200 * b + beats) / (2 * beats), kLanesY, 1, 342);
+            if (v.gridMode >= 3 && bars * 16 <= 32)
+            {
+                const int steps = bars * 16;
+                g.alpha(12);
+                for (int b = 1; b < steps; b++) if (b % 4 != 0) g.rect(kWaveX + (1200 * b + steps) / (2 * steps), kLanesY, 1, 342);
+            }
+        }
+        g.alpha(255);
+    }
+
+    // the bar the playhead is in, in the bright colour on the ruler
+    if (bars > 0)
+    {
+        const int step = (bars <= 8) ? 1 : 4;
+        const int cur = (int)(((uint64_t)pos * bars) / v.loopFrames);
+        const int shown = cur - (cur % step);
+        const int bx = kWaveX + (shown * kWaveW) / bars;
+        char n[4];
+        n[0] = (char)('0' + ((shown + 1) / 10));
+        n[1] = (char)('0' + ((shown + 1) % 10));
+        n[2] = 0;
+        T(bx + 4, 34, (shown + 1) >= 10 ? n : n + 1, kF12, pal.text);
+    }
+
+    // playhead across all lanes
+    rect(px, 32, 1, 368, pal.text);
+    rect(px - 3, 32, 7, 4, pal.text);
 }
 
 //--------------------------------------------------------------------------------------------
@@ -411,7 +581,7 @@ void drawLayer(int layer, int stage, const View& view, const Palette& palette, G
     {
         case 0:
             if (stage == 0) p.drawTop();
-            else if (stage >= 1 && stage <= 4) p.drawLane(stage - 1, kLanesY + (stage - 1) * kLaneH);
+            else if (stage >= 1 && stage <= 4) p.drawLane(stage - 1);
             break;
         case 1:
             p.drawDynamic();

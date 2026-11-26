@@ -366,7 +366,7 @@ void App::selectTrack(int track)
 {
     const bool idle = (session.mode() == FourTrackSession::Mode::Idle) && !countingIn;
     if (idle && track == session.selected())
-        trackSource[track] = (Source)(((int)trackSource[track] + 1) % 4);
+        focusUser = !focusUser; // pressing the selected track again opens it in focus, and again closes it
     else
         session.selectTrack(track);
     if (idle) applySource(trackSource[session.selected()]);
@@ -443,6 +443,7 @@ void App::startRecording()
 
 void App::pressStop()
 {
+    focusUser = false; // Stop returns to the overview
     if (countingIn)
     {
         countingIn = false;
@@ -881,6 +882,31 @@ void App::computeWave(int track)
     lane.waveCount = columns;
 }
 
+// The take being recorded, as columns that grow behind the playhead
+void App::computeLive(int track)
+{
+    Lane& L = model.lane[track];
+    const uint32_t rate = hal.sampleRate();
+    const uint32_t loop = session.loopFrames();
+    const bool first = session.mode() == FourTrackSession::Mode::RecordingFirst;
+    const uint32_t span = first ? rate * kMaxTakeSeconds : loop;
+    const uint32_t per = span / 120;
+    if (per == 0) { L.liveCount = 0; return; }
+    const uint32_t len = hal.recordLength();
+    const uint32_t start = first ? takeOffset : 0;
+    const int16_t* d = hal.region(track);
+    int cols = (int)((len > start ? len - start : 0) / per);
+    if (cols > 120) cols = 120;
+    for (int c = liveDone > 1 ? liveDone - 1 : 0; c < cols; c++)
+    {
+        const uint16_t peak = loopPeakBlock(d + start + (uint32_t)c * per, per, 0, (int)per);
+        const int h = (int)(squareRoot((float)peak / 32767.0f) * 255.0f);
+        L.live[c] = (uint8_t)(h > 255 ? 255 : h);
+    }
+    liveDone = cols;
+    L.liveCount = (uint8_t)cols;
+}
+
 void App::fillView()
 {
     const uint32_t rate = hal.sampleRate();
@@ -927,6 +953,22 @@ void App::fillView()
     }
     v.barCount = (uint8_t)session.bars();
     v.loopFrames = loop;
+    v.gridMode = set.homeGrid;
+    {
+        const bool armedNow = recTrack >= 0 && (mode == FourTrackSession::Mode::RecordingFirst || mode == FourTrackSession::Mode::RecordingPart || mode == FourTrackSession::Mode::Armed);
+        v.focusLane = (int8_t)(armedNow ? recTrack : (focusUser ? session.selected() : -1));
+        const uint32_t now = hal.millis();
+        if (now - blinkAt >= 500) { blinkAt = now; blinkOn = !blinkOn; }
+        v.blink = blinkOn;
+        float l = 0, r = 0;
+        hal.inputLevels(l, r);
+        v.inL = (uint8_t)0; v.inR = (uint8_t)0;
+        const int dl = ampToDb(l), dr = ampToDb(r);
+        v.inL = (uint8_t)(dl < -60 ? 0 : dl + 60);
+        v.inR = (uint8_t)(dr < -60 ? 0 : dr + 60);
+        v.waitDb = set.waitSound ? set.waitDb : 0;
+        fmt(v.inputName, sizeof(v.inputName), "%s", sourceName(trackSource[recTrack >= 0 ? recTrack : session.selected()]));
+    }
 
     v.statusNote[0] = 0;
     if (countingIn)
@@ -1025,12 +1067,11 @@ void App::fillView()
         if (L.active && mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
         {
             fmt(L.msg1, sizeof(L.msg1), "Waiting for sound");
-            fmt(L.msg2, sizeof(L.msg2), "%d dB", waitLevelDb);
-            fmt(L.side1, sizeof(L.side1), "Starts at %d dB", (int)set.waitDb);
+            fmt(L.msg2, sizeof(L.msg2), "starts at %d dB, then records up to %d s", (int)set.waitDb, (int)kMaxTakeSeconds);
         }
         else if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
         {
-            fmt(L.msg1, sizeof(L.msg1), "First take - elapsed");
+            fmt(L.msg1, sizeof(L.msg1), "First take");
             const uint32_t took = hal.recordLength() > takeOffset ? hal.recordLength() - takeOffset : 0;
             formatTime(L.msg2, sizeof(L.msg2), took, rate);
             const uint32_t maxFrames = rate * kMaxTakeSeconds;
@@ -1043,11 +1084,11 @@ void App::fillView()
         }
         else if (L.active && mode == FourTrackSession::Mode::Armed)
         {
-            fmt(L.msg1, sizeof(L.msg1), "Waits for the loop start");
+            fmt(L.msg1, sizeof(L.msg1), "Recording starts at the loop start");
             const uint32_t pos = hal.playerPosition();
             const uint32_t toEnd = (loop > pos) ? (loop - pos) : 0;
             const uint32_t tenths = toEnd * 10 / rate;
-            fmt(L.msg2, sizeof(L.msg2), "Starts in %u.%u s", (unsigned)(tenths / 10), (unsigned)(tenths % 10));
+            fmt(L.msg2, sizeof(L.msg2), "in %u.%u s - records one Loop, then stops", (unsigned)(tenths / 10), (unsigned)(tenths % 10));
         }
         else if (L.active && mode == FourTrackSession::Mode::RecordingPart)
         {
@@ -1055,7 +1096,7 @@ void App::fillView()
             const uint32_t pos = hal.playerPosition();
             const int bars = session.bars() > 0 ? session.bars() : 1;
             const uint32_t sixteenths = loop > 0 ? (uint32_t)(((uint64_t)pos * bars * 16) / loop) : 0;
-            fmt(L.msg2, sizeof(L.msg2), "Bar %u.%u of %d", (unsigned)(sixteenths / 16 + 1), (unsigned)((sixteenths % 16) / 4 + 1), bars);
+            fmt(L.msg2, sizeof(L.msg2), "bar %u.%u of %d", (unsigned)(sixteenths / 16 + 1), (unsigned)((sixteenths % 16) / 4 + 1), bars);
         }
         else if (countingIn && t == session.selected())
         {
@@ -1068,6 +1109,10 @@ void App::fillView()
             else fmt(L.msg2, sizeof(L.msg2), "Empty");
         }
     }
+
+    for (int t = 0; t < FourTrackSession::kTracks; t++) v.lane[t].liveCount = 0;
+    if (recTrack >= 0 && (mode == FourTrackSession::Mode::RecordingFirst || mode == FourTrackSession::Mode::RecordingPart) && !waitingSound) computeLive(recTrack);
+    else liveDone = 0;
 
     v.master = 0;
     for (int t = 0; t < FourTrackSession::kTracks; t++) if (v.lane[t].meter > v.master) v.master = v.lane[t].meter;
@@ -1194,6 +1239,9 @@ void App::refresh(bool force)
     sig = hashBytes(sig, &v.monitor, sizeof(v.monitor));
     sig = hashBytes(sig, &v.loopFrames, sizeof(v.loopFrames));
     sig = hashBytes(sig, &v.barCount, sizeof(v.barCount));
+    sig = hashBytes(sig, &v.focusLane, sizeof(v.focusLane));
+    sig = hashBytes(sig, &v.waitDb, sizeof(v.waitDb));
+    sig = hashBytes(sig, v.inputName, sizeof(v.inputName));
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
         const Lane& L = v.lane[t];

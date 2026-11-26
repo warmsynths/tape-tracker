@@ -18,6 +18,7 @@ class DisplayGfx : public ft::Gfx
     }
 
     void color(uint32_t rgb) override { API_COLOR(rgb); }
+    void alpha(int a) override { API_COLOR_A((uint8_t)a); }
     void rect(int x, int y, int w, int h) override
     {
         API_BEGIN(RECTS);

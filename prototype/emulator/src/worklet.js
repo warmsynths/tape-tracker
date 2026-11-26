@@ -105,7 +105,7 @@ class FourTrackProcessor extends AudioWorkletProcessor {
       WebAssembly.instantiate(m.wasm, { host: this.hostImports() }).then(({ instance }) => {
         this.x = instance.exports;
         const mem = this.x.memory.buffer;
-        const pal = new Uint32Array(mem, this.x.ft_palette_ptr(), 17);
+        const pal = new Uint32Array(mem, this.x.ft_palette_ptr(), 21);
         m.palette.forEach((v, i) => (pal[i] = v));
         m.advances.forEach((a, f) => new Uint8Array(mem, this.x.ft_adv_ptr(f), 128).set(a));
         (m.files || []).forEach((f) => this.files.set(f.path, { buf: f.data, len: f.data.length }));
@@ -147,7 +147,7 @@ class FourTrackProcessor extends AudioWorkletProcessor {
     }
     else if (m.type === 'monitor') this.x.ft_set_monitor(m.on ? 1 : 0);
     else if (m.type === 'palette') {
-      const pal = new Uint32Array(this.x.memory.buffer, this.x.ft_palette_ptr(), 17);
+      const pal = new Uint32Array(this.x.memory.buffer, this.x.ft_palette_ptr(), 21);
       m.palette.forEach((v, i) => (pal[i] = v));
       this.x.ft_set_palette();
     }

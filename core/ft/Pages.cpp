@@ -1345,7 +1345,7 @@ void App::resampleJog(int delta)
 
 int App::deviceRowCount(int g) const
 {
-    static const int n[8] = { 3, 1, 1, 1, 1, 4, 2, 2 };
+    static const int n[8] = { 3, 1, 1, 1, 2, 4, 2, 2 };
     return n[g < 0 || g > 7 ? 0 : g];
 }
 
@@ -1386,7 +1386,15 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
         case 1: n = "USB audio"; fmt(value, size, "%s", usb[hal.deviceValue(Dev::UsbAudio) & 3]); h = "Audio over USB: the Tracker's output, a computer's audio in, or both."; break;
         case 2: n = "Line input"; fmt(value, size, "%s", line[hal.deviceValue(Dev::LineInput) % 3]); h = "Stereo uses both line inputs. Mono left or right records one side to both."; break;
         case 3: n = "Volume"; fmt(value, size, "%d", hal.deviceValue(Dev::Volume)); h = "Headphone and output level. Shift + jog moves in larger steps."; break;
-        case 4: n = "Brightness"; fmt(value, size, "%s", bright[hal.deviceValue(Dev::Brightness) % 3]); h = "How bright the screen is."; break;
+        case 4:
+            if (r == 0) { n = "Brightness"; fmt(value, size, "%s", bright[hal.deviceValue(Dev::Brightness) % 3]); h = "How bright the screen is."; }
+            else
+            {
+                static const char* const grids[4] = { "Off", "Bars", "Bars and beats", "With sixteenths" };
+                n = "Grid"; fmt(value, size, "%s", grids[set.homeGrid & 3]);
+                h = "Lines over the lanes on the home screen. Sixteenths show only on short loops.";
+            }
+            break;
         case 5:
             if (r == 0) { n = "Alignment window"; fmt(value, size, "%s", wins[set.windowIdx % 5]); h = "A new Part whose first sound lands this close to the loop start is moved onto it."; }
             else if (r == 1) { n = "Pre-roll"; fmt(value, size, "%s", rolls[set.preRollIdx % 5]); h = "How long before the loop start a Part begins recording, so nothing is missed."; }
@@ -1422,7 +1430,7 @@ void App::deviceChange(int g, int r, int delta)
         case 1: step(Dev::UsbAudio, 0, 3, 1); break;
         case 2: step(Dev::LineInput, 0, 2, 1); break;
         case 3: step(Dev::Volume, 0, 100, shift ? 5 : 1); break;
-        case 4: step(Dev::Brightness, 0, 2, 1); break;
+        case 4: if (r == 0) step(Dev::Brightness, 0, 2, 1); else set.homeGrid = (uint8_t)clampi(set.homeGrid + d, 0, 3); break;
         case 5:
             if (r == 0) set.windowIdx = (uint8_t)clampi(set.windowIdx + d, 0, 4);
             else if (r == 1) set.preRollIdx = (uint8_t)clampi(set.preRollIdx + d, 0, 4);
