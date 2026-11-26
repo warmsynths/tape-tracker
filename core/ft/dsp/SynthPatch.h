@@ -73,6 +73,9 @@ float synthParamGet(const SynthPatch& p, int index);
 void synthParamSet(SynthPatch& p, int index, float value);
 // The setting as a fraction of its range, for a bar (0 to 1)
 float synthParamFraction(const SynthPatch& p, int index);
+// The gain for a synth level in tenths of a dB (0 is 1.0)
+float synthLevelAmp(int db10);
+constexpr int kSynthLevelMinDb10 = -300, kSynthLevelMaxDb10 = 120;
 } // namespace ft
 
 #endif /* FT_SYNTH_PATCH_H_ */

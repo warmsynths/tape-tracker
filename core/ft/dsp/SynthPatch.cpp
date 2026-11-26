@@ -114,6 +114,8 @@ const SynthPatch& synthPreset(int index)
     return kPresets[index < 0 ? 0 : (index >= kPresetCount ? kPresetCount - 1 : index)];
 }
 
+float synthLevelAmp(int db10) { return exp2f_((float)db10 / 10.0f / 6.0206f); }
+
 const char* synthMacroHint(int index)
 {
     static const char* const h[kSynthMacros] = { "Filter opening", "Filter edge", "Fade in", "Fade out", "Detune and sub", "Stereo width", "Grit", "Wobble" };

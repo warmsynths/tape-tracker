@@ -17,6 +17,7 @@ class AudioPlaySynth : public AudioStream
 
     void begin(float sampleRate);
     void setPatch(const ft::SynthPatch& patch);
+    void setLevelDb10(int db10) { levelAmp = ft::synthLevelAmp(db10); }
     void noteOn(int note, int velocity);
     void noteOff(int note);
     void allNotesOff();
@@ -26,6 +27,7 @@ class AudioPlaySynth : public AudioStream
   private:
     ft::Synth synth;
     bool started = false;
+    volatile float levelAmp = 1.0f;
 };
 
 #endif

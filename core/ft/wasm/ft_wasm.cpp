@@ -405,7 +405,9 @@ class EmuHal : public Hal
     Synth synth;
     void synthSetPatch(const SynthPatch& patch) override { synth.setPatch(patch); }
     void synthNote(int note, int velocity, bool on) override { if (on) synth.noteOn(note, velocity); else synth.noteOff(note); }
+    float synthAmp = 1.0f;
     void synthAllOff() override { synth.allNotesOff(); }
+    void synthSetLevelDb10(int db10) override { synthAmp = ft::synthLevelAmp(db10); }
     void sampleNote(int id, int note, int velocity, bool on) override
     {
         if (on)
@@ -448,7 +450,7 @@ class EmuHal : public Hal
         {
             float sl[kBlock], sr[kBlock];
             synth.render(sl, sr, n);
-            for (int i = 0; i < n; i++) { padL[i] += sl[i]; padR[i] += sr[i]; pad[i] += (sl[i] + sr[i]) * 0.5f; }
+            for (int i = 0; i < n; i++) { sl[i] *= synthAmp; sr[i] *= synthAmp; padL[i] += sl[i]; padR[i] += sr[i]; pad[i] += (sl[i] + sr[i]) * 0.5f; }
         }
         for (auto& v : voices)
         {

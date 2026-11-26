@@ -174,6 +174,8 @@ struct FakeHal : Hal
     int vmin = 127, vmax = 0;
     void synthNote(int note, int vel, bool on) override { notesOn += on ? 1 : -1; noteEvents++; if (on) { lastNote = note; if (vel < vmin) vmin = vel; if (vel > vmax) vmax = vel; } }
     void synthAllOff() override { notesOn = 0; }
+    int synthLevel = 0;
+    void synthSetLevelDb10(int db10) override { synthLevel = db10; }
     void sampleNote(int, int, int, bool on) override { sampleNotes += on ? 1 : -1; }
 
     // Let `frames` of audio go by, in blocks of 128, running the application's main loop as it
@@ -1067,6 +1069,25 @@ int main()
         CHECK(app.chordSettings().humanise == 100, "humanise goes to 100");
         for (int k = 0; k < 6; k++) { app.pad(0, true); hal.advance(app, 128 * 20); app.pad(0, false); }
         CHECK(hal.vmax <= 100 && hal.vmin >= 65 && hal.vmin < hal.vmax, "humanised velocities vary but stay within a third of the base");
+    }
+    {   // levels from the home screen; the lo-fi master is opt in
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        CHECK(hal.lofi().cfg.bypass, "the lo-fi master starts bypassed");
+        const int before = hal.bank().cfg[0].levelDb10;
+        app.setShift(true); app.jog(1); app.jog(1); app.jog(-1); app.setShift(false);
+        CHECK(hal.bank().cfg[0].levelDb10 == before + 10, "Shift + Jog changes the selected track's level by 1 dB a click");
+        app.key(kRight); app.key(kRight); app.key(kRight);
+        CHECK(hal.synthLevel == 30, "Right raises the synth level by 1 dB");
+        app.key(kLeft);
+        CHECK(hal.synthLevel == 20, "Left lowers it");
+        hal.advance(app, 100000);
+        FakeHal hal2;
+        hal2.files = hal.files;
+        App app2(hal2, palette());
+        app2.enter();
+        CHECK(hal2.synthLevel == 20, "the synth level is kept");
     }
     {   // Rec with the chord pads on records them
         FakeHal hal;

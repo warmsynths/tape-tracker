@@ -1345,7 +1345,7 @@ void App::drawChords(Pen& p)
     }
     else if (chPage == 2)
     {
-        char v[7][24];
+        char v[8][24];
         fmt(v[0], 24, "%s", Chords::playStyleName(c.playStyle));
         fmt(v[1], 24, "%d%%", c.humanise);
         fmt(v[2], 24, "%d ms", c.strumMs);
@@ -1353,8 +1353,9 @@ void App::drawChords(Pen& p)
         fmt(v[4], 24, "%d oct", c.arpRange);
         fmt(v[5], 24, "%d%%", c.gate);
         fmt(v[6], 24, "%s", c.padVelocity ? "From the pads" : "Fixed");
-        static const char* const names[7] = { "Play style", "Humanise", "Strum speed", "Arp rate", "Arp range", "Arp gate", "Velocity" };
-        for (int i = 0; i < 7; i++)
+        fmt(v[7], 24, "%s%d dB", synthDb10 < 0 ? "-" : "+", (synthDb10 < 0 ? -synthDb10 : synthDb10) / 10);
+        static const char* const names[8] = { "Play style", "Humanise", "Strum speed", "Arp rate", "Arp range", "Arp gate", "Velocity", "Synth level" };
+        for (int i = 0; i < 8; i++)
         {
             const int x = 14 + (i % 4) * 193, y = i < 4 ? 62 : 120;
             p.cell(x, y, 189, 52, i == chField, pal.panel);

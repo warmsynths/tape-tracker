@@ -235,6 +235,15 @@ void App::key(int k)
             refresh(true);
             break;
         }
+        case kLeft:
+        case kRight:
+        {
+            // the level of the synth (the chord pads), from the home screen
+            synthLevelStep(k == kRight ? 1 : -1);
+            fmt(noteHint, sizeof noteHint, "Synth level %s%d dB. Left or Right changes it. Shift + Jog: track level.", synthDb10 < 0 ? "-" : "+", (synthDb10 < 0 ? -synthDb10 : synthDb10) / 10);
+            refresh(true);
+            break;
+        }
         case kB5: selectTrack(0); break;
         case kB6: selectTrack(1); break;
         case kB7: selectTrack(2); break;
@@ -287,6 +296,19 @@ void App::jog(int delta)
     if (moveMode)
     {
         moveStep(session.selected(), delta > 0 ? 1 : -1, shift);
+        return;
+    }
+    if (shift && !actionMenu && session.mode() == FourTrackSession::Mode::Idle)
+    {
+        // Shift + Jog on the home screen: the level of the selected track, 1 dB a click
+        const int t = session.selected();
+        TrackCfg& c = hal.bank().cfg[t];
+        { int v = c.levelDb10 + (delta > 0 ? 10 : -10); c.levelDb10 = (int16_t)(v < -600 ? -600 : v > 60 ? 60 : v); }
+        unsaved = true;
+        const int a = c.levelDb10 < 0 ? -c.levelDb10 : c.levelDb10;
+        if (c.levelDb10 <= -600) fmt(noteHint, sizeof noteHint, "Track %d level off. Shift + Jog changes it.", t + 1);
+        else fmt(noteHint, sizeof noteHint, "Track %d level %s%d dB. Shift + Jog changes it.", t + 1, c.levelDb10 < 0 ? "-" : "+", a / 10);
+        refresh(true);
         return;
     }
     moveSelection(delta > 0 ? 1 : -1);

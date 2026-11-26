@@ -292,3 +292,9 @@ New, and the first firmware with sound that comes from the Tracker rather than a
 - **Timing:** the strum and arpeggio are timed by the application's main loop (a step is on time to within one loop pass). If a strum or arpeggio sounds lumpy on the device, tell me; the fix is to schedule it in the audio block.
 - Flash 560,236 bytes (53.4%).
 
+## FT46 addendum 3: levels, and the lo-fi master is opt in
+- **Found:** a recorded chord loop played about 10 dB louder than the live synth, so melody notes were buried. The cause was the Lo-fi master, on by default: its saturation raises quiet material, and the live pads do not go through it.
+- **The lo-fi master now starts bypassed** (Master page, B1 switches it on). Saved projects keep their own setting; new projects start off.
+- **Home screen levels:** Left and Right change the synth's level (1 dB a click, -30 to +12 dB, saved with the sound settings); Shift + Jog changes the selected track's level (1 dB a click). The hint line shows the value. The synth level is also on the Chords page 3 ("Synth level").
+- Because the loop no longer gets the boost, recorded loops are about 10 dB quieter than before relative to the live synth. Raise a track with Shift + Jog if you want it louder.
+

@@ -188,6 +188,7 @@ void FourTrackHal::synthNote(int note, int velocity, bool on)
     if (on) engine.getSynthPlayer()->noteOn(note, velocity);
     else engine.getSynthPlayer()->noteOff(note);
 }
+void FourTrackHal::synthSetLevelDb10(int db10) { engine.getSynthPlayer()->setLevelDb10(db10); }
 void FourTrackHal::synthAllOff() { engine.getSynthPlayer()->allNotesOff(); }
 void FourTrackHal::sampleNote(int id, int note, int velocity, bool on)
 {

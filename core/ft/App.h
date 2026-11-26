@@ -188,7 +188,9 @@ class App
     void soundJog(int delta);
     void soundAdvKey(int k);
     void soundAdvJog(int delta);
-    void soundApply();            // sends the patch with the knobs applied to the synth
+    void soundApply();
+    void synthLevelStep(int d);   // the synth level from Left and Right on the home screen, and the Chords page
+    int synthDb10 = 0;            // sends the patch with the knobs applied to the synth
     void soundPick(int preset);
     void soundHear(bool on);
     bool soundEdited() const;     // the raw settings differ from the patch

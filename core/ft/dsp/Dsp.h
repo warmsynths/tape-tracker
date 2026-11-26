@@ -110,7 +110,7 @@ class TrackBank
 
 struct LofiCfg
 {
-    bool bypass = false;
+    bool bypass = true;   // the lo-fi master is opt in: it starts bypassed
     bool glueOn = true, satOn = true, wowOn = true, crushOn = false;
     uint8_t glue = 40;      // 0..100
     uint8_t sat = 60;       // 0..100

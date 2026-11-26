@@ -53,9 +53,10 @@ void AudioPlaySynth::update(void)
     }
     float l[AUDIO_BLOCK_SAMPLES], r[AUDIO_BLOCK_SAMPLES];
     synth.render(l, r, AUDIO_BLOCK_SAMPLES);
+    const float amp = levelAmp;
     for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++)
     {
-        float a = l[i] * 32767.0f, b = r[i] * 32767.0f;
+        float a = l[i] * amp * 32767.0f, b = r[i] * amp * 32767.0f;
         if (a > 32767.0f) a = 32767.0f;
         if (a < -32768.0f) a = -32768.0f;
         if (b > 32767.0f) b = 32767.0f;
