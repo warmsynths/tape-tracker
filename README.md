@@ -1,167 +1,128 @@
-# Polyend Tracker Community Edition (CE)
+# Tape Tracker: a four-track recorder with chord pads and a synth for the Original Polyend Tracker
 
-Welcome to the **Polyend Tracker Community Edition** repository!
+This is a fork of Polyend's open firmware ([`polyend/tracker-ce`](https://github.com/polyend/tracker-ce)) that turns the **Original Polyend Tracker** (Kinetis MK66, Cortex-M4F at 180 MHz) into a **four-track looping recorder** with a **chord and scale instrument** built on the 48 pads and a **vintage-style synth**. You play chords on the pads, record them one part at a time, then play a melody over them on the next track.
 
-Built directly from the original Polyend firmware source code, Tracker CE opens up the Polyend Tracker platform to musicians, sound designers, and developers around the world. Whether you are here to flash the latest Community Edition firmware, want to build your own idea on the Tracker, design custom themes and fonts, write Sample Editor plugins, or build new synthesizer engines, we are excited to have you here.
+The stock Pattern, Song and Instrument editors are gone. The Tracker boots straight into the recorder. Everything it does is described below.
 
-This unified codebase powers all three hardware instruments in the Tracker family:
-* **Original Polyend Tracker** (`NXP Kinetis MK66FX1M0`, Cortex-M4F @ 180 MHz)
-* **Polyend Tracker+ & Tracker Mini** (`NXP i.MX RT1051/RT1064`, Cortex-M7 @ 600 MHz)
+![Recording a take from the chord pads](docs/images/home-recording.png)
 
-### What's New:
-See [`CHANGELOG.md`](CHANGELOG.md) for the full list of new features and improvements.
-
-
-## Notice: Official Support, Warranty & Hardware Disclaimer
-
-> **A Quick Note Before Flashing or Modifying Firmware**
->
-> Thanks to the Tracker's isolated bootloader and hardware emergency recovery button (see [Flashing on Hardware & Emergency Recovery](#4-flashing-on-hardware--emergency-recovery)), experimenting with Community Edition builds is very safe. Even if a custom build fails to boot, you can easily re-flash a stable `.ptf` image from your microSD card. That said, we still need to include the standard legal disclaimer just in case:
->
-> * **Provided "AS IS" Without Support Obligation**: While the foundation of this repository was originally developed and released by **Polyend**, the **Polyend Tracker Community Edition (CE)** firmware, source code, and any community-developed modifications or plugins are provided **"AS IS"**, without warranty of any kind, express or implied. **Polyend has no obligation to provide official technical support, maintenance, bug fixes, or customer service** for Community Edition firmware or custom builds.
-> * **Use at Your Own Risk**: Flashing, modifying, or running custom firmware is done at your own discretion and risk. Polyend is not liable for any data loss, project corruption, malfunction, or hardware damage (including "bricking" a device or issues caused by code modifications) arising from the use of this software.
-> * **Out-of-Warranty Repairs Available**: In the unlikely event that something ever goes wrong with your hardware while using custom firmware, it is **not covered under standard warranty**. However, **Polyend is always happy to help get your instrument back up and running through its official out-of-warranty repair service** (standard service, parts, and shipping fees apply. See [How to Contact Polyend Customer Support](https://backstage.polyend.com/t/how-to-contact-the-polyend-customer-support/15510)).
+> **Status:** the first four-track recorder builds were tested on a real Original Tracker (recording, the home screen, waveform bitmaps). Builds since then (Copy and Clear, the removed stock screens, the mixer, the chord pads, the synth, the play styles and the sound controls) have so far only been run in the web emulator and in tests: expect rough edges, and tell me what you find on the device. Nothing has been measured for CPU load with the synth on a real Tracker yet. See [`docs/first-test-build.md`](docs/first-test-build.md) for what each build contains and what to check.
 
 ---
 
-## Repository Structure
+## The workflow
+
+1. **Set up the pads.** Press **Note**. Pick a key, a scale and a style. The pads become chords and scale notes.
+2. **Record the chords.** Press **Rec**. After a count-in, hold chord pads for the first take. The track's source is set to *Pads* for you, so what you play is what is recorded. Stop sets the loop length (how many bars).
+3. **Play over it.** Pick Track 2, press **Rec**: it records one loop in time with the first. Play single notes on the scale pads, or more chords.
+4. **Shape it.** Level, pan and tone per track on **Params**. Copy a Part to another track, clear one, undo a take, glitch a Part, trim it in the Part Editor.
+5. **Keep it.** Save the project to the SD card, export WAV files.
+
+Tempo is either **Free** (the first take sets the loop and the tempo is worked out from its length) or **Set** (takes land on a grid at the tempo you choose). Later Parts always record exactly one loop and are aligned automatically.
+
+---
+
+## Chord pads
+
+The 48 pads (12 columns by 4 rows) are split into regions:
+
+| Region | What it does |
+|---|---|
+| **Left ten columns, top rows** | **Chords.** Each row is one *chord type*: Triad, 6th, 7th, Maj7, 9th, Add9, Add4, Sus2, Sus4, 6/9, 7sus4 or Power. Columns 1 to 7 are the scale's seven chords; columns 8 to 10 are three *colour* chords from outside the key. |
+| **Left ten columns, other rows** | **Notes.** The scale, rising left to right and upward. Modes: *Scale*, *Chord* (the notes of the chord you played last) or *Follow* (the scale, with the last chord's notes marked). |
+| **Right two columns** | **Performance pads**, for the right hand. |
+
+![The chord pads page](docs/images/chords-harmony.png)
+
+- **Theory built in.** 9 scales (Major, Minor, Harmonic and Melodic minor and the modes), 12 keys. The 7th and 9th follow the scale, so ii gives a m7 and V a dominant 7. Chords with notes outside the key (Maj7 on ii, for instance) are shown and lit dimmer, so you can see what leaves the key.
+- **Styles.** Lo-fi, Pop, Jazz-ish, Synthwave and Soul set the row types and three colour chords. **Shuffle** re-rolls the colour chords. You can set every row type and every colour chord yourself on page 2 of the Chords screen.
+- **Performance pads** (held while you play a chord): **Oct +**, **Oct -**, **Invert**, **Open** (spread voicing), **Sus**, **7th**. **Hold** latches the chord so it keeps sounding after you let go. The last pad is the **Style pad** and steps the play style.
+- **Play styles:** Block, Strum down, Strum up, Arpeggio up, down, up-down and random. Strum speed, arpeggio rate (1/4 to 1/32, triplets), range (1 to 3 octaves) and gate are settings. While a loop plays, an arpeggio waits for the loop's grid, so recorded arpeggios sit in time.
+- **Humanise** loosens velocity, timing and note length. **Velocity** can come from the pads.
+- **Pad lights** show the tonic, the colour chords and the chord tones in steps of brightness, flash when a pad is played and fade, and pulse on the beat. (The Tracker's pad LEDs have brightness only, no colour.)
+
+![Feel page: play style, humanise, arpeggio](docs/images/chords-feel.png)
+
+![Chord types and colour chords](docs/images/chords-types.png)
+
+---
+
+## Synth
+
+Six voices built on [Plaits](https://github.com/pichenettes/eurorack) oscillators (Mutable Instruments, MIT) with a 24 dB low-pass filter, two envelopes, an LFO, drive and a stereo ensemble chorus. It plays into the pad bus, so it is recorded exactly like a pad sound.
+
+Press **Instr** for the **Sound** screen: choose one of 12 patches (Warm Pad, Juno Pad, Strings, Brass, Dream Keys, Tine Keys, Organ, Pluck, Bass, Sub Bass, Lead, Square Lead), then tweak it with **eight knobs** (Bright, Reson, Attack, Release, Thick, Chorus, Drive, Motion). **Advanced** opens all 28 raw settings. Hold B1 to hear a patch. Your sound and chord settings are saved on the SD card.
+
+Prefer samples? Set the chord sound to *Sample* and the chords play the sample on the pads, pitched.
+
+![The Sound screen](docs/images/sound.png)
+
+---
+
+## Everything else on the device
+
+- **Four tracks**, always visible, each with its own colour, a waveform drawn as a bitmap, and a live waveform while recording. Parts up to 16 s.
+- **Mixer** (Params): level, pan, tone, mute and solo for each track. Quick keys on the home screen: **Shift + Jog** is the selected track's level, **Left and Right** the synth level, **Shift + Left or Right** the output volume.
+- **Part Editor**: trim, fades, grid and snap to zero crossings, offset, normalise.
+- **Glitch** (Perform): stutter, jump, reverse, crush and more, held or latched per Part.
+- **Lo-fi master**: tape saturation, glue, wow and flutter, bit crush. It is **opt in** (it starts bypassed).
+- **Copy / Delete**: copy a Part to another track, clear a Part, clear all, undo.
+- **Samples**: load WAV files from the SD card onto the pads (Sample Load), set tune, volume, start and end (Sample Play), resample the mix into a pad slot (Sample Rec).
+- **Projects**: save, load, export WAV. Device settings and the firmware updater are on Config.
+
+**Shortcuts.** Shift + Play is the click. B2 before the first take sets the tempo. Shift + B1 loop mode, Shift + B4 input and source, Shift + B5 to B8 mute tracks. The full list is in the emulator's Emulator settings overlay.
+
+---
+
+## Try it without a Tracker: the web emulator
+
+[`prototype/emulator/dist/four-track-emulator.html`](prototype/emulator/dist/four-track-emulator.html): open it in a browser and click once. It runs **the same application code as the firmware**, compiled to WebAssembly, with the Tracker's real fonts, the pad layout and the synth. Keys: **N** Chords, **T** Sound, **1 to 8** the eight buttons, **[ ]** the jog, **R** Rec, **S** Stop, **Space** Play, **H** home, click the pads. Use headphones.
+
+Rebuild it with `python3 prototype/emulator/build.py` (needs clang with the wasm target). Always build with `tools/build-all.sh <number>`: it builds the emulator, runs the tests and builds the firmware from the same sources with the same build id.
+
+---
+
+## Building and flashing
+
+Prerequisites: the [GNU Arm Embedded Toolchain 10.3-2021.10](https://developer.arm.com/downloads/-/gnu-rm) on your `PATH` (or `TOOLCHAIN=/path/to/arm-none-eabi-`), `make`, `python3`, and clang with the wasm32 target for the emulator.
+
+```bash
+tools/build-all.sh 47      # tests + emulator + firmware, one build id
+make original              # or just the Original Tracker firmware
+tests/run.sh               # the host tests only
+```
+
+The firmware is written to `firmware/` as `PolyendTracker_FT<number>_full.ptf`.
+
+**Flash it:** copy the `.ptf` to the `/Firmware/` folder on the Tracker's microSD card (name at most 31 characters, starting `PolyendTrac`), then **Config**, **Firmware**, choose the file and press **B1 Update**.
+
+> **Keep a stock `.ptf` on the card.** The bootloader runs on a separate microcontroller and is never touched by this firmware, so a build that fails to boot can be recovered: put a known-good `.ptf` in `/Firmware/`, insert the card, power on, and press the recessed Reset pinhole on the bottom of the Tracker. **Never change the linker script's flash start address or anything in the bootloader area.**
+
+---
+
+## What is where
 
 ```text
-.
-├── Makefile                # Unified top-level build & version management
-├── version.mk              # Centralized version & build number configuration
-├── CHANGELOG.md            # Release history & feature highlights
-├── CONTRIBUTING.md         # Contribution rules & hardware testing workflow
-├── LICENSE                 # PolyForm Noncommercial 1.0.0 (+ Music Use & MIT for .ptfx SDK)
-├── NOTICE.md               # Third-party open-source attributions
-├── core/                   # Shared Tracker application, audio engine, UI & open synth engines
-├── platforms/
-│   ├── mk66/               # Original Tracker (Kinetis MK66) HAL, drivers & linker scripts
-│   └── imx/                # Tracker+ & Tracker Mini (i.MX RT1051) HAL, drivers & linker scripts
-├── synth/
-│   ├── include/PolySynth/  # PolySynth public headers & Open Synth SDK (synth/include/PolySynth/sdk/)
-│   └── lib/                # Precompiled libPolySynth.a & libPolyDSP.a + LICENSE-PROPRIETARY.txt
-├── util/                   # Shared C++ utility headers & third-party header libraries (ETL, magic_enum)
-├── editor-fx-sdk/          # .ptfx Sample Editor plugin SDK, builder & effects/ sources
-└── docs/                   # User guides, SDK tutorials & architecture documentation
+core/ft/            The four-track application, screens, chord engine and synth glue (shared by the firmware and the emulator)
+core/ft/dsp/        Track playback, lo-fi master, the synth and its patches (Plaits and stmlib are vendored in third_party/)
+core/interface/fourTrack/   The Tracker-specific side: display, pads, audio nodes
+prototype/emulator/ The web emulator
+tests/              Host tests for the engine, the synth and the application (tests/run.sh)
+docs/               Build notes, test checklists, design briefs and research
+  first-test-build.md   what each firmware build contains, and what to check on the device
+  design/               screen limits and the briefs for the design tool
+  plan-synth-and-chords.md   the plan and status of the chord and synth work
+wayfinder/          decisions and open questions (start with map.md)
+firmware/           built firmware images
 ```
 
----
-
-## Guiding Principles of the Community Edition Firmware
-
-This repository prioritizes workflow continuity: our aim is to respect existing muscle memory, introduce features, optimizations and improvements that fit the original vision of the device, while fixing bugs along the way.
-
-If you have ideas for major workflow adjustments or structural changes, please open a [GitHub Discussion](https://github.com/polyend/tracker-ce/discussions) or a topic on the [Polyend Backstage Forum](https://backstage.polyend.com/) first, so we can align on direction together with the community.
-
-For radical experiments or reimagined interfaces, we actively encourage community forks!
+The original Polyend README (themes, `.ptfx` SDK, synth SDK links) is kept as [`docs/upstream-readme.md`](docs/upstream-readme.md). New here? Read [`HANDOVER.md`](HANDOVER.md), [`START-HERE.md`](START-HERE.md) and [`CONTEXT.md`](CONTEXT.md).
 
 ---
 
-## Contributing
+## Credits and licence
 
-We welcome community contributions! ❤️
-
-From bug fixes and workflow improvements to new open-source synth engines and `.ptfx` Sample Editor plugins. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) for our project philosophy, pull request rules, hardware testing workflow, and technical checklist before opening a Pull Request.
-
----
-
-## Building Firmware
-
-### 1. Prerequisites
-* **[GNU Arm Embedded Toolchain `10.3-2021.10`](https://developer.arm.com/downloads/-/gnu-rm)**:
-  * Direct official downloads from Arm:
-    * **Linux (`x86_64`)**: [`gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2`](https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2)
-    * **Linux (`aarch64` / ARM64)**: [`gcc-arm-none-eabi-10.3-2021.10-aarch64-linux.tar.bz2`](https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-aarch64-linux.tar.bz2)
-    * **macOS (`x86_64` / Apple Silicon via Rosetta)**: [`gcc-arm-none-eabi-10.3-2021.10-mac.tar.bz2`](https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-mac.tar.bz2)
-    * **Windows (ZIP)**: [`gcc-arm-none-eabi-10.3-2021.10-win32.zip`](https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-win32.zip)
-  * Ensure `arm-none-eabi-gcc` is on your `PATH`, extract the toolchain into `./agt/10.3/`, or pass `TOOLCHAIN=/path/to/arm-none-eabi-` to `make`.
-* `make` (for building firmware) and `python3` (used by `make ptfx` to package `.ptfx` Sample Editor plugins and by the `make bump-*` version helpers; standard library only).
-
-### 2. Build Commands
-From the repository root:
-
-```bash
-# Build all three devices (Original Tracker, Tracker+, Tracker Mini)
-make all
-
-# Or build a single target:
-make original   # -> build/PolyendTracker_CE_1.0.0.ptf
-make plus       # -> build/TrackerPlus_CE_1.0.0.ptf
-make mini       # -> build/TrackerMini_CE_1.0.0.ptf
-
-# Build reference .ptfx Sample Editor effects into editor-fx-sdk/build/Effects/:
-make ptfx
-
-# Clean all build directories:
-make clean
-```
-
-### 3. Version Management (`version.mk`)
-All firmware version numbers are defined in [`version.mk`](version.mk). The **Build** identifier displayed on the hardware under **Config > Firmware > Build** is automatically populated from the short Git commit hash (`git rev-parse --short=7 HEAD`):
-
-```bash
-# Show current version, Git build hash & output filenames
-make version
-
-# Increment patch version (e.g. 1.0.0 -> 1.0.1)
-make bump-patch TARGET=all        # or TARGET=original | TARGET=plus | TARGET=mini
-
-# Increment minor version (e.g. 1.0.x -> 1.1.0)
-make bump-minor TARGET=all        # or TARGET=original | TARGET=plus | TARGET=mini
-```
-
-### 4. Flashing on Hardware & Emergency Recovery
-
-1. Copy the generated `.ptf` file from `build/` (`PolyendTracker_*.ptf`, `TrackerPlus_*.ptf`, or `TrackerMini_*.ptf`) to the `/Firmware/` folder on your Tracker's microSD card.
-   * *Note*: Keep `.ptf` filenames at **31 characters or fewer** so the Original Tracker's 32-byte `/Firmware/_fwinfo` bootloader buffer remains null-terminated.
-2. On the device, open **Config > Firmware > Firmware update**, select the `.ptf` file, and confirm.
-
-> **Bootloader Resilience & Emergency Firmware Recovery**:
-> * The Polyend Tracker bootloader is isolated from the application firmware:
->   * On the **Original Tracker (`MK66`)**, the bootloader runs on a separate dedicated microcontroller (`kBootloaderTrig`).
->   * On **Tracker+ and Tracker Mini (`IMX`)**, the bootloader resides in a protected region at the bottom of QSPI Flash (`0x60000000`–`0x6002FFFF`), while `.ptf` application builds are linked starting at `0x60030000` (do not modify the flash `ORIGIN` address in the linker scripts).
-> * **Emergency Recovery**: If a custom firmware build ever hangs or fails to boot into the UI, you can always recover your device:
->   1. Place a known-good, stable `.ptf` firmware file for your device inside the `/Firmware/` folder on your microSD card (ideally as the only `.ptf` file in `/Firmware/`).
->   2. Insert the microSD card into your Tracker and power it on.
->   3. Use a paperclip or SIM-eject pin to press the **recessed hardware Reset / Emergency Bootloader pinhole button** (located on the bottom of the Original Tracker / Tracker+, or next to the USB-C port on Tracker Mini). The hardware bootloader will automatically pick up the `.ptf` file from `/Firmware/` and flash it.
-
----
-
-## Documentation & Developer Guides
-
-Full user and developer documentation is available in [`docs/`](docs/Home.md) and on the repository **Wiki**:
-
-* **User Guides**:
-  * [Custom Themes & Fonts](docs/custom_themes_and_fonts.md) + [Live Web Editor](https://polyend.github.io/tracker-theme-editor/) ([`polyend/tracker-theme-editor`](https://github.com/polyend/tracker-theme-editor))
-  * [Wavetable Envelopes, LFOs & Step FX](docs/wavetable_envelopes.md)
-  * [SD Card Image Viewer](docs/image_viewer.md)
-* **Developer & Architecture Guides**:
-  * [Firmware Architecture, Hardware Limits & Developer Gotchas](docs/developer_guide.md)
-  * [Custom Synth Engine SDK](docs/custom_synth_sdk.md)
-  * [Modular Sample Editor Effects & `.ptfx` Developer SDK](docs/modular_effects_system.md)
-
----
-
-## Polyend Tracker Open-Source Ecosystem
-
-This repository is part of a growing open-source ecosystem around the Polyend Tracker family:
-
-* **[`polyend/tracker-theme-editor`](https://github.com/polyend/tracker-theme-editor)** ([Live Web App](https://polyend.github.io/tracker-theme-editor/)): Browser-based visual **Theme & Font Editor** with a hardware screen simulator.
-* **[`polyend/tracker-lib`](https://github.com/polyend/tracker-lib)**: Open-source library and tools for reading, writing, and inspecting Polyend Tracker project (`.mt`), pattern (`.mtp`), and instrument (`.pti`) files.
-* **[Polyend Backstage Forum](https://backstage.polyend.com/)**: Community forum for sharing custom themes, fonts, `.ptfx` plugins, synth engines, and discussing workflows.
-* **[The Tracker Overflow (Discord)](https://discord.com/invite/uEPTnwckJV)**: Unofficial Polyend Tracker Discord where users and developers can join, chat, and find like-minded people.
-
----
-
-## License
-
-* **Firmware Source Code, Headers, Open Synth SDK (`synth/include/`), and Documentation (`docs/`)**: Licensed under the **PolyForm Noncommercial License 1.0.0 with Polyend Additional Permissions** (see [`LICENSE`](LICENSE)).
-  * **Musicians & Creators**: Using the firmware for commercial music production, albums, paid live performances/gigs, sample packs, and monetized streaming/YouTube content is **expressly permitted**.
-  * **No Selling of Firmware or Competing Products**: Selling the firmware or derivative software, or embedding any part of the codebase into competing commercial hardware or software products, is prohibited.
-    
-* **`.ptfx` Sample Editor FX SDK (`editor-fx-sdk/`)**: Licensed under the **MIT License** (see Part 3 of [`LICENSE`](LICENSE)). Developers may freely build, distribute, and sell `.ptfx` plugins.
-  
-* **Precompiled Synth & DSP Libraries (`synth/lib/libPolySynth.a`, `synth/lib/libPolyDSP.a`)**: Provided under the [Polyend Precompiled Synthesizer & DSP Library License](synth/lib/LICENSE-PROPRIETARY.txt) for building firmware targeting authentic Polyend hardware.
-  
-* **Third-Party Components**: See [`NOTICE.md`](NOTICE.md).
+- Built on Polyend's open firmware, **Polyend Tracker Community Edition**. The platform code, audio engine and drivers are theirs; this fork replaces the application on top of them.
+- **Plaits** oscillators, ensemble and overdrive, and **stmlib**, by Emilie Gillet (Mutable Instruments), MIT licence. The chord theory follows the author's [`chroma-chords`](https://github.com/warmsynths/chroma-chords).
+- **Licence:** PolyForm Noncommercial 1.0.0 with Polyend's additional permissions; see [`LICENSE`](LICENSE). Making and selling **music** with the firmware is expressly permitted; selling the firmware or putting it in a competing product is not. Third-party parts: [`NOTICE.md`](NOTICE.md). The precompiled `synth/lib/*.a` libraries keep their own licence.
+- **Provided as is.** This is an unofficial community firmware: no warranty, and **Polyend does not support it**. Flashing custom firmware is at your own risk, though the bootloader is separate and a stock `.ptf` on the card always recovers the device (above).
