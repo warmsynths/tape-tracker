@@ -23,6 +23,7 @@ enum Key
     kMaster,       // opens the lo-fi master
     kFile,         // opens Project
     kSong,         // switches the click (metronome) on or off
+    kPattern,      // back to the main screen from any page
     kKeyCount
 };
 

@@ -233,6 +233,16 @@ static void pagesAndProjects()
         CHECK(app.screen() == Screen::Input, "Shift+B4 opens Input setup");
         app.setShift(false);
     }
+    {   // the Pattern button is home
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kMaster);
+        CHECK(app.screen() == Screen::Master, "Master opens its page");
+        app.key(kPattern);
+        CHECK(app.screen() == Screen::Main, "Pattern goes home");
+    }
     {   // the action menu on Insert
         FakeHal hal;
         App app(hal, palette());

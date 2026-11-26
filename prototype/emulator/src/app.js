@@ -8,7 +8,7 @@
   const WORKLET = document.getElementById('worklet-src').textContent;
 
   // Key ids, same order as core/ft/App.h
-  const K = { B1: 0, B2: 1, B3: 2, B4: 3, B5: 4, B6: 5, B7: 6, B8: 7, Up: 8, Down: 9, Left: 10, Right: 11, Rec: 12, Play: 13, Stop: 14, Jog: 15, Sample: 16, Perf: 17, Master: 18, File: 19, Song: 20 };
+  const K = { B1: 0, B2: 1, B3: 2, B4: 3, B5: 4, B6: 5, B7: 6, B8: 7, Up: 8, Down: 9, Left: 10, Right: 11, Rec: 12, Play: 13, Stop: 14, Jog: 15, Sample: 16, Perf: 17, Master: 18, File: 19, Song: 20, Pattern: 21 };
 
   // Colours, in the order of the Palette in core/ft/Gfx.h: bg, top, topText, frame, text, dim,
   // cell, sel, panel, rec, meter, track, wave, waveBg, waveOff, marker, warn
@@ -163,8 +163,19 @@
   function turn(d) { jogAngle += d * 18; jog.style.transform = 'rotate(' + jogAngle + 'deg)'; start().then(() => send({ type: 'jog', delta: d })); }
   jog.addEventListener('wheel', (e) => { e.preventDefault(); turn(e.deltaY > 0 ? 1 : -1); }, { passive: false });
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); turn(e.deltaY > 0 ? 1 : -1); }, { passive: false });
-  document.getElementById('jogL').addEventListener('click', () => turn(-1));
-  document.getElementById('jogR').addEventListener('click', () => turn(1));
+  // drag round the wheel to turn it
+  let dragAngle = null, dragAcc = 0;
+  jog.addEventListener('pointerdown', (e) => { jog.setPointerCapture(e.pointerId); const r = jog.getBoundingClientRect(); dragAngle = Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)); dragAcc = 0; });
+  jog.addEventListener('pointermove', (e) => {
+    if (dragAngle === null) return;
+    const r = jog.getBoundingClientRect();
+    const a = Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
+    let d = a - dragAngle; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
+    dragAngle = a; dragAcc += d;
+    while (dragAcc > 0.31) { turn(1); dragAcc -= 0.31; }
+    while (dragAcc < -0.31) { turn(-1); dragAcc += 0.31; }
+  });
+  jog.addEventListener('pointerup', () => { dragAngle = null; });
 
   const padGrid = document.getElementById('pads');
   for (let i = 0; i < 48; i++) {
@@ -192,6 +203,7 @@
     if (e.key === 'Shift') { start().then(() => setShift(true)); return; }
     if (e.key === 'Enter' || e.key === 'i') { press(K.Jog); return; }
     if (e.key === 'c') { press(K.Song); return; }
+    if (e.key === 'h') { press(K.Pattern); return; }
     if (e.key === 'e') { press(K.Sample); return; }
     if (e.key === 'g') { press(K.Perf); return; }
     if (e.key === 'm') { press(K.Master); return; }

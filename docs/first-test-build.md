@@ -128,7 +128,7 @@ New: after you stop the first take (or it stops by itself at 24 s), the Tracker 
 Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.
 
 ## Test build FT16: the whole design, one build
-`firmware/PolyendTracker_FT26_full.ptf` (FT16 plus the fixes below; FT26 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
+`firmware/PolyendTracker_FT27_full.ptf` (FT16 plus the fixes below; FT27 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
 
 What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-requirements.md` for each screen):
 - **Main screen:** starting tempo and count-in, click, source per track (line, mic low, mic high, pads), alignment of each Part to the loop (first-note detection and snap, window in Settings), offset, mute, Loop Mode, undo of a replaced take, How many bars.
@@ -177,3 +177,5 @@ FT26:
 - **Song button = metronome.** It switches the click on or off. A CLICK tag shows in the top bar while it is on. The click now also plays during the first take (at the starting tempo, or 120 BPM when the tempo is Free), not only once a loop exists. The same setting is in Settings (Click).
 - **B4 Monitor works for every input.** Line and the mics each remember their own monitoring (Line starts on, mics start off). The top bar shows MON or MON OFF for the selected track's input.
 - **Emulator matches the device's buttons:** Insert, Song, Shift, Sample Edit, Performance, Master, File, Rec, Play, arrows and the jog wheel (which turns but does not push). The extra Stop and jog-press buttons and the monitor checkbox are gone.
+
+FT27: the Pattern button is home: from any page or menu it goes back to the main screen. The emulator's front panel is now laid out like the Original: the screen with the jog wheel beside it, the eight buttons under the screen, the 48 pads, and the 5 x 5 button block (Params, Performance, File, Config, Master / Sample Load, Sample Play, Sample Edit, Sample Rec, Song / Note, Instr, Vol, Fx, Pattern / Play, Copy, Insert, Up, Delete / Rec, Shift, Left, Down, Right). Buttons that belong to stock screens or that the Four-Track screen does not use are shown dimmed and do nothing in the emulator.

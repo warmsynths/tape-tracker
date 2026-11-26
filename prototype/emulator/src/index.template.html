@@ -8,42 +8,55 @@
 </head>
 <body>
 <main>
-  <section class="device">
-    <div class="bezel">
-      <canvas id="screen" width="800" height="480"></canvas>
-      <div id="overlay"><div>Click anywhere to start the emulator<br><small>It records from your microphone or a built-in demo instrument. Use headphones.</small></div></div>
+  <section class="device" aria-label="Polyend Tracker (Original)">
+    <div class="top">
+      <div class="bezel">
+        <canvas id="screen" width="800" height="480"></canvas>
+        <div id="overlay"><div>Click anywhere to start the emulator<br><small>It records from your microphone or a built-in demo instrument. Use headphones.</small></div></div>
+      </div>
+      <div class="wheelcol"><div id="jog" title="Jog wheel: scroll, drag, or use [ and ]"><i></i></div></div>
     </div>
-    <div class="buttons" aria-label="Buttons under the screen">
+    <div class="soft" aria-label="Buttons under the screen">
       <button data-key="B1">1</button><button data-key="B2">2</button><button data-key="B3">3</button><button data-key="B4">4</button>
       <button data-key="B5">5</button><button data-key="B6">6</button><button data-key="B7">7</button><button data-key="B8">8</button>
     </div>
-    <div class="controls">
-      <div class="group">
-        <button data-key="Rec" class="rec">Rec</button>
-        <button data-key="Play">Play</button>
-      </div>
-      <div class="group">
-        <button id="shift" type="button" title="Hold the Shift key, or click to latch">Shift</button>
-        <button data-key="Sample" title="Sample Edit: Part Editor (E)">Sample Edit</button>
-        <button data-key="Perf" title="Performance: Glitch (G)">Performance</button>
-        <button data-key="Master" title="Master: lo-fi (M)">Master</button>
-        <button data-key="File" title="File: Project (F)">File</button>
+    <div class="lower">
+      <div id="pads" class="pads" aria-label="48 pads"></div>
+      <div class="keys5" aria-label="Buttons">
+        <button class="off" title="Stock screen: not in this emulator">Params</button>
+        <button data-key="Perf" title="Performance (G)">Performance</button>
+        <button data-key="File" title="File (F)">File</button>
+        <button class="off" title="Stock screen: not in this emulator">Config</button>
+        <button data-key="Master" title="Master (M)">Master</button>
+
+        <button class="off" title="Stock screen: not in this emulator">Sample Load</button>
+        <button class="off" title="Stock screen: not in this emulator">Sample Play</button>
+        <button data-key="Sample" title="Sample Edit (E)">Sample Edit</button>
+        <button class="off" title="Stock screen: not in this emulator">Sample Rec</button>
         <button data-key="Song" title="Song: click on or off (C)">Song</button>
+
+        <button class="off" title="Stock screen: not in this emulator">Note</button>
+        <button class="off" title="Stock screen: not in this emulator">Instr</button>
+        <button class="off" title="Stock screen: not in this emulator">Vol</button>
+        <button class="off" title="Stock screen: not in this emulator">Fx</button>
+        <button data-key="Pattern" title="Pattern: home (H)">Pattern</button>
+
+        <button data-key="Play" title="Play (Space)">Play</button>
+        <button class="off" title="Not used by the Four-Track screen">Copy</button>
         <button data-key="Jog" title="Insert (Enter or I)">Insert</button>
-      </div>
-      <div class="group">
-        <div class="arrows">
-          <button data-key="Up">&#9650;</button>
-          <button data-key="Left">&#9664;</button>
-          <button data-key="Down">&#9660;</button>
-          <button data-key="Right">&#9654;</button>
-        </div>
-        <div class="jogwrap"><button id="jogL">&#8634;</button><div id="jog" title="Jog wheel: scroll on it or on the screen"><i></i></div><button id="jogR">&#8635;</button></div>
+        <button data-key="Up" title="Up">&#9650;</button>
+        <button class="off" title="Not used by the Four-Track screen">Delete</button>
+
+        <button data-key="Rec" class="rec" title="Rec (R)">Rec</button>
+        <button id="shift" type="button" title="Shift: hold the Shift key, or click to latch">Shift</button>
+        <button data-key="Left" title="Left">&#9664;</button>
+        <button data-key="Down" title="Down">&#9660;</button>
+        <button data-key="Right" title="Right">&#9654;</button>
       </div>
     </div>
-    <div id="pads" class="pads" aria-label="Pads"></div>
   </section>
   <aside>
+    <p class="small"><b>The device is on the left.</b> This panel is only for the emulator: sound, input, colours, files and pad samples.</p>
     <h1>Four-Track Emulator</h1>
     <p>This page runs the same screen and recording logic as the Tracker firmware (the same C++, compiled to WebAssembly). What you see and do here is what the device does, apart from the audio hardware.</p>
     <h2>Audio</h2>
@@ -69,6 +82,7 @@
       <tr><td>Arrows</td><td>arrow buttons</td></tr>
       <tr><td>[ ] or scroll</td><td>jog wheel</td></tr>
       <tr><td>Enter or I</td><td>Insert</td></tr>
+      <tr><td>H</td><td>Pattern (home)</td></tr>
       <tr><td>C</td><td>Song (click on or off)</td></tr>
       <tr><td>Shift (hold)</td><td>Shift</td></tr>
       <tr><td>E, G, M, F</td><td>Sample Edit, Performance, Master, File</td></tr>

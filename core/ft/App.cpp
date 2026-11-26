@@ -106,6 +106,14 @@ void App::key(int k)
         popupKey(k);
         return;
     }
+    if (k == kPattern) // the Pattern button is the home screen: it leaves a page or a menu
+    {
+        actionMenu = false;
+        if (moveMode) moveKey(kB8);
+        if (current != Screen::Main) back();
+        else refresh(true);
+        return;
+    }
     if (current != Screen::Main)
     {
         // Play and Stop work on the pages that sit beside the recorder
