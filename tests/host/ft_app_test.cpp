@@ -507,6 +507,21 @@ static void pagesAndProjects()
         app.tick();
         CHECK(app.screen() == Screen::Main, "the emulator returns home when its pretend update ends");
     }
+    {   // a page button works straight from another page
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kParams);
+        app.key(kSampleLoad);
+        CHECK(app.screen() == Screen::Load, "Sample Load opens from the mixer");
+        app.key(kConfig);
+        CHECK(app.screen() == Screen::Device, "Config opens from Load samples");
+        app.key(kSamplePlay);
+        CHECK(app.screen() == Screen::PadSample, "Sample Play opens from Device settings");
+        app.key(kParams);
+        CHECK(app.screen() == Screen::Mixer, "Params opens from the pad sample page");
+    }
     {   // the Pattern button is home
         FakeHal hal;
         App app(hal, palette());

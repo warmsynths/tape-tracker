@@ -115,6 +115,20 @@ void App::key(int k)
         else refresh(true);
         return;
     }
+    if (current != Screen::Main && job == Job::None && !fwUpdating && current != Screen::NameEntry && current != Screen::Tempo)
+    {
+        // A button that opens a page also works from another page: go home, then open it
+        struct Open { int key; Screen page; };
+        static const Open pages[] = { { kSampleEdit, Screen::Editor }, { kPerformance, Screen::Glitch }, { kMaster, Screen::Master }, { kFile, Screen::Project },
+                                      { kParams, Screen::Mixer }, { kSamplePlay, Screen::PadSample }, { kSampleLoad, Screen::Load }, { kSampleRec, Screen::Resample }, { kConfig, Screen::Device } };
+        for (const Open& o : pages)
+            if (o.key == k && o.page != current)
+            {
+                back();
+                key(k);
+                return;
+            }
+    }
     if (current != Screen::Main)
     {
         // Play and Stop work on the pages that sit beside the recorder
