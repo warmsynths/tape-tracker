@@ -919,8 +919,7 @@ void App::fillView()
         }
         if (!L.hasPart) L.waveCount = 0;
 
-        if (L.hasPart || L.active) fmt(L.tag, sizeof(L.tag), "%s", sourceName(trackSource[t]));
-        else L.tag[0] = 0;
+        fmt(L.tag, sizeof(L.tag), "%s", sourceName(trackSource[t])); // every track shows where it records from
         if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
         {
             fmt(L.msg1, sizeof(L.msg1), "First take - elapsed");
