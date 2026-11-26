@@ -193,6 +193,7 @@ class audioEngine
     MixerAndFxs<kVoices>* getMixerAndFx();
     AudioPlaySdWav* getSdPlayer();
     AudioPlayLoops* getLoopPlayer();
+    AudioPlaySynth* getSynthPlayer();
     // Records the sound of the pads and MIDI voices only: the dry sum of the 8 voices, before the
     // delay and reverb sends and without the looped Parts (Four-Track recording source "Pads").
     AudioRecordQueue* getPadBusQueue(int channel);
@@ -237,6 +238,7 @@ class audioEngine
     std::vector<AudioConnection*> connections;
     AudioInput input;
     AudioPlayLoops loopPlayer; // declared before mixerAndFxs so it updates before the mixer
+    AudioPlaySynth synthPlayer; // the chord pads' synth, also before the mixer
     AudioPlaySdWav playerWavFromSD;
     AudioSynthWaveform testWaveform;
     AudioPlayMemory metronomeTick;

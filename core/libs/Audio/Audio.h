@@ -60,6 +60,7 @@
 #include "monoToStereo.h"
 #include "mux.h"
 #include "play_loops.h"
+#include "play_synth.h"
 #include "play_memory.h"
 #include "play_sd_wav.h"
 #include "record_queue.h"

@@ -70,6 +70,7 @@ void App::buildPage()
         case Screen::Memory: drawMemory(p); break;
         case Screen::Mixer: drawMixer(p); break;
         case Screen::PadSample: drawPadSample(p); break;
+        case Screen::Chords: drawChords(p); break;
         case Screen::Load: drawLoad(p); break;
         case Screen::Resample: drawResample(p); break;
         case Screen::Device: if (fwUpdating) drawFirmwareUpdate(p); else drawDevice(p); break;
@@ -1309,4 +1310,55 @@ void App::drawPopup(Pen& p)
     const char* l[8] = { "", "", "", "", "", popupKind == Popup::Unsaved ? "Cancel" : "", b7, b8 };
     p.buttons(l, 0, red ? 7 : -1);
 }
+//--------------------------------------------------------------------------------------------
+// C10 Chords (Note button)
+void App::drawChords(Pen& p)
+{
+    heading(p, model, "Chords");
+    const ChordCfg& c = chords.cfg;
+    char b[24];
+    char v[7][24];
+    fmt(v[0], 24, "%s", Chords::keyName(c.key));
+    fmt(v[1], 24, "%s", Chords::scaleName(c.scale));
+    if (c.shuffle != 0) fmt(v[2], 24, "%s %u", Chords::styleName(c.style), (unsigned)c.shuffle);
+    else fmt(v[2], 24, "%s", Chords::styleName(c.style));
+    fmt(v[3], 24, "%d chords, %d notes", c.chordRows, 4 - c.chordRows);
+    fmt(v[4], 24, "%s", c.noteMode == NoteMode::Scale ? "Scale" : c.noteMode == NoteMode::Chord ? "Chord" : "Follow");
+    fmt(v[5], 24, "%s%d", c.octave > 0 ? "+" : "", c.octave);
+    const int presets = hal.synthPresetCount();
+    fmt(v[6], 24, "%s", chSound < presets ? hal.synthPresetName(chSound) : "Sample");
+    static const char* const names[7] = { "Key", "Scale", "Style", "Rows", "Note pads", "Octave", "Sound" };
+    static const int widths[7] = { 60, 140, 112, 152, 88, 70, 128 };
+    int x = 14;
+    for (int i = 0; i < 7; i++)
+    {
+        p.cell(x, 64, widths[i], 60, i == chField, pal.panel);
+        p.text(x + 10, 72, names[i], F12, pal.dim);
+        p.text(x + 10, 92, v[i], F17B, pal.text);
+        x += widths[i] + 4;
+    }
+    // the 48 pads as they are laid out on the Tracker
+    for (int pad = 0; pad < 48; pad++)
+    {
+        const int px = 16 + (pad % 12) * 64, py = 140 + (pad / 12) * 64;
+        const bool held = heldCount[pad] != 0;
+        const Tier t = chords.tier(pad);
+        uint32_t fill = pal.panel;
+        uint32_t ink = pal.text;
+        if (t == Tier::Tonic) fill = pal.sel;
+        else if (t == Tier::Colour) fill = pal.cell;
+        else if (t == Tier::ChordTone) fill = pal.sel;
+        if (held) { fill = pal.text; ink = pal.bg; }
+        p.rect(px, py, 62, 62, fill);
+        if (!held && t == Tier::Tonic) p.rect(px, py, 62, 3, pal.marker);
+        if (!held && t == Tier::ChordTone) p.rect(px, py + 59, 62, 3, pal.meter);
+        if (!held && t == Tier::Colour) p.rect(px, py, 62, 3, pal.dim);
+        chords.label(pad, b, sizeof b);
+        p.textMid(px, 62, py + 24, b, b[0] != 0 && p.width(b, F17B) <= 58 ? F17B : F12, ink);
+    }
+    p.text(14, 412, c.chordRows == 0 ? "All pads play scale notes. Jog changes the selected value." : c.chordRows == 4 ? "All pads play chords. Jog changes the selected value." : "Top rows play chords, the rest scale notes. Jog changes the selected value.", F14, pal.text);
+    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Shuffle", "Reset", "", "", "", "", "Back" };
+    p.buttons(l, padsChords ? 1 : 0);
+}
 } // namespace ft
+

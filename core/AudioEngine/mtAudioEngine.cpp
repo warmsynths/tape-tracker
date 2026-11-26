@@ -133,6 +133,11 @@ AudioPlayLoops* audioEngine::getLoopPlayer()
     return &loopPlayer;
 }
 
+AudioPlaySynth* audioEngine::getSynthPlayer()
+{
+    return &synthPlayer;
+}
+
 AudioRecordQueue* audioEngine::getPadBusQueue(int channel)
 {
     return &padBusQueue[channel];
@@ -163,6 +168,16 @@ audioEngine::audioEngine()
           mixerAndFxs.getTracksAndSendsMixer((MixerAndFxChannelType)channel),
           MixerAndFxs<kVoices>::TrackAndFxsChannels::kLoopChannel));
     }
+    // the synth joins the pad sounds, so it is recorded from the pad bus like them
+    for (int channel = 0; channel < 2; channel++)
+    {
+        connections.push_back(new AudioConnection(
+          &synthPlayer,
+          channel,
+          mixerAndFxs.getTracksMixer((MixerAndFxChannelType)channel),
+          MixerAndFxs<kVoices>::kFourTrackSynthInput));
+    }
+    synthPlayer.begin(44100.0f);
     for (int channel = 0; channel < 2; channel++)
     {
         connections.push_back(new AudioConnection(

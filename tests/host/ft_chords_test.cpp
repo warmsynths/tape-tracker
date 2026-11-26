@@ -70,6 +70,8 @@ int main()
     c.cfg.style = 0; c.rebuild();
     label(c, 7, l);  CHECK(std::strcmp(l, "Db") == 0, "Lo-fi colour 1 is Db");
     label(c, 19, l); CHECK(std::strcmp(l, "Dbmaj9") == 0, "Lo-fi second row has 9ths");
+    label(c, 14, l); CHECK(std::strcmp(l, "Em7") == 0, "no flat 9th on iii: it stays a 7th");
+    label(c, 18, l); CHECK(std::strcmp(l, "Bm7b5") == 0, "and on vii");
 
     // suspended and 9ths with four chord rows: triad, 7th or 9th, the other, sus
     c.cfg.chordRows = 4; c.cfg.style = 1; c.rebuild();

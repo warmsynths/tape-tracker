@@ -167,6 +167,13 @@ struct FakeHal : Hal
     void padOn(int, bool) override { padsOn++; }
     void padOff(int) override { padsOn--; }
     void padsReleaseAll() override { padsOn = 0; }
+    int notesOn = 0, noteEvents = 0, lastNote = 0, synthPreset = 0, sampleNotes = 0;
+    int synthPresetCount() override { return 3; }
+    const char* synthPresetName(int i) override { return i == 0 ? "One" : i == 1 ? "Two" : "Three"; }
+    void synthSetPreset(int i) override { synthPreset = i; }
+    void synthNote(int note, int, bool on) override { notesOn += on ? 1 : -1; noteEvents++; lastNote = note; }
+    void synthAllOff() override { notesOn = 0; }
+    void sampleNote(int, int, bool on) override { sampleNotes += on ? 1 : -1; }
 
     // Let `frames` of audio go by, in blocks of 128, running the application's main loop as it
     // would run on the device.
@@ -933,6 +940,43 @@ int main()
         CHECK(hal.padsOn == 0, "a pad release reaches the machine");
         app.key(kB4);
         CHECK(!app.view().monitor, "B4 switches the monitor off");
+    }
+    {   // chords: Note opens the page and the pads play chords and scale notes
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        app.key(kNote);
+        CHECK(app.screen() == Screen::Chords, "Note opens the Chords page");
+        CHECK(std::strcmp(app.view().padsMode, "CHORD") == 0, "the pads are in chord mode");
+        app.pad(0, true);
+        CHECK(hal.notesOn == 3 && hal.lastNote == 55, "pad 0 plays the C major triad");
+        app.pad(0, false);
+        CHECK(hal.notesOn == 0, "releasing the pad releases the notes");
+        app.pad(40, true);
+        CHECK(hal.notesOn == 1 && hal.lastNote == 55, "a scale pad plays one note in key");
+        app.pad(40, false);
+        app.jog(1); // the Key field
+        app.pad(0, true);
+        CHECK(hal.lastNote == 56, "after one step up the key is Db: its fifth is Ab");
+        app.pad(0, false);
+        // sound field: the third value is the sample
+        app.key(kRight); app.key(kRight); app.key(kRight); app.key(kRight); app.key(kRight); app.key(kRight);
+        app.jog(1); app.jog(1); app.jog(1);
+        app.pad(0, true);
+        CHECK(hal.sampleNotes == 3, "with Sound set to Sample the chord plays the sample");
+        app.pad(0, false);
+        CHECK(hal.sampleNotes == 0, "and it is released");
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Main, "Back returns home");
+        app.pad(0, true);
+        CHECK(hal.sampleNotes == 3 && hal.padsOn == 0, "the pads still play chords on the home screen");
+        app.pad(0, false);
+        app.key(kNote);
+        app.key(kB1); // Pads: off
+        app.key(kB8);
+        app.pad(3, true);
+        CHECK(hal.padsOn == 1, "with chord pads off, the pads are the normal pads again");
+        app.pad(3, false);
     }
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
     return failures ? 1 : 0;

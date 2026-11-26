@@ -89,6 +89,12 @@ class FourTrackHal : public ft::Hal
     void padOn(int pad, bool keysMode) override;
     void padOff(int pad) override;
     void padsReleaseAll() override;
+    int synthPresetCount() override;
+    const char* synthPresetName(int index) override;
+    void synthSetPreset(int index) override;
+    void synthNote(int note, int velocity, bool on) override;
+    void synthAllOff() override;
+    void sampleNote(int id, int note, bool on) override;
 
     // Called when the screen is closed: put the codec and monitor back as they were.
     void restoreAudio();

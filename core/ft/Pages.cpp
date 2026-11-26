@@ -268,6 +268,7 @@ void App::keyScreen(int k)
             else if (k == kB8 || k == kSamplePlay) { if (psAuditioning) { psAuditioning = false; hal.padAudition(hal.currentSample(), false); } back(); return; }
             for (int i = 0; i < 48; i++) padModeKeys[i] = padsKeysMode;
             break;
+        case Screen::Chords: chordsKey(k); break;
         case Screen::Load: loadKey(k); break;
         case Screen::Resample: resampleKey(k); break;
         case Screen::Device: deviceKey(k); break;
@@ -406,6 +407,7 @@ void App::jogScreen(int delta)
             break;
         }
         case Screen::PadSample: psChange(delta); break;
+        case Screen::Chords: chordsJog(delta); break;
         case Screen::Load: loadJog(delta); break;
         case Screen::Resample: resampleJog(delta); break;
         case Screen::Device: deviceJog(delta); break;
@@ -1740,4 +1742,52 @@ void App::resetAll()
     fmt(noteHint, sizeof noteHint, "Everything cleared. This is a new project.");
     refresh(true);
 }
+//--------------------------------------------------------------------------------------------
+// C10 Chords (Note button): chords and scale notes on the pads
+
+void App::chordsKey(int k)
+{
+    ChordCfg& c = chords.cfg;
+    if (k == kLeft) chField = clampi(chField - 1, 0, 6);
+    else if (k == kRight) chField = clampi(chField + 1, 0, 6);
+    else if (k == kUp) chField = clampi(chField - 4, 0, 6);
+    else if (k == kDown) chField = clampi(chField + 4, 0, 6);
+    else if (k == kB1)
+    {
+        if (padsChords) chordsOff();
+        else { hal.padsReleaseAll(); padsChords = true; }
+    }
+    else if (k == kB2 || k == kB3)
+    {
+        chordsReleaseAll();
+        c.shuffle = k == kB3 ? 0 : (uint16_t)(c.shuffle >= 65000 ? 1 : c.shuffle + 1);
+        chords.rebuild();
+    }
+    else if (k == kB8 || k == kNote) { back(); return; }
+}
+
+void App::chordsJog(int delta)
+{
+    ChordCfg& c = chords.cfg;
+    const int d = delta > 0 ? 1 : -1;
+    chordsReleaseAll();
+    switch (chField)
+    {
+        case 0: c.key = (uint8_t)((c.key + 12 + d) % 12); break;
+        case 1: c.scale = (uint8_t)((c.scale + kScaleCount + d) % kScaleCount); break;
+        case 2: c.style = (uint8_t)((c.style + kStyleCount + d) % kStyleCount); c.shuffle = 0; break;
+        case 3: c.chordRows = (uint8_t)clampi(c.chordRows + d, 0, 4); break;
+        case 4: c.noteMode = (NoteMode)(((int)c.noteMode + 3 + d) % 3); break;
+        case 5: c.octave = (int8_t)clampi(c.octave + d, -2, 2); break;
+        default:
+        {
+            const int count = hal.synthPresetCount() + 1; // the presets and the sample
+            chSound = clampi(chSound + d, 0, count - 1);
+            if (chSound < hal.synthPresetCount()) hal.synthSetPreset(chSound);
+            break;
+        }
+    }
+    chords.rebuild();
+}
 } // namespace ft
+

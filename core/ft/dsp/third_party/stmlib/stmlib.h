@@ -53,11 +53,11 @@
 #define STATIC_ASSERT(expression, message)\
   struct JOIN(__static_assertion_at_line_, __LINE__)\
   {\
-    impl::StaticAssertion<static_cast<bool>((expression))> JOIN(JOIN(JOIN(STATIC_ASSERTION_FAILED_AT_LINE_, __LINE__), _), message);\
+    stmlib_impl::StaticAssertion<static_cast<bool>((expression))> JOIN(JOIN(JOIN(STATIC_ASSERTION_FAILED_AT_LINE_, __LINE__), _), message);\
   };\
-  typedef impl::StaticAssertionTest<sizeof(JOIN(__static_assertion_at_line_, __LINE__))> JOIN(__static_assertion_test_at_line_, __LINE__)
+  typedef stmlib_impl::StaticAssertionTest<sizeof(JOIN(__static_assertion_at_line_, __LINE__))> JOIN(__static_assertion_test_at_line_, __LINE__)
 
-namespace impl {
+namespace stmlib_impl {
 
   template <bool>
   struct StaticAssertion;
@@ -72,7 +72,7 @@ namespace impl {
   {
   }; // StaticAssertionTest<int>
 
-} // namespace impl
+} // namespace stmlib_impl
 
 
 #ifndef TEST

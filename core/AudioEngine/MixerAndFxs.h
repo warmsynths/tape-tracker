@@ -39,7 +39,8 @@ class MixerAndFxs
     static constexpr int kTrackMixerOutputsCount = 1;
     static constexpr int kTrackAndSendsMixerInputs =
       kTrackMixerOutputsCount + kExternalInputsCount + FxType::kFxCount + 1; // +1: loop player
-    static constexpr int kTracksAndSynthVoices = voicesCount + kSynthParts;
+    static constexpr int kTracksAndSynthVoices = voicesCount + kSynthParts + 1; // +1: the four-track synth
+    static constexpr int kFourTrackSynthInput = voicesCount + kSynthParts;
 
     MixerAndFxs();
     AudioMixer<kSendsInputsCount>* getPreFxMixer(FxType type);

@@ -163,7 +163,7 @@ Chords::Chord Chords::columnChord(int col, int variant) const
             iv[n++] = (uint8_t)up(2);
             iv[n++] = (uint8_t)up(4);
             if (sev) iv[n++] = (uint8_t)up(6);
-            if (sev && nine) iv[n++] = (uint8_t)(up(1) + 12);
+            if (sev && nine && up(1) != 1) iv[n++] = (uint8_t)(up(1) + 12); // a flat 9th clashes: leave it out
         }
         for (int i = 0; i < n; i++) c.offset[i] = iv[i];
         c.count = (uint8_t)n;

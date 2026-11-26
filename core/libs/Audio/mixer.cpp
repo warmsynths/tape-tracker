@@ -73,6 +73,7 @@ template class AudioMixer<4>;
 template class AudioMixer<5>; // master mixer with the four-track loop input
 template class AudioMixer<7>;
 template class AudioMixer<8>;
+template class AudioMixer<9>; // pad sounds with the four-track synth
 template class AudioMixer<10>;
 #ifdef PLATFORM_IMX
 template class AudioMixer<18>;

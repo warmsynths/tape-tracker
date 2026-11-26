@@ -6,6 +6,7 @@
 // No C library is available, so the few functions the compiler needs are defined at the bottom.
 
 #include "App.h"
+#include "Synth.h"
 #include "loop_fill.h"
 
 #include <stddef.h>
@@ -399,6 +400,25 @@ class EmuHal : public Hal
         if (on) { startVoice(900 + slot, slot, 1.0f); voices[0].held = true; for (auto& v : voices) if (v.pad == 900 + slot) v.held = true; }
         else for (auto& v : voices) if (v.on && v.pad == 900 + slot) v.held = false;
     }
+    // the chord pads: the synth, or the current sample pitched
+    Synth synth;
+    int synthPresetCount() override { return kSynthPresets; }
+    const char* synthPresetName(int i) override { return ft::synthPreset(i).name; }
+    void synthSetPreset(int i) override { synth.setPreset(i); }
+    void synthNote(int note, int velocity, bool on) override { if (on) synth.noteOn(note, velocity); else synth.noteOff(note); }
+    void synthAllOff() override { synth.allNotesOff(); }
+    void sampleNote(int id, int note, bool on) override
+    {
+        if (on)
+        {
+            float r = 1.0f;
+            const int semis = note - 60;
+            if (semis > 0) for (int i = 0; i < semis; i++) r *= 1.05946309f;
+            if (semis < 0) for (int i = 0; i < -semis; i++) r /= 1.05946309f;
+            startVoice(id, currentSampleSlot, r);
+        }
+        else for (auto& v : voices) if (v.on && v.pad == id) v.held = false;
+    }
     void padOff(int pad) override { for (auto& v : voices) if (v.on && v.pad == pad) v.held = false; }
     void padsReleaseAll() override { for (auto& v : voices) v.held = false; }
 
@@ -424,6 +444,12 @@ class EmuHal : public Hal
         // pads
         float pad[kBlock], padL[kBlock], padR[kBlock];
         for (int i = 0; i < n; i++) pad[i] = padL[i] = padR[i] = 0;
+        if (synth.active())
+        {
+            float sl[kBlock], sr[kBlock];
+            synth.render(sl, sr, n);
+            for (int i = 0; i < n; i++) { padL[i] += sl[i]; padR[i] += sr[i]; pad[i] += (sl[i] + sr[i]) * 0.5f; }
+        }
         for (auto& v : voices)
         {
             if (!v.on) continue;
@@ -582,6 +608,8 @@ void ft_init(uint32_t rate)
 {
     new (g_halStorage) EmuHal();
     g_hal.rate = rate > kMaxRate ? kMaxRate : rate;
+    g_hal.synth.init((float)g_hal.rate);
+    g_hal.synth.setPreset(0);
     makeKit(g_hal.rate);
     loadPalette();
     static BufferGfx measure;

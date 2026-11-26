@@ -174,6 +174,22 @@ void FourTrackHal::padsReleaseAll()
     padsBacklight.clearGlobalPads(1, 1, 1);
 }
 
+// The chord pads: the synth, or the pad sample pitched (the sample's own pitch is note 60)
+int FourTrackHal::synthPresetCount() { return engine.getSynthPlayer()->presetCount(); }
+const char* FourTrackHal::synthPresetName(int index) { return engine.getSynthPlayer()->presetName(index); }
+void FourTrackHal::synthSetPreset(int index) { engine.getSynthPlayer()->setPreset(index); }
+void FourTrackHal::synthNote(int note, int velocity, bool on)
+{
+    if (on) engine.getSynthPlayer()->noteOn(note, velocity);
+    else engine.getSynthPlayer()->noteOff(note);
+}
+void FourTrackHal::synthAllOff() { engine.getSynthPlayer()->allNotesOff(); }
+void FourTrackHal::sampleNote(int id, int note, bool on)
+{
+    if (on) sequencer.handleNoteOn(Sequencer::GRID_OUTSIDE_PATTERN, (byte)note, 127, (int16_t)id);
+    else sequencer.handleNoteOff(Sequencer::GRID_OUTSIDE_PATTERN, (byte)note, 0, (int16_t)id);
+}
+
 //--------------------------------------------------------------------------------------------
 // Sound
 

@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 OUT=${TMPDIR:-/tmp}/ft-tests
 mkdir -p "$OUT"
 INC="-Icore/ft -Icore/ft/dsp -Icore/ft/dsp/third_party -Icore/source -Icore/libs/Audio -Itests/host"
-RES=core/ft/dsp/third_party/plaits/resources.cc
+RES=core/ft/dsp/third_party/plaits/resources.cpp
 CXX=${CXX:-clang++}
 for t in four_track_session loop_bars loop_fill loop_mix; do
   [ -f tests/host/${t}_test.cpp ] || continue

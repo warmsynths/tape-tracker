@@ -34,6 +34,7 @@ App::App(Hal& h, const Palette& palette)
   , session(h.sampleRate() * kMaxTakeSeconds)
 {
     for (int i = 0; i < 48; i++) padModeKeys[i] = true;
+    chords.init();
     set.waveBitmap = hal.maskDefault();
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
@@ -128,7 +129,7 @@ void App::key(int k)
         // A button that opens a page also works from another page: go home, then open it
         struct Open { int key; Screen page; };
         static const Open pages[] = { { kSampleEdit, Screen::Editor }, { kPerformance, Screen::Glitch }, { kMaster, Screen::Master }, { kFile, Screen::Project },
-                                      { kParams, Screen::Mixer }, { kSamplePlay, Screen::PadSample }, { kSampleLoad, Screen::Load }, { kSampleRec, Screen::Resample }, { kConfig, Screen::Device } };
+                                      { kParams, Screen::Mixer }, { kSamplePlay, Screen::PadSample }, { kSampleLoad, Screen::Load }, { kSampleRec, Screen::Resample }, { kConfig, Screen::Device }, { kNote, Screen::Chords } };
         for (const Open& o : pages)
             if (o.key == k && o.page != current)
             {
@@ -142,7 +143,7 @@ void App::key(int k)
         // Play and Stop work on the pages that sit beside the recorder
         const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
                                current == Screen::Input || current == Screen::Pads || current == Screen::Memory || current == Screen::Mixer || current == Screen::PadSample || current == Screen::Load || current == Screen::Resample ||
-                               current == Screen::Settings;
+                               current == Screen::Settings || current == Screen::Chords;
         if (transport && k == kPlay) { togglePlay(); refresh(true); return; }
         if (transport && k == kStop) { pressStop(); refresh(true); return; }
         keyScreen(k);
@@ -245,6 +246,7 @@ void App::key(int k)
         case kSampleLoad: open(Screen::Load); loadOpen(); break;
         case kSampleRec: resampleOpen(); open(Screen::Resample); break;
         case kConfig: deviceOpen(); open(Screen::Device); break;
+        case kNote: if (!padsChords) { hal.padsReleaseAll(); padsChords = true; } open(Screen::Chords); break;
         case kFile: refreshProjectList(); open(Screen::Project); break;
         default: break;
     }
@@ -276,13 +278,60 @@ void App::jog(int delta)
 void App::pad(int p, bool down)
 {
     if (p < 0 || p >= 48) return;
+    if (padsChords && current != Screen::PadSample)
+    {
+        chordPad(p, down);
+        if (current == Screen::Chords) refresh(true);
+        return;
+    }
     if (current == Screen::PadSample && down) { hal.setCurrentSample(p); refresh(true); } // a pad chooses its sample here
     if (down) hal.padOn(p, padModeKeys[hal.currentSample() >= 0 ? hal.currentSample() : 0] ? padsKeysMode : false);
     else hal.padOff(p);
 }
 
+void App::chordNote(int pad, int index, int note, bool on)
+{
+    if (chSound < hal.synthPresetCount()) hal.synthNote(note, 100, on);
+    else hal.sampleNote(200 + pad * kMaxChordNotes + index, note, on);
+}
+
+void App::chordPad(int p, bool down)
+{
+    if (down)
+    {
+        if (heldCount[p] != 0) return;
+        uint8_t n[kMaxChordNotes];
+        const int count = chords.notes(p, n);
+        chords.played(p);
+        for (int i = 0; i < count; i++)
+        {
+            heldNote[p][i] = n[i];
+            chordNote(p, i, n[i], true);
+        }
+        heldCount[p] = (uint8_t)count;
+    }
+    else
+    {
+        for (int i = 0; i < heldCount[p]; i++) chordNote(p, i, heldNote[p][i], false);
+        heldCount[p] = 0;
+    }
+}
+
+void App::chordsReleaseAll()
+{
+    for (int p = 0; p < 48; p++) chordPad(p, false);
+    hal.synthAllOff();
+}
+
+void App::chordsOff()
+{
+    chordsReleaseAll();
+    padsChords = false;
+}
+
 void App::togglePadMode()
 {
+    if (padsChords) chordsOff();
     hal.padsReleaseAll();
     padsKeysMode = !padsKeysMode;
     refresh(true);
@@ -1283,7 +1332,7 @@ void App::fillView()
     if (moveMode) fmt(v.hint, sizeof(v.hint), "Move Track %d: jog or arrows step by the grid, Shift+arrows by 1 ms.", session.selected() + 1);
     if (noteHint[0] != 0) fmt(v.hint, sizeof(v.hint), "%s", noteHint);
     fmt(v.loopMode, sizeof(v.loopMode), "%s", set.loopOnce ? "Play once" : "Repeat");
-    fmt(v.padsMode, sizeof(v.padsMode), "%s", padsKeysMode ? "KEYS" : "PAD");
+    fmt(v.padsMode, sizeof(v.padsMode), "%s", padsChords ? "CHORD" : padsKeysMode ? "KEYS" : "PAD");
 
     static const char* const names[8] = { "Rec", "Stop", "Play", "", "Track 1", "Track 2", "Track 3", "Track 4" };
     for (int b = 0; b < 8; b++)

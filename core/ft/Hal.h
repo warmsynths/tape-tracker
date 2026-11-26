@@ -145,6 +145,15 @@ class Hal
     virtual void padOn(int pad, bool keysMode) = 0;
     virtual void padOff(int pad) = 0;
     virtual void padsReleaseAll() = 0;
+
+    // Notes from the chord pads and the synth. `note` is a MIDI note. A sample plays pitched from
+    // its original pitch at note 60; `id` tells the note's voice apart so it can be released.
+    virtual int synthPresetCount() { return 0; }
+    virtual const char* synthPresetName(int /*index*/) { return ""; }
+    virtual void synthSetPreset(int /*index*/) {}
+    virtual void synthNote(int /*note*/, int /*velocity*/, bool /*on*/) {}
+    virtual void synthAllOff() {}
+    virtual void sampleNote(int /*id*/, int /*note*/, bool /*on*/) {}
 };
 } // namespace ft
 

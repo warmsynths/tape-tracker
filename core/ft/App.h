@@ -6,6 +6,7 @@
 #include "Gfx.h"
 #include "Hal.h"
 #include "Mask.h"
+#include "Chords.h"
 #include "View.h"
 #include "loop_bars.h"
 
@@ -34,12 +35,13 @@ enum Key
     kConfig,       // device settings
     kCopy,         // copy a Part to another track
     kDelete,       // clear a Part (Shift: all)
+    kNote,         // chords and scale notes on the pads
     kKeyCount
 };
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords
 };
 
 enum class Popup : uint8_t
@@ -165,6 +167,20 @@ class App
     void drawMemory(class Pen& p);
     void drawMixer(class Pen& p);
     void drawPadSample(class Pen& p);
+    // Chords page and chord pads
+    void drawChords(class Pen& p);
+    void chordsKey(int k);
+    void chordsJog(int delta);
+    void chordPad(int p, bool down);
+    void chordsOff();
+    void chordsReleaseAll();
+    void chordNote(int pad, int index, int note, bool on);
+    Chords chords;
+    bool padsChords = false;      // the pads play chords and scale notes
+    int chField = 0;              // chords page: 0 key, 1 scale, 2 style, 3 chord rows, 4 notes, 5 octave, 6 sound
+    int chSound = 0;              // 0 .. synth presets - 1 the presets, then the sample
+    uint8_t heldCount[48] = {};
+    uint8_t heldNote[48][kMaxChordNotes] = {};
     int psField = 0;              // pad sample page: 0 tune, 1 volume, 2 pan, 3 play mode, 4 start, 5 end
     bool psAuditioning = false;
     void psChange(int delta);
