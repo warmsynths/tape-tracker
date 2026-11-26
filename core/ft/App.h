@@ -44,7 +44,7 @@ enum class Screen : uint8_t
 
 enum class Popup : uint8_t
 {
-    None, Replace, NoSound, NotArmed, SdMissing, Unsaved, Message, ReplaceSlot, Copy, Clear
+    None, Replace, NoSound, NotArmed, SdMissing, Unsaved, Message, ReplaceSlot, Copy, Clear, Busy
 };
 
 struct Settings
@@ -292,7 +292,7 @@ class App
     // Project
     void projectKey(int k);
     void refreshProjectList();
-    void newProject();
+    void newProject(bool everything = false);
     void startSave();
     void startLoad(const char* name);
     void startExport();
@@ -319,7 +319,7 @@ class App
     char pendingName[24] = {};
 
     // jobs: saving and loading a project, writing a WAV
-    enum class Job : uint8_t { None, Save, Load, Export, Done, Resample };
+    enum class Job : uint8_t { None, Save, Load, Export, Done, Resample, Backup };
     Job job = Job::None;
     char jobPath[48] = {};
     uint32_t jobDone = 0, jobTotal = 0, jobStage = 0;
@@ -361,6 +361,7 @@ class App
         uint8_t kind = 0;      // 0 none, 1 copy, 2 clear, 3 clear all
         uint8_t mask = 0;      // tracks it changed
         uint8_t prevHad = 0;   // which of them had a Part before
+        uint8_t fromFile = 0;  // which of those were kept on the card (a copy over a Part); a clear leaves the audio where it is
         TrackCfg cfg[4];
         int32_t align[4] = {}, user[4] = {};
     } lastOp;
@@ -373,6 +374,10 @@ class App
     void doClear();
     void undoOp();
     void snapshotForUndo(int track);
+    void finishCopy();
+    void resetAll();
+    int bkDst = 0;
+    uint32_t bkDone = 0;
     void computeLive(int track);
     void uploadMasks(int track);
     uint8_t wave600[4][600] = {};

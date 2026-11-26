@@ -599,6 +599,7 @@ static void pagesAndProjects()
         CHECK(app.state().loopFrames() == loop, "the Loop is unchanged");
         app.setShift(true); app.key(kCopy); app.setShift(false);
         CHECK(!app.state().hasPart(2) && app.state().hasPart(0), "Shift + Copy undoes the copy");
+        const std::vector<int16_t> before = hal.mem[0];
         app.key(kDelete);
         CHECK(app.popup() == Popup::Clear, "Delete opens the clear question");
         for (int st = 0; st < app.stagesOf(5); st++) app.draw(5, st, gfx);
@@ -606,11 +607,31 @@ static void pagesAndProjects()
         CHECK(!app.state().hasPart(0) && app.state().loopFrames() == loop, "Clear removes the Part and keeps the Loop");
         app.setShift(true); app.key(kCopy); app.setShift(false);
         CHECK(app.state().hasPart(0), "Shift + Copy brings the Part back");
-        CHECK(std::memcmp(hal.mem[0].data(), hal.files["undo/t0.raw"].data(), loop * 2) == 0, "with its audio");
+        CHECK(std::memcmp(hal.mem[0].data(), before.data(), loop * 2) == 0, "with its audio");
+        CHECK(!hal.files.count("undo/t0.raw"), "a clear writes nothing to the card");
         app.setShift(true); app.key(kDelete); app.setShift(false);
         CHECK(app.popup() == Popup::Clear, "Shift + Delete asks to clear all tracks");
+        for (int st = 0; st < app.stagesOf(5); st++) app.draw(5, st, gfx);
         app.key(kB8);
         CHECK(!app.state().hasPart(0) && app.state().loopFrames() == loop, "Clear all keeps the Loop too");
+        // copying onto a track that has a Part keeps the old one on the card with a progress panel
+        app.setShift(true); app.key(kCopy); app.setShift(false); // brings the Parts back
+        app.key(kB6); recordLoop(hal, app);
+        app.key(kB5);
+        app.key(kCopy);
+        app.key(kB2);
+        app.key(kB8);
+        CHECK(app.popup() == Popup::Busy, "copying over a Part shows a progress panel");
+        for (int st = 0; st < app.stagesOf(5); st++) app.draw(5, st, gfx);
+        app.key(kB8);
+        CHECK(app.popup() == Popup::Busy, "buttons are ignored while it works");
+        for (int i = 0; i < 40 && app.popup() == Popup::Busy; i++) hal.advance(app, 128);
+        CHECK(app.popup() == Popup::None && hal.files.count("undo/t1.raw"), "it finishes and the old Part is on the card");
+        // Reset all forgets the Loop, tempo and glitch settings as well
+        hal.bank().cfg[2].slot[0].on = true;
+        app.setShift(true); app.key(kDelete); app.setShift(false);
+        app.key(kB6);
+        CHECK(app.state().loopFrames() == 0 && !hal.bank().cfg[2].slot[0].on && app.view().focusLane == -1, "Reset all starts a new project");
     }
     {   // the Part Editor and the Pad sample page draw their big waveform as one shared bitmap
         FakeHal hal;

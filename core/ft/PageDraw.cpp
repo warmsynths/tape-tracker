@@ -1189,13 +1189,30 @@ void App::drawPopup(Pen& p)
             line1 = current == Screen::Load ? "Samples cannot be listed or loaded." : "Put the card in to save, open or export.";
             line2 = current == Screen::Load ? "Insert the card and press Retry." : "";
             b7 = "Back"; b8 = "Retry"; break;
-        case Popup::ReplaceSlot: case Popup::Copy: case Popup::Clear: break; // drawn below
+        case Popup::ReplaceSlot: case Popup::Copy: case Popup::Clear: case Popup::Busy: break; // drawn below
         case Popup::Unsaved: head = "Unsaved changes"; line1 = "This project has changes that are not saved."; line2 = "Save them first?"; b7 = "Don't save"; b8 = "Save"; break;
         case Popup::Message:
             head = popupArg == 3 ? "Cannot open" : popupArg == 4 ? "Nothing to export" : (popupArg == 1 || popupArg == 5) ? "Memory full" : popupArg == 2 ? "Nothing to undo" : popupArg == 6 ? "Cannot load" : popupArg == 7 ? "Nothing to resample" : popupArg == 8 ? "Nothing to copy or undo" : popupArg == 9 ? "Nothing to clear" : "Notice";
             line1 = popupArg == 3 ? "This file is not a Four-Track project." : popupArg == 4 ? "Record something first." : popupArg == 1 ? "No room for another Part." : popupArg == 2 ? "There is no earlier take on this track." : popupArg == 5 ? "This sample does not fit in the sample memory." : popupArg == 6 ? "Only 8, 16 and 24 bit PCM WAV files load." : popupArg == 7 ? "Record a Part first." : popupArg == 8 ? "Select a track with a Part. Shift + Copy undoes the last copy or clear." : popupArg == 9 ? "There is no Part to clear." : "";
             break;
         default: break;
+    }
+    if (popupKind == Popup::Busy)
+    {
+        p.rect(150, 157, 500, 122, pal.panel);
+        p.frame(150, 157, 500, 122, pal.frame);
+        p.rect(150, 157, 500, 2, pal.text);
+        p.text(174, 177, "Copying", F17B, pal.text);
+        char t[60];
+        fmt(t, sizeof t, "Keeping the old Part on Track %d so Shift + Copy can bring it back.", bkDst + 1);
+        p.text(174, 213, t, F14, pal.text);
+        p.rect(174, 240, 452, 8, pal.track);
+        p.rect(174, 240, 452 * popupArg / 100, 8, pal.text);
+        fmt(t, sizeof t, "%d%%", popupArg);
+        p.textRight(626, 256, t, F12, pal.dim);
+        const char* none[8] = {};
+        p.buttons(none);
+        return;
     }
     if (popupKind == Popup::Copy)
     {
@@ -1247,8 +1264,13 @@ void App::drawPopup(Pen& p)
         else fmt(t, sizeof t, "%s - %u.%02u s", model.lane[sel].name, hund / 100, hund % 100);
         p.text(174, 201, t, F14, pal.text);
         p.text(174, 221, "The Loop and tempo stay as they are.", F14, pal.text);
-        p.text(174, 251, clearAll ? "Shift + Copy brings them back." : "Shift + Copy brings it back. Shift + Delete clears all tracks.", F12, pal.dim);
-        const char* lc[8] = { "", "", "", "", "", "", "Cancel", "Clear" };
+        if (clearAll)
+        {
+            p.text(174, 243, "Clear keeps the Loop, tempo, glitch and mixer settings. Reset all", F12, pal.dim);
+            p.text(174, 259, "forgets those too and starts a new project. Shift + Copy undoes Clear.", F12, pal.dim);
+        }
+        else p.text(174, 251, "Shift + Copy brings it back. Shift + Delete clears all tracks.", F12, pal.dim);
+        const char* lc[8] = { "", "", "", "", "", clearAll ? "Reset all" : "", "Cancel", "Clear" };
         p.buttons(lc, 0, 7);
         return;
     }

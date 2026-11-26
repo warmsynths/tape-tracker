@@ -435,6 +435,7 @@ void App::startRecording()
 {
     lastClickBeat = -1;
     const int t = session.selected();
+    if ((lastOp.mask >> t) & 1) lastOp = LastOp(); // the memory behind this track is about to be written over
     // Keep the take that is about to be replaced, so it can be brought back
     if (session.hasPart(t) && session.loopFrames() > 0 && hal.sdPresent())
     {

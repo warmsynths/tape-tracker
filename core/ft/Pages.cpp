@@ -134,6 +134,7 @@ void App::popupKey(int k)
             else if (k == kB7) { close(); job = Job::None; }
             else if (k == kB8) { close(); }
             break;
+        case Popup::Busy: break;
         case Popup::Copy:
         {
             const int src = session.selected();
@@ -148,6 +149,7 @@ void App::popupKey(int k)
         case Popup::Clear:
             if (k == kB7) close();
             else if (k == kB8) { close(); doClear(); }
+            else if (k == kB6 && clearAll) { close(); resetAll(); }
             break;
         case Popup::ReplaceSlot:
             if (k == kB7) close();
@@ -699,9 +701,11 @@ void App::refreshProjectList()
     if (listSel >= listCount) listSel = listCount > 0 ? listCount - 1 : 0;
 }
 
-void App::newProject()
+void App::newProject(bool everything)
 {
     moveMode = false;
+    lastOp = LastOp();
+    focusUser = false;
     hal.playerStop();
     session.reset();
     for (int t = 0; t < 4; t++)
@@ -714,10 +718,17 @@ void App::newProject()
         for (int s = 0; s < 4; s++) keep[s] = hal.bank().cfg[t].slot[s];
         hal.bank().cfg[t] = fresh;
         for (int s = 0; s < 4; s++) { hal.bank().cfg[t].slot[s] = keep[s]; hal.bank().cfg[t].slot[s].on = false; }
+        if (everything)
+        {
+            // the glitch effects go back to how they start, too
+            FxSlot defaults[4] = { { FxType::RandomJumps, false, 50, 0, 50 }, { FxType::PitchSteps, false, 50, 0, 40 }, { FxType::Stutter, false, 50, 7, 100 }, { FxType::Reverse, false, 50, 7, 100 } };
+            for (int s = 0; s < 4; s++) hal.bank().cfg[t].slot[s] = defaults[s];
+        }
         hal.playerSetTrack(t, nullptr);
         waveDirty[t] = true;
         trackSource[t] = Source::Line;
     }
+    if (everything) hal.lofi().cfg = LofiCfg(); // and the lo-fi master
     set.tempoTenths = 0;
     fmt(projectName, sizeof(projectName), "Untitled");
     unsaved = false;
@@ -886,6 +897,7 @@ void App::startSave()
 
 void App::startLoad(const char* name)
 {
+    lastOp = LastOp();
     if (!hal.sdPresent()) { showPopup(Popup::SdMissing); return; }
     fmt(jobPath, sizeof(jobPath), "Projects/%s.ftp", name);
     uint8_t h[kHeader];
@@ -965,6 +977,29 @@ uint32_t App::partOffset(int track) const
 void App::serviceJob()
 {
     if (job == Job::None || job == Job::Done) return;
+    if (job == Job::Backup)
+    {
+        // keep the Part that is about to be replaced on the card, 16,384 frames a pass
+        constexpr uint32_t kChunk = 16384;
+        const uint32_t loop = session.loopFrames();
+        const uint32_t n = (loop - bkDone) < kChunk ? (loop - bkDone) : kChunk;
+        char path[24];
+        fmt(path, sizeof(path), "undo/t%d.raw", bkDst);
+        if (!hal.fileWrite(path, partData[bkDst] + bkDone, n * 2, bkDone > 0)) { job = Job::None; popupKind = Popup::None; redraw[5] = false; dirtyAll(); lastOp = LastOp(); showPopup(Popup::SdMissing); return; }
+        bkDone += n;
+        if (bkDone >= loop)
+        {
+            const int32_t trailer[2] = { alignShift[bkDst], userOffset[bkDst] };
+            hal.fileWrite(path, trailer, 8, true);
+            job = Job::None;
+            popupKind = Popup::None;
+            redraw[5] = false;
+            dirtyAll();
+            finishCopy();
+        }
+        else showPopup(Popup::Busy, (int)((uint64_t)bkDone * 100 / loop));
+        return;
+    }
     if (job == Job::Export || job == Job::Resample)
     {
         const char* outFile = job == Job::Export ? exportFile : rsPath;
@@ -1539,20 +1574,15 @@ void App::deviceJog(int delta)
 //--------------------------------------------------------------------------------------------
 // C8 Copy a Part and C9 Clear, with one undo step (Shift + Copy)
 
-// Keep a track as it is before a copy or a clear, so Shift + Copy can bring it back
+// Keep a track as it is before a copy or a clear, so Shift + Copy can bring it back. A clear leaves the
+// audio where it is (the memory behind the track is not touched until something is recorded or copied
+// there), so it needs no write to the card.
 void App::snapshotForUndo(int t)
 {
     lastOp.cfg[t] = hal.bank().cfg[t];
     lastOp.align[t] = alignShift[t];
     lastOp.user[t] = userOffset[t];
-    if (!session.hasPart(t)) return;
-    const uint32_t frames = session.loopFrames();
-    const int32_t trailer[2] = { alignShift[t], userOffset[t] };
-    char path[24];
-    fmt(path, sizeof(path), "undo/t%d.raw", t);
-    if (hal.fileWrite(path, partData[t], frames * 2, false)) hal.fileWrite(path, trailer, 8, true);
-    hasUndoTake[t] = false;
-    lastOp.prevHad |= (uint8_t)(1u << t);
+    if (session.hasPart(t)) lastOp.prevHad |= (uint8_t)(1u << t);
 }
 
 void App::copyOpen()
@@ -1581,11 +1611,28 @@ void App::doCopy()
     const int src = session.selected(), dst = copyTarget;
     const uint32_t frames = session.loopFrames();
     if (dst == src || frames == 0 || !session.hasPart(src)) return;
-    if (!hal.sdPresent()) { showPopup(Popup::SdMissing); return; }
     lastOp = LastOp();
     lastOp.kind = 1;
     lastOp.mask = (uint8_t)(1u << dst);
     snapshotForUndo(dst);
+    if (session.hasPart(dst))
+    {
+        // the Part being replaced is kept on the card, a piece at a time with a progress panel
+        if (!hal.sdPresent()) { showPopup(Popup::SdMissing); lastOp = LastOp(); return; }
+        lastOp.fromFile = (uint8_t)(1u << dst);
+        bkDst = dst;
+        bkDone = 0;
+        job = Job::Backup;
+        showPopup(Popup::Busy, 0);
+        return;
+    }
+    finishCopy();
+}
+
+void App::finishCopy()
+{
+    const int src = session.selected(), dst = bkDst = copyTarget;
+    const uint32_t frames = session.loopFrames();
     int16_t* to = hal.region(dst);
     const int16_t* from = partData[src];
     for (uint32_t i = 0; i < frames; i++) to[i] = from[i];
@@ -1619,7 +1666,6 @@ void App::doClear()
     uint8_t mask = 0;
     for (int i = 0; i < 4; i++) if (session.hasPart(i) && (clearAll || i == sel)) mask |= (uint8_t)(1u << i);
     if (mask == 0) return;
-    if (!hal.sdPresent()) { showPopup(Popup::SdMissing); return; }
     lastOp.mask = mask;
     for (int i = 0; i < 4; i++)
         if ((mask >> i) & 1)
@@ -1654,11 +1700,14 @@ void App::undoOp()
         if (!((lastOp.mask >> t) & 1)) continue;
         if ((lastOp.prevHad >> t) & 1)
         {
-            char path[24];
-            fmt(path, sizeof(path), "undo/t%d.raw", t);
-            int32_t trailer[2] = { 0, 0 };
-            if (hal.fileRead(path, 0, hal.region(t), frames * 2) != frames * 2) { showPopup(Popup::SdMissing); return; }
-            hal.fileRead(path, frames * 2, trailer, 8);
+            if ((lastOp.fromFile >> t) & 1)
+            {
+                char path[24];
+                fmt(path, sizeof(path), "undo/t%d.raw", t);
+                int32_t trailer[2] = { 0, 0 };
+                if (hal.fileRead(path, 0, hal.region(t), frames * 2) != frames * 2) { showPopup(Popup::SdMissing); return; }
+                hal.fileRead(path, frames * 2, trailer, 8);
+            }
             partData[t] = hal.region(t);
             alignShift[t] = lastOp.align[t];
             userOffset[t] = lastOp.user[t];
@@ -1681,6 +1730,14 @@ void App::undoOp()
     pushBank();
     syncPlayer();
     fmt(noteHint, sizeof noteHint, "Undone.");
+    refresh(true);
+}
+
+// Clear all tracks, and also forget the Loop, tempo, glitch settings, mixer and lo-fi master: a new project
+void App::resetAll()
+{
+    newProject(true);
+    fmt(noteHint, sizeof noteHint, "Everything cleared. This is a new project.");
     refresh(true);
 }
 } // namespace ft

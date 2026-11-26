@@ -257,3 +257,8 @@ The take being recorded is a bitmap too (it was 120 red columns). It grows at on
 - Every track starts at -6 dB (it was 0 dB), so four Parts have headroom; the mixer's Reset (B3) goes back to -6 dB. Saved projects keep their own levels.
 - The default output volume is 60 (the stock default was 81). A config still on 81 is set to 60 once when the Four-Track screen starts; Device settings, Volume changes it and the change is kept.
 - Shift + Left or Right on the home screen changes the output volume by 2; the hint line shows the value.
+
+## FT45 (not sent): Clear is instant, Copy shows progress, Reset all
+- Clear no longer writes anything to the card. The audio stays in the track's memory until something is recorded or copied there, so Shift + Copy still brings it back (that is lost once you record on that track, copy onto it, or open a project). It used to write the whole Part to the card first, which is why the last clear took so long with nothing on screen.
+- Copying onto a track that has a Part still keeps the old Part on the card, but now a Copying panel with a progress bar shows while it writes, and buttons are ignored until it finishes.
+- Shift + Delete, Clear all tracks?, has a new B6 Reset all: it clears every Part and also forgets the Loop, tempo, glitch settings, mixer levels and the lo-fi master, like a new project. B8 Clear keeps those, and the panel now says so.
