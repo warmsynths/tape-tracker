@@ -12,9 +12,6 @@ class FourTrackProcessor extends AudioWorkletProcessor {
     super();
     this.ready = false;
     this.blocks = 0;
-    this.demo = false;
-    this.demoPhase = 0;
-    this.demoVoices = [];
     this.files = new Map(); // path -> { buf: Uint8Array, len }
     this.changed = new Set();
     this.pending = [];
@@ -130,8 +127,6 @@ class FourTrackProcessor extends AudioWorkletProcessor {
     } else if (m.type === 'getfile') {
       const f = this.files.get(m.path);
       this.port.postMessage({ type: 'file', path: m.path, data: f ? f.buf.slice(0, f.len) : null, why: m.why });
-    } else if (m.type === 'demo') {
-      this.demo = m.on; // can arrive before the engine has loaded
     } else if (!this.ready) {
       return;
     } else if (m.type === 'init-fonts') {
@@ -159,44 +154,11 @@ class FourTrackProcessor extends AudioWorkletProcessor {
     }
   }
 
-  // A made-up instrument for trying the recorder without a microphone: a plucked chord
-  // arpeggio, slightly different in the left and right channels.
-  demoBlock(outL, outR) {
-    const bpm = 100, notes = [220, 261.63, 329.63, 392, 329.63, 261.63, 196, 246.94];
-    const beat = (sampleRate * 60) / bpm / 2;
-    for (let i = 0; i < 128; i++) {
-      if (this.demoPhase % Math.floor(beat) === 0) {
-        const n = Math.floor(this.demoPhase / beat) % notes.length;
-        this.demoVoices.push({ f: notes[n], t: 0, p: 0 });
-        if (this.demoVoices.length > 6) this.demoVoices.shift();
-      }
-      this.demoPhase++;
-      let s = 0;
-      for (const v of this.demoVoices) {
-        v.p += v.f / sampleRate;
-        if (v.p >= 1) v.p -= 1;
-        const env = Math.exp(-v.t / (sampleRate * 0.5));
-        s += (v.p * 2 - 1) * env * 0.12 + Math.sin(v.p * 6.2832) * env * 0.12;
-        v.t++;
-      }
-      outL[i] = s;
-      outR[i] = s * 0.92;
-    }
-  }
-
   process(inputs, outputs) {
     const out = outputs[0];
     if (!this.ready) return true;
     const input = inputs[0];
-    // The demo instrument only sounds while a take is being recorded (first take or a Part)
-    const mode = this.x.ft_state_mode();
-    // While the take waits for sound the demo instrument stays quiet for two seconds, then plays
-    if (this.x.ft_state_waiting()) this.waitBlocks = (this.waitBlocks || 0) + 1; else this.waitBlocks = 0;
-    const quietWait = this.waitBlocks > 0 && this.waitBlocks < (2 * sampleRate) / 128;
-    if (this.demo) {
-      if ((mode === 1 || mode === 3) && !quietWait) this.demoBlock(this.inL, this.inR);
-      else { this.inL.fill(0); this.inR.fill(0); }
-    } else if (input && input.length > 0) {
+    if (input && input.length > 0) {
       this.inL.set(input[0]);
       this.inR.set(input.length > 1 ? input[1] : input[0]);
     } else {

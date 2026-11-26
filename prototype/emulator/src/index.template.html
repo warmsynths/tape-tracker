@@ -18,7 +18,7 @@
       <div class="screen-frame">
         <div class="screen"><canvas id="screen" width="800" height="480"></canvas>
           <div id="stock" hidden><img id="stockImg" alt=""><div id="stockCard"></div><div id="stockTag">Stock screen (picture only). Click to close.</div></div>
-          <div id="overlay"><div>Click anywhere to start the emulator<br><small>It records from a built-in demo instrument or your microphone. Use headphones.</small></div></div>
+          <div id="overlay"><div>Click anywhere to start the emulator<br><small>Play the chord pads and record them, or use your microphone. Use headphones.</small></div></div>
         </div>
       </div>
       <div class="hw-fn-row" aria-label="Buttons under the screen">
@@ -66,7 +66,7 @@
       </div>
     </div>
   </main>
-  <div class="footer-strip"><div class="last-event" id="lastEvent"><span>Last:</span>Ready. Press Rec (R), play the pads or the demo instrument, then Stop (button 2).</div><div class="hint">R rec &middot; Space play &middot; 1-8 buttons &middot; Arrows &middot; [ ] jog &middot; Enter insert &middot; C click &middot; H home</div></div>
+  <div class="footer-strip"><div class="last-event" id="lastEvent"><span>Last:</span>Ready. Press Rec (R), play the chord pads, then Stop (button 2).</div><div class="hint">R rec &middot; Space play &middot; 1-8 buttons &middot; Arrows &middot; [ ] jog &middot; Enter insert &middot; C click &middot; H home</div></div>
  </div>
 </div>
 
@@ -74,7 +74,7 @@
   <div class="drawer-head"><b>Emulator settings</b><button id="drawerClose" type="button" aria-label="Close">&#10005;</button></div>
   <p class="small">Not part of the device: sound, input, colours, files and pad samples.</p>
   <h2>Audio</h2>
-  <label><input type="radio" name="input" value="demo" checked> Demo instrument (plays only while you record)</label>
+  <label><input type="radio" name="input" value="none" checked> None (silent line input)</label>
   <label><input type="radio" name="input" value="mic"> Microphone</label>
   <p class="small">Use headphones with the microphone to avoid feedback.</p>
   <p class="small" id="note"></p>

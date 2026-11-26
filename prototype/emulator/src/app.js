@@ -147,7 +147,7 @@
     };
     node.port.postMessage({ type: 'init', wasm: WASM, palette: PALETTE, advances: advances(), files: (await loadSaved()).concat(demoCard()) });
     node.connect(audio.destination);
-    setInput('demo');
+    setInput('none');
     if (audio.state === 'suspended') await audio.resume();
   }
 
@@ -155,16 +155,14 @@
   async function setInput(kind) {
     document.querySelectorAll('[name=input]').forEach((r) => (r.checked = r.value === kind));
     if (micSource) { micSource.disconnect(); micSource = null; }
-    if (kind === 'demo') { send({ type: 'demo', on: true }); return; }
-    send({ type: 'demo', on: false });
     if (kind === 'mic') {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 } });
         micSource = audio.createMediaStreamSource(stream);
         micSource.connect(node);
       } catch (err) {
-        document.getElementById('note').textContent = 'Microphone not available: ' + err.message + '. Using the demo instrument.';
-        setInput('demo');
+        document.getElementById('note').textContent = 'Microphone not available: ' + err.message + '. The input is silent.';
+        setInput('none');
       }
     }
   }
