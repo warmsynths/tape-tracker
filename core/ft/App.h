@@ -178,7 +178,7 @@ class App
     void chordNote(int pad, int index, int note, bool on);
     Chords chords;
     bool padsChords = false;      // the pads play chords and scale notes
-    int chField = 0;              // chords page: 0 key, 1 scale, 2 style, 3 chord rows, 4 notes, 5 octave, 6 sound
+    int chField = 0;              // chords page 1: 0 key, 1 scale, 2 style, 3 chord rows, 4 notes, 5 octave, 6 sound; page 2: 0 to 3 row types, 4 to 9 colour chords
     int chSound = 0;              // 0 .. kSynthPresets - 1 the patches, then kSynthPresets: the pad sample
     // Sound page (Instr): a patch, eight tweak knobs on top, and every raw setting on the Advanced page
     void drawSound(class Pen& p);
@@ -210,6 +210,11 @@ class App
     uint32_t beatAt = 0;          // when the last beat started, for the pulse
     int lightBeat = -1;
     bool lightsOn = false;
+    void releasePad(int p);
+    void releaseLatched();
+    int chPage = 0;               // chords page: 0 harmony, 1 chord types
+    bool chHold = false;          // the Hold pad: chords keep sounding until the next one
+    bool latched[48] = {};
     uint8_t heldCount[48] = {};
     uint8_t heldNote[48][kMaxChordNotes] = {};
     int psField = 0;              // pad sample page: 0 tune, 1 volume, 2 pan, 3 play mode, 4 start, 5 end

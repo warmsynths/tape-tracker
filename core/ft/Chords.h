@@ -10,16 +10,29 @@ namespace ft
 // suggestion, because the whole set is on the pads. Portable, no libc: the emulator and the Tracker
 // run the same code.
 //
-// Layout: 12 columns by 4 rows. Pad numbers run along the rows, so pad 0 is the top left. The top
-// `chordRows` rows are chords; the rest are the scale's notes, rising left to right and from the
-// bottom row up.
-//   Chord rows, top down: triads, 7ths (or 9ths, per style), 9ths, suspended.
-//   Columns: the 7 degrees of the scale, then 5 colour chords chosen by the style (or shuffled).
+// The pads are 12 columns by 4 rows; pad numbers run along the rows, so pad 0 is the top left. They
+// are split into regions, so a layout is a short list of rectangles rather than fixed rows:
+//   Performance: the two right-hand columns (8 pads), played with the right hand.
+//   Chords: the top `chordRows` rows of the other ten columns. Each row is one chord type (Triad,
+//           7th, 9th, ...). The columns are the 7 degrees of the scale, then 3 colour chords.
+//   Notes:  the rest of those ten columns, scale notes rising left to right and from the bottom up.
 // A pad is always the same degree for a key and scale, so playing by memory works.
 
 constexpr int kScaleCount = 9;
 constexpr int kStyleCount = 5;
 constexpr int kMaxChordNotes = 6;
+constexpr int kColourChords = 3;
+constexpr int kPlayColumns = 10;   // columns 0 to 9 are chords and notes; 10 and 11 are performance pads
+constexpr int kChordTypes = 12;
+constexpr int kColourKinds = 4;
+
+// What a chord row plays. The seventh and ninth follow the scale ("diatonic"): the 7th on ii is m7,
+// on V it is a dominant 7. The others are literal over the degree's own triad (Maj7, 6, add9, add4)
+// or replace its third (sus2, sus4, 7sus4), so they can leave the key; those pads light dimmer.
+enum class ChordType : uint8_t
+{
+    Triad, Sixth, Seventh, MajSeventh, Ninth, Add9, Add4, Sus2, Sus4, SixNine, SevenSus4, Power
+};
 
 enum class NoteMode : uint8_t
 {
@@ -37,16 +50,26 @@ struct ChordCfg
     NoteMode noteMode = NoteMode::Scale;
     int8_t octave = 0;       // -2 to +2 octaves
     uint16_t shuffle = 0;    // 0: the style's own colour chords
+    uint8_t rowType[4] = { 0, 2, 4, 8 };        // the chord type of each row (Triad, 7th, 9th, Sus4)
+    uint8_t colSemi[kColourChords] = { 1, 3, 5 }; // colour chords: semitones above the tonic (1 to 11)
+    uint8_t colKind[kColourChords] = { 1, 1, 2 }; // and their kind, see kindName
 };
+
+// The right-hand performance pads
+enum class Perf : uint8_t { None, OctUp, OctDown, Inversion, Open, Sus, Seventh, Hold, Spare };
+// Modifiers that act while their pad is held and a chord is played
+enum Mod : uint8_t { ModOctUp = 1, ModOctDown = 2, ModInversion = 4, ModOpen = 8, ModSus = 16, ModSeventh = 32 };
 
 // What a pad lights as
 enum class Tier : uint8_t
 {
     Off = 0,
     Other,      // a note or chord that is in the set but not special
+    Outside,    // a chord that has notes outside the key
     ChordTone,  // a scale note that is in the chord played last (Follow mode)
     Colour,     // a colour chord
-    Tonic       // the key's tonic chord or note
+    Tonic,      // the key's tonic chord or note
+    Control     // a performance pad
 };
 
 class Chords
@@ -54,45 +77,55 @@ class Chords
   public:
     void init();
     ChordCfg cfg;
+    uint8_t mods = 0;        // the performance modifiers held right now
 
     // Call after the settings change
     void rebuild();
+    // Fills the colour chords (and with `rows` the row types) from the style and the shuffle
+    void applyStyle(bool rows = true);
 
     // The notes a pad plays (MIDI numbers), 0 if the pad has no chord or note. Does not change state.
     int notes(int pad, uint8_t* out) const;
     // Tell the engine a pad was played (for the Chord and Follow modes)
     void played(int pad);
     Tier tier(int pad) const;
-    bool isChordPad(int pad) const { return pad >= 0 && pad < 48 && pad / 12 < cfg.chordRows; }
-    // "Dm7", "Bb", "F#" ...
+    static bool isPerf(int pad) { return pad >= 0 && pad < 48 && pad % 12 >= kPlayColumns; }
+    static Perf perfOf(int pad);
+    static uint8_t modFor(Perf p);
+    bool isChordPad(int pad) const { return pad >= 0 && pad < 48 && !isPerf(pad) && pad / 12 < cfg.chordRows; }
+    // "Dm7", "Bb", "F#", or the name of a performance pad
     void label(int pad, char* out, int size) const;
-    // The 12 colour chords' names as "semitone quality" for the page: column 7 to 11
-    void colourName(int col, char* out, int size) const;
 
     static const char* scaleName(int s);
     static const char* styleName(int s);
     static const char* keyName(int k);
-    static const char* qualityName(int q);
+    static const char* typeName(int t);
+    static const char* kindName(int k);
+    static const char* perfName(Perf p);
 
-    // The notes of a scale degree chord for tests: variant 0 triad, 1 7th, 2 9th, 3 suspended
-    int degreeChord(int degree, int variant, uint8_t* out) const;
+    // The notes of a chord for tests: a degree 0 to 6 or a colour 7 to 9, and a type
+    int degreeChord(int col, int type, uint8_t* out) const;
 
   private:
+    struct Tones { int t, f, s, n; };  // third, fifth, seventh and ninth above the root, in semitones
     struct Chord
     {
-        uint8_t root;   // pitch class
-        uint8_t quality; // index into the quality table, 255 if unnamed
+        uint8_t root;    // pitch class
+        uint8_t quality; // index into the shape table, 255 if unnamed
+        uint8_t type;
+        uint8_t third, fifth;
         uint8_t count;
         uint8_t offset[kMaxChordNotes]; // semitones above the root, ascending
+        Tones tones;
     };
-    struct Colour { uint8_t semi; uint8_t triad; uint8_t rich; }; // semitone above the tonic, and qualities
-    void buildColumns();
-    Chord columnChord(int col, int variant) const;
-    void placeChord(const Chord& c, uint8_t* out, int& n) const;
+    Chord columnChord(int col, int type) const;
+    Chord makeChord(int rootPc, const Tones& tones, int type) const;
+    void placeChord(const Chord& c, bool withMods, uint8_t* out, int& n) const;
+    bool inKey(const Chord& c) const;
     int scaleNote(int index) const; // MIDI note of the scale's index-th note counting from the bottom
     int noteRowIndex(int pad) const;
+    int octaveShift() const;
 
-    Colour colour[5];
     uint8_t lastNotes[kMaxChordNotes];
     int lastCount;
     uint8_t lastPc[12];

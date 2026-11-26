@@ -978,6 +978,37 @@ int main()
         CHECK(hal.padsOn == 1, "with chord pads off, the pads are the normal pads again");
         app.pad(3, false);
     }
+    {   // performance pads, Hold, and the chord types page
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        app.key(kNote);
+        app.pad(10, true); // Oct +
+        CHECK(hal.notesOn == 0, "a performance pad makes no sound");
+        app.pad(0, true);
+        CHECK(hal.notesOn == 3 && hal.lastNote == 67, "Oct + held: the chord is an octave up (G5)");
+        app.pad(0, false); app.pad(10, false);
+        app.pad(0, true);
+        CHECK(hal.lastNote == 55, "released: back to normal");
+        app.pad(0, false);
+        CHECK(hal.notesOn == 0, "the chord ends with the pad");
+        app.pad(46, true); app.pad(46, false); // Hold
+        app.pad(0, true); app.pad(0, false);
+        CHECK(hal.notesOn == 3, "Hold keeps the chord sounding after the pad is let go");
+        app.pad(2, true);
+        CHECK(hal.notesOn == 3, "the next chord replaces it");
+        app.pad(2, false);
+        app.pad(46, true); app.pad(46, false); // Hold off
+        CHECK(hal.notesOn == 0, "Hold off lets it go");
+        // page 2: the type of row 1
+        app.key(kB7);
+        app.jog(1);
+        app.pad(0, true);
+        CHECK(hal.notesOn == 4 && hal.lastNote == 57, "row 1 is now a 6th: C E G A (changed by jog)");
+        app.pad(0, false);
+        app.key(kB7);
+        app.key(kB8);
+    }
     {   // Shift + Play switches the click; Play alone still plays
         FakeHal hal;
         App app(hal, palette());

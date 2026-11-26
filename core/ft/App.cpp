@@ -312,10 +312,46 @@ void App::chordNote(int pad, int index, int note, bool on)
     else hal.sampleNote(200 + pad * kMaxChordNotes + index, note, on);
 }
 
+void App::releasePad(int p)
+{
+    for (int i = 0; i < heldCount[p]; i++) chordNote(p, i, heldNote[p][i], false);
+    if (heldCount[p] != 0) hitAt[p] = hal.millis();
+    heldCount[p] = 0;
+    latched[p] = false;
+}
+
+void App::releaseLatched()
+{
+    for (int p = 0; p < 48; p++) if (latched[p]) releasePad(p);
+}
+
 void App::chordPad(int p, bool down)
 {
+    const Perf perf = Chords::perfOf(p);
+    if (perf != Perf::None)
+    {
+        // the performance pads: held modifiers, and Hold which latches
+        if (down)
+        {
+            heldCount[p] = 1;
+            hitAt[p] = hal.millis();
+            if (perf == Perf::Hold)
+            {
+                chHold = !chHold;
+                if (!chHold) releaseLatched();
+            }
+            else chords.mods |= Chords::modFor(perf);
+        }
+        else
+        {
+            heldCount[p] = 0;
+            chords.mods &= (uint8_t)~Chords::modFor(perf);
+        }
+        return;
+    }
     if (down)
     {
+        releaseLatched(); // a new chord ends the ones Hold kept
         if (heldCount[p] != 0) return;
         uint8_t n[kMaxChordNotes];
         const int count = chords.notes(p, n);
@@ -329,15 +365,21 @@ void App::chordPad(int p, bool down)
     }
     else
     {
-        for (int i = 0; i < heldCount[p]; i++) chordNote(p, i, heldNote[p][i], false);
-        if (heldCount[p] != 0) hitAt[p] = hal.millis();
-        heldCount[p] = 0;
+        if (heldCount[p] == 0) return;
+        if (chHold) { latched[p] = true; return; }
+        releasePad(p);
     }
 }
 
 void App::chordsReleaseAll()
 {
-    for (int p = 0; p < 48; p++) chordPad(p, false);
+    chHold = false;
+    for (int p = 0; p < 48; p++)
+    {
+        if (Chords::isPerf(p)) heldCount[p] = 0;
+        else releasePad(p);
+    }
+    chords.mods = 0;
     hal.synthAllOff();
 }
 
@@ -907,6 +949,8 @@ void App::serviceLights()
             case Tier::Colour: base = 5; break;
             case Tier::ChordTone: base = 10; break;
             case Tier::Other: base = 3; break;
+            case Tier::Outside: base = 2; break;
+            case Tier::Control: base = Chords::perfOf(p) == Perf::Hold && chHold ? 24 : 4; break;
             default: break;
         }
         int level = base;

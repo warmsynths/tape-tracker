@@ -1319,46 +1319,81 @@ void App::drawChords(Pen& p)
     heading(p, model, "Chords");
     const ChordCfg& c = chords.cfg;
     char b[24];
-    char v[7][24];
-    fmt(v[0], 24, "%s", Chords::keyName(c.key));
-    fmt(v[1], 24, "%s", Chords::scaleName(c.scale));
-    if (c.shuffle != 0) fmt(v[2], 24, "%s %u", Chords::styleName(c.style), (unsigned)c.shuffle);
-    else fmt(v[2], 24, "%s", Chords::styleName(c.style));
-    fmt(v[3], 24, "%d chords, %d notes", c.chordRows, 4 - c.chordRows);
-    fmt(v[4], 24, "%s", c.noteMode == NoteMode::Scale ? "Scale" : c.noteMode == NoteMode::Chord ? "Chord" : "Follow");
-    fmt(v[5], 24, "%s%d", c.octave > 0 ? "+" : "", c.octave);
-    fmt(v[6], 24, "%s%s", chSound < kSynthPresets ? synthPreset(chSound).name : "Sample", chSound < kSynthPresets && (sndMacros.any() || soundEdited()) ? " *" : "");
-    static const char* const names[7] = { "Key", "Scale", "Style", "Rows", "Note pads", "Octave", "Sound" };
-    static const int widths[7] = { 60, 140, 112, 152, 88, 70, 128 };
-    int x = 14;
-    for (int i = 0; i < 7; i++)
+    p.textRight(786, 44, chPage == 0 ? "Page 1 of 2: harmony" : "Page 2 of 2: chord types", F12, pal.dim);
+    int gy = 140, gstep = 64, gh = 62;
+    if (chPage == 0)
     {
-        p.cell(x, 64, widths[i], 60, i == chField, pal.panel);
-        p.text(x + 10, 72, names[i], F12, pal.dim);
-        p.text(x + 10, 92, v[i], F17B, pal.text);
-        x += widths[i] + 4;
+        char v[7][24];
+        fmt(v[0], 24, "%s", Chords::keyName(c.key));
+        fmt(v[1], 24, "%s", Chords::scaleName(c.scale));
+        if (c.shuffle != 0) fmt(v[2], 24, "%s %u", Chords::styleName(c.style), (unsigned)c.shuffle);
+        else fmt(v[2], 24, "%s", Chords::styleName(c.style));
+        fmt(v[3], 24, "%d chords, %d notes", c.chordRows, 4 - c.chordRows);
+        fmt(v[4], 24, "%s", c.noteMode == NoteMode::Scale ? "Scale" : c.noteMode == NoteMode::Chord ? "Chord" : "Follow");
+        fmt(v[5], 24, "%s%d", c.octave > 0 ? "+" : "", c.octave);
+        fmt(v[6], 24, "%s%s", chSound < kSynthPresets ? synthPreset(chSound).name : "Sample", chSound < kSynthPresets && (sndMacros.any() || soundEdited()) ? " *" : "");
+        static const char* const names[7] = { "Key", "Scale", "Style", "Rows", "Note pads", "Octave", "Sound" };
+        static const int widths[7] = { 60, 140, 112, 152, 88, 70, 128 };
+        int x = 14;
+        for (int i = 0; i < 7; i++)
+        {
+            p.cell(x, 64, widths[i], 60, i == chField, pal.panel);
+            p.text(x + 10, 72, names[i], F12, pal.dim);
+            p.text(x + 10, 92, v[i], F17B, pal.text);
+            x += widths[i] + 4;
+        }
+    }
+    else
+    {
+        // the type of each chord row, and the three colour chords
+        for (int i = 0; i < 4; i++)
+        {
+            const int x = 14 + i * 154;
+            p.cell(x, 62, 150, 52, i == chField, pal.panel);
+            fmt(b, sizeof b, "Row %d%s", i + 1, i < c.chordRows ? "" : " (off)");
+            p.text(x + 10, 68, b, F12, pal.dim);
+            p.text(x + 10, 86, Chords::typeName(c.rowType[i]), F17B, i < c.chordRows ? pal.text : pal.dim);
+        }
+        for (int i = 0; i < kColourChords * 2; i++)
+        {
+            const int x = 14 + i * 128, ci = i / 2;
+            p.cell(x, 120, 124, 52, 4 + i == chField, pal.panel);
+            fmt(b, sizeof b, "Colour %d %s", ci + 1, i % 2 == 0 ? "root" : "kind");
+            p.text(x + 10, 126, b, F12, pal.dim);
+            if (i % 2 == 0) fmt(b, sizeof b, "%s", Chords::keyName(c.key + c.colSemi[ci]));
+            else fmt(b, sizeof b, "%s", Chords::kindName(c.colKind[ci]));
+            p.text(x + 10, 144, b, F17B, pal.text);
+        }
+        gy = 182; gstep = 52; gh = 50;
     }
     // the 48 pads as they are laid out on the Tracker
     for (int pad = 0; pad < 48; pad++)
     {
-        const int px = 16 + (pad % 12) * 64, py = 140 + (pad / 12) * 64;
-        const bool held = heldCount[pad] != 0;
+        const int px = 16 + (pad % 12) * 64, py = gy + (pad / 12) * gstep;
+        const Perf perf = Chords::perfOf(pad);
+        const bool held = heldCount[pad] != 0 || (perf == Perf::Hold && chHold);
         const Tier t = chords.tier(pad);
         uint32_t fill = pal.panel;
         uint32_t ink = pal.text;
         if (t == Tier::Tonic) fill = pal.sel;
         else if (t == Tier::Colour) fill = pal.cell;
         else if (t == Tier::ChordTone) fill = pal.sel;
+        else if (t == Tier::Control) fill = pal.cell;
+        if (t == Tier::Outside || t == Tier::Off) ink = pal.dim;
         if (held) { fill = pal.text; ink = pal.bg; }
-        p.rect(px, py, 62, 62, fill);
+        p.rect(px, py, 62, gh, fill);
         if (!held && t == Tier::Tonic) p.rect(px, py, 62, 3, pal.marker);
-        if (!held && t == Tier::ChordTone) p.rect(px, py + 59, 62, 3, pal.meter);
+        if (!held && t == Tier::ChordTone) p.rect(px, py + gh - 3, 62, 3, pal.meter);
         if (!held && t == Tier::Colour) p.rect(px, py, 62, 3, pal.dim);
+        if (!held && t == Tier::Control) p.rect(px, py, 3, gh, pal.meter);
         chords.label(pad, b, sizeof b);
-        p.textMid(px, 62, py + 24, b, b[0] != 0 && p.width(b, F17B) <= 58 ? F17B : F12, ink);
+        p.textMid(px, 62, py + gh / 2 - 8, b, b[0] != 0 && p.width(b, F17B) <= 58 ? F17B : F12, ink);
     }
-    p.text(14, 412, c.chordRows == 0 ? "All pads play scale notes. Jog changes the selected value." : c.chordRows == 4 ? "All pads play chords. Jog changes the selected value." : "Top rows play chords, the rest scale notes. Jog changes the selected value.", F14, pal.text);
-    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Shuffle", "Reset", "Sound", "", "", "", "Back" };
+    if (chPage == 0)
+        p.text(14, 412, c.chordRows == 0 ? "All left pads play scale notes. The right two columns are performance pads." : "Left: chords by type, then scale notes. Right: Oct, Invert, Open, Sus, 7th (hold), Hold (latch).", F14, pal.text);
+    else
+        p.text(14, 412, "Dim chords are outside the key. Jog changes the selected setting.", F14, pal.text);
+    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Shuffle", "Reset", "Sound", "", "", chPage == 0 ? "Page 2" : "Page 1", "Back" };
     p.buttons(l, padsChords ? 1 : 0);
 }
 

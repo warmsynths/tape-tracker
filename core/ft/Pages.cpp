@@ -1753,10 +1753,11 @@ void App::resetAll()
 void App::chordsKey(int k)
 {
     ChordCfg& c = chords.cfg;
-    if (k == kLeft) chField = clampi(chField - 1, 0, 6);
-    else if (k == kRight) chField = clampi(chField + 1, 0, 6);
-    else if (k == kUp) chField = clampi(chField - 4, 0, 6);
-    else if (k == kDown) chField = clampi(chField + 4, 0, 6);
+    const int last = chPage == 0 ? 6 : 9;
+    if (k == kLeft) chField = clampi(chField - 1, 0, last);
+    else if (k == kRight) chField = clampi(chField + 1, 0, last);
+    else if (k == kUp) chField = clampi(chField - (chPage == 0 ? 4 : 5), 0, last);
+    else if (k == kDown) chField = clampi(chField + (chPage == 0 ? 4 : 5), 0, last);
     else if (k == kB1)
     {
         if (padsChords) chordsOff();
@@ -1766,10 +1767,12 @@ void App::chordsKey(int k)
     {
         chordsReleaseAll();
         c.shuffle = k == kB3 ? 0 : (uint16_t)(c.shuffle >= 65000 ? 1 : c.shuffle + 1);
+        chords.applyStyle(false); // the colour chords only: the row types stay as they are
         chords.rebuild();
         soundMark();
     }
     else if (k == kB4) { if (chSound >= kSynthPresets) chSound = sndPreset; open(Screen::Sound); return; }
+    else if (k == kB7) { chPage = 1 - chPage; chField = 0; }
     else if (k == kB8 || k == kNote) { back(); return; }
 }
 
@@ -1778,11 +1781,24 @@ void App::chordsJog(int delta)
     ChordCfg& c = chords.cfg;
     const int d = delta > 0 ? 1 : -1;
     chordsReleaseAll();
+    if (chPage == 1)
+    {
+        if (chField < 4) c.rowType[chField] = (uint8_t)((c.rowType[chField] + kChordTypes + d) % kChordTypes);
+        else
+        {
+            const int i = (chField - 4) / 2;
+            if ((chField - 4) % 2 == 0) c.colSemi[i] = (uint8_t)(c.colSemi[i] + d < 1 ? 11 : c.colSemi[i] + d > 11 ? 1 : c.colSemi[i] + d);
+            else c.colKind[i] = (uint8_t)((c.colKind[i] + kColourKinds + d) % kColourKinds);
+        }
+        chords.rebuild();
+        soundMark();
+        return;
+    }
     switch (chField)
     {
         case 0: c.key = (uint8_t)((c.key + 12 + d) % 12); break;
         case 1: c.scale = (uint8_t)((c.scale + kScaleCount + d) % kScaleCount); break;
-        case 2: c.style = (uint8_t)((c.style + kStyleCount + d) % kStyleCount); c.shuffle = 0; break;
+        case 2: c.style = (uint8_t)((c.style + kStyleCount + d) % kStyleCount); c.shuffle = 0; chords.applyStyle(true); break;
         case 3: c.chordRows = (uint8_t)clampi(c.chordRows + d, 0, 4); break;
         case 4: c.noteMode = (NoteMode)(((int)c.noteMode + 3 + d) % 3); break;
         case 5: c.octave = (int8_t)clampi(c.octave + d, -2, 2); break;
@@ -1887,12 +1903,14 @@ void App::soundAdvJog(int delta)
 void App::soundSave()
 {
     if (!hal.sdPresent()) return;
-    uint8_t b[160];
+    uint8_t b[200];
     int n = 0;
-    b[n++] = 'F'; b[n++] = 'S'; b[n++] = '0'; b[n++] = '1';
+    b[n++] = 'F'; b[n++] = 'S'; b[n++] = '0'; b[n++] = '2';
     const ChordCfg& c = chords.cfg;
     b[n++] = c.key; b[n++] = c.scale; b[n++] = c.style; b[n++] = c.chordRows; b[n++] = (uint8_t)c.noteMode; b[n++] = (uint8_t)c.octave;
     b[n++] = (uint8_t)(c.shuffle & 255); b[n++] = (uint8_t)(c.shuffle >> 8);
+    for (int i = 0; i < 4; i++) b[n++] = c.rowType[i];
+    for (int i = 0; i < kColourChords; i++) { b[n++] = c.colSemi[i]; b[n++] = c.colKind[i]; }
     b[n++] = (uint8_t)chSound; b[n++] = (uint8_t)sndPreset;
     for (int i = 0; i < kSynthMacros; i++) b[n++] = (uint8_t)sndMacros.v[i];
     for (int i = 0; i < kSynthParams; i++)
@@ -1906,14 +1924,16 @@ void App::soundSave()
 
 void App::soundLoad()
 {
-    uint8_t b[160];
-    const uint32_t want = 4 + 6 + 2 + 2 + kSynthMacros + 4 * kSynthParams;
+    uint8_t b[200];
+    const uint32_t want = 4 + 6 + 2 + 4 + 2 * kColourChords + 2 + kSynthMacros + 4 * kSynthParams;
     if (hal.fileSize("sound.cfg") != want || hal.fileRead("sound.cfg", 0, b, want) != want) return;
-    if (b[0] != 'F' || b[1] != 'S' || b[2] != '0' || b[3] != '1') return;
+    if (b[0] != 'F' || b[1] != 'S' || b[2] != '0' || b[3] != '2') return;
     int n = 4;
     ChordCfg& c = chords.cfg;
     c.key = b[n++]; c.scale = b[n++]; c.style = b[n++]; c.chordRows = b[n++]; c.noteMode = (NoteMode)(b[n] > 2 ? 0 : b[n]); n++; c.octave = (int8_t)b[n++];
     c.shuffle = (uint16_t)(b[n] | (b[n + 1] << 8)); n += 2;
+    for (int i = 0; i < 4; i++) c.rowType[i] = b[n++];
+    for (int i = 0; i < kColourChords; i++) { c.colSemi[i] = b[n++]; c.colKind[i] = b[n++]; }
     chSound = clampi(b[n++], 0, kSynthPresets);
     sndPreset = clampi(b[n++], 0, kSynthPresets - 1);
     sndBase = synthPreset(sndPreset);
