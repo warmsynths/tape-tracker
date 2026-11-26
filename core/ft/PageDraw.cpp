@@ -72,6 +72,7 @@ void App::buildPage()
         case Screen::PadSample: drawPadSample(p); break;
         case Screen::Load: drawLoad(p); break;
         case Screen::Resample: drawResample(p); break;
+        case Screen::Device: if (fwUpdating) drawFirmwareUpdate(p); else drawDevice(p); break;
         default: break;
     }
     if (popupKind != Popup::None)
@@ -617,6 +618,71 @@ void App::drawResample(Pen& p)
     const bool b1dim = full;
     if (rec) { p.rect(17, 455, 10, 10, pal.text); p.text(35, 451, "Cancel", F14, pal.text); }
     else { if (!b1dim) p.dot(22, 460, 5, pal.rec); p.text(35, 451, "Record", F14, b1dim ? pal.dim : pal.text); }
+}
+
+//--------------------------------------------------------------------------------------------
+// C5 Device settings (Config button)
+void App::drawDevice(Pen& p)
+{
+    heading(p, model, "Device settings", 39);
+    p.textRight(786, 42, "Saved on the device, for every project", F12, pal.dim);
+    static const char* const groups[8] = { "MIDI", "USB audio", "Line input", "Volume", "Display", "Four-Track", "Firmware", "About" };
+    for (int g = 0; g < 8; g++)
+    {
+        const int y = 64 + g * 34;
+        if (g == dvGroup)
+        {
+            p.rect(0, y, 200, 32, pal.sel);
+            if (!dvRows) p.rect(0, y, 4, 32, pal.text);
+        }
+        p.text(16, y + 8, groups[g], g == dvGroup ? F14B : F14, g == dvGroup ? pal.text : pal.dim);
+    }
+    p.rect(200, 64, 1, 300, pal.frame);
+    char name[100], val[100], help[100];
+    const int rows = deviceRowCount(dvGroup);
+    char focusName[80] = "", focusHelp[100] = "";
+    for (int r = 0; r < rows; r++)
+    {
+        deviceRow(dvGroup, r, name, val, help, 100);
+        const int y = 64 + r * 34;
+        const bool focus = dvRows && r == dvRow;
+        if (focus)
+        {
+            p.rect(201, y, 599, 32, pal.sel);
+            p.rect(201, y, 599, 2, pal.text);
+        }
+        p.text(216, y + 8, name, focus ? F14B : F14, pal.text);
+        p.text(500, y + 7, val, F17B, pal.text);
+        if (r == (dvRows ? dvRow : 0)) { fmt(focusName, sizeof focusName, "%s", name); fmt(focusHelp, sizeof focusHelp, "%s", help); }
+    }
+    p.rect(0, 376, 800, 1, pal.frame);
+    char title[120];
+    fmt(title, sizeof title, "%s - %s", focusName, groups[dvGroup]);
+    p.text(14, 387, title, F17B, pal.text);
+    p.text(14, 411, focusHelp, F14, pal.text);
+    const char* l[8] = { dvGroup == 6 && fwCount > 0 ? "Update" : "", "", "", "", "", "", "", "Back" };
+    p.buttons(l);
+}
+
+void App::drawFirmwareUpdate(Pen& p)
+{
+    heading(p, model, "Updating firmware", 41);
+    char b[100];
+    fmt(b, sizeof b, "Installing from %s", fwNames[fwSel]);
+    p.text(14, 77, b, F14, pal.text);
+    const int pc = hal.firmwareProgress();
+    p.rect(14, 112, 680, 10, pal.track);
+    if (pc > 0) p.rect(14, 112, 680 * (pc > 100 ? 100 : pc) / 100, 10, pal.text);
+    if (pc >= 0) { fmt(b, sizeof b, "%d%%", pc); p.textRight(786, 107, b, F17, pal.text); }
+    p.text(14, 143, fwInstalled ? "Writing" : "Starting the updater", F12, pal.dim);
+    p.rect(0, 180, 800, 1, pal.frame);
+    p.text(14, 197, "Do not switch off or take out the card.", F17B, pal.warn);
+    p.text(14, 225, "The Tracker restarts by itself when the update is done.", F14, pal.text);
+    if (fwSavedFirst) fmt(b, sizeof b, "%s was saved before the update started.", projectName);
+    else fmt(b, sizeof b, "%s had no changes to save.", projectName);
+    p.text(14, 245, b, F14, pal.text);
+    const char* l[8] = { "", "", "", "", "", "", "", "" };
+    p.buttons(l);
 }
 
 //--------------------------------------------------------------------------------------------

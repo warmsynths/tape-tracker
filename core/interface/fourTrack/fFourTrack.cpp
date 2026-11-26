@@ -45,6 +45,7 @@ static void functFile() { functKey(ft::kFile); }
 static void functPattern() { functKey(ft::kPattern); } // home
 static void functParams() { functKey(ft::kParams); } // the track mixer
 static void functSamplePlay() { functKey(ft::kSamplePlay); } // pad sample settings
+static void functConfig() { functKey(ft::kConfig); } // device settings
 static void functSampleRec() { functKey(ft::kSampleRec); } // resample the mix
 static void functSampleLoad() { functKey(ft::kSampleLoad); } // load samples from the card
 static void functSong() { functKey(ft::kSong); } // the Song button switches the click on or off
@@ -92,7 +93,7 @@ void cFourTrack::start(uint32_t options)
     songTimer.hide();
 
     ip->setButtonObj(interfaceButtonParams, buttonPress, functParams);
-    ip->setButtonObj(interfaceButtonConfig, buttonPress, functSwitchModule);
+    ip->setButtonObj(interfaceButtonConfig, buttonPress, functConfig);
     ip->setButtonObj(interfaceButtonSamplePlay, buttonPress, functSamplePlay);
     // These four open pages of this screen: Part Editor, Glitch, Lo-fi master, Project
     ip->setButtonObj(interfaceButtonSampleEdit, buttonPress, functSampleEdit);

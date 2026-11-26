@@ -2,6 +2,9 @@
 
 #include "Platform.h"
 #include "fileManager.h"
+#include "configEditor/configMenuActions.h"
+#include "core/interfaceDefs.h"
+#include "mtConfig.h"
 #include "Recorder.h"
 #include "mtAudioEngine.h"
 #include "mtConfig.h"
@@ -553,3 +556,65 @@ void FourTrackHal::previewFile(const char* path, bool on)
 }
 
 bool FourTrackHal::previewActive() { return newFileManager.getStatus() == fmPreviewSampleFromSd; }
+
+//--------------------------------------------------------------------------------------------
+// Device settings: the same values the stock Config screen edits, so nothing else changes
+
+int FourTrackHal::deviceValue(ft::Dev d)
+{
+    switch (d)
+    {
+        case ft::Dev::MidiIn: return mtConfig.midi.notesInMode;
+        case ft::Dev::MidiInChannel: return mtConfig.midi.notesInChannel;
+        case ft::Dev::MidiOut: return mtConfig.midi.notesOutMode;
+        case ft::Dev::UsbAudio: return mtConfig.common.usbAudioMode;
+        case ft::Dev::LineInput: return mtConfig.general.lineInOutType;
+        case ft::Dev::Volume: return mtConfig.audioCodecConfig.volume;
+        case ft::Dev::Brightness: return mtConfig.general.dispBrightness;
+    }
+    return 0;
+}
+
+void FourTrackHal::setDeviceValue(ft::Dev d, int v)
+{
+    switch (d)
+    {
+        case ft::Dev::MidiIn: mtConfig.midi.notesInMode = (uint8_t)v; break;
+        case ft::Dev::MidiInChannel: mtConfig.midi.notesInChannel = (uint8_t)v; break;
+        case ft::Dev::MidiOut: mtConfig.midi.notesOutMode = (uint8_t)v; break;
+        case ft::Dev::UsbAudio: mtConfig.common.usbAudioMode = (uint8_t)v; usbAudioChange(); break;
+        case ft::Dev::LineInput: mtConfig.general.lineInOutType = (uint8_t)v; setLineInOutType(); break;
+        case ft::Dev::Volume: mtConfig.audioCodecConfig.volume = (uint8_t)v; engine.setHeadphonesVolume(mtConfig.audioCodecConfig.volume); break;
+        case ft::Dev::Brightness: mtConfig.general.dispBrightness = (uint8_t)v; setDisplayBrightness(); break;
+    }
+    saveConfigAsap();
+}
+
+void FourTrackHal::firmwareVersion(char* out, int size) { snprintf(out, size, "%s", interfaceGlobals.currentFirmwareVersion); }
+
+int FourTrackHal::firmwareFiles(char (*names)[28], int max)
+{
+    FileSystem* fs = platform->getFileSystem();
+    closeFiles();
+    if (!fs->isSdCardInserted()) return 0;
+    static char buffer[8 * 28];
+    char* list[8];
+    int count = max < 8 ? max : 8;
+    fs->listDirContents("Firmware", FileSystem::kFiles, [](const char* n) { const size_t l = strlen(n); return l > 4 && n[0] != '.' && strcasecmp(n + l - 4, ".ptf") == 0; }, buffer, sizeof buffer, 28, count, list);
+    int n = 0;
+    for (int i = 0; i < count && n < max; i++)
+    {
+        if (list[i] == nullptr || list[i][0] == 0) continue;
+        snprintf(names[n++], 28, "%s", list[i]);
+    }
+    return n;
+}
+
+// The stock updater: the bootloader takes over and installs the file from the Firmware folder.
+bool FourTrackHal::firmwareInstall(const char* name)
+{
+    static char file[32];
+    snprintf(file, sizeof file, "%s", name);
+    platform->runBootloader(file);
+    return true;
+}

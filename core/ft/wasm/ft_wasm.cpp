@@ -320,6 +320,35 @@ class EmuHal : public Hal
     }
     bool previewActive() override { for (auto& v : voices) if (v.on && v.pad == 950) return true; return false; }
 
+    // device settings and the firmware update (a pretend update: it counts up and then restarts)
+    int devVal[7] = { 3, 0, 2, 3, 0, 80, 2 };
+    uint32_t fwStartMs = 0;
+    bool fwRunning = false;
+    int deviceValue(Dev d) override { return devVal[(int)d]; }
+    void setDeviceValue(Dev d, int v) override { devVal[(int)d] = v; }
+    void firmwareVersion(char* out, int size) override
+    {
+        const char* v = "1.0.0 emulator";
+        int i = 0;
+        for (; i < size - 1 && v[i]; i++) out[i] = v[i];
+        out[i] = 0;
+    }
+    int firmwareFiles(char (*names)[28], int max) override
+    {
+        const char* f = "tracker-ft6.ptf";
+        if (max < 1 || host_file_size("/Firmware/tracker-ft6.ptf") == 0) return 0;
+        int i = 0;
+        for (; f[i]; i++) names[0][i] = f[i];
+        names[0][i] = 0;
+        return 1;
+    }
+    bool firmwareInstall(const char*) override { fwRunning = true; fwStartMs = nowMs; return true; }
+    int firmwareProgress() override
+    {
+        if (!fwRunning) return 0;
+        const uint32_t e = nowMs - fwStartMs;
+        return e >= 6000 ? 100 : (int)(e / 60);
+    }
     void padOn(int pad, bool keysMode) override
     {
         const int semis = keysMode ? (pad % 12) + 12 * ((pad / 12) % 4) - 12 : 0;

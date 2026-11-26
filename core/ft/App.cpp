@@ -209,6 +209,7 @@ void App::key(int k)
         case kSamplePlay: psField = 0; open(Screen::PadSample); break;
         case kSampleLoad: open(Screen::Load); loadOpen(); break;
         case kSampleRec: resampleOpen(); open(Screen::Resample); break;
+        case kConfig: deviceOpen(); open(Screen::Device); break;
         case kFile: refreshProjectList(); open(Screen::Project); break;
         default: break;
     }
@@ -794,7 +795,15 @@ void App::tick()
     serviceCountIn();
     serviceClick();
     serviceJob();
+    serviceFirmware();
     refresh(false);
+}
+
+void App::serviceFirmware()
+{
+    if (!fwUpdating) return;
+    if (!fwInstalled && hal.millis() - fwStartMs > 700) { fwInstalled = true; hal.firmwareInstall(fwNames[fwSel]); } // after the screen has been drawn
+    if (fwInstalled && hal.firmwareProgress() >= 100) { fwUpdating = false; fwInstalled = false; back(); } // only the emulator gets here: a Tracker restarts
 }
 
 bool App::updateTrackMeters()

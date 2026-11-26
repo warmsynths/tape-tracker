@@ -30,12 +30,13 @@ enum Key
     kSamplePlay,   // settings of the pad sample
     kSampleLoad,   // load samples from the SD card
     kSampleRec,    // resample the mix into a pad slot
+    kConfig,       // device settings
     kKeyCount
 };
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device
 };
 
 enum class Popup : uint8_t
@@ -204,6 +205,23 @@ class App
     char rsPath[64] = {};
     int rsLevelL = -60, rsLevelR = -60;
     uint32_t rsBytesSaved = 0;
+    // C5 Device settings: groups on the left, the rows of the chosen group on the right
+    void drawDevice(class Pen& p);
+    void drawFirmwareUpdate(class Pen& p);
+    void deviceOpen();
+    void deviceKey(int k);
+    void deviceJog(int delta);
+    int deviceRowCount(int group) const;
+    void deviceRow(int group, int row, char* name, char* value, char* help, int size);
+    void deviceChange(int group, int row, int delta);
+    void firmwareGo();
+    void serviceFirmware();
+    int dvGroup = 0, dvRow = 0;
+    bool dvRows = true;           // focus is on the rows (false: on the list of groups)
+    char fwNames[4][28] = {};
+    int fwCount = 0, fwSel = 0;
+    bool fwUpdating = false, fwInstalled = false, fwSavedFirst = false;
+    uint32_t fwStartMs = 0;
     int mxTrack = 0, mxField = 0; // mixer: the column and the control in focus (0 level, 1 pan, 2 tone)
     void drawPopup(class Pen& p);
     void showPopup(Popup kind, int arg = 0);

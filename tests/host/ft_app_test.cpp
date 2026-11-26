@@ -146,6 +146,15 @@ struct FakeHal : Hal
     void setPadSample(int slot, const PadSample& in) override { if (slot >= 0 && slot < 48) sampleData[slot] = in; }
     int padSampleWave(int, uint8_t* out, int columns) override { for (int i = 0; i < columns; i++) out[i] = (uint8_t)(i % 200); return columns; }
     void padAudition(int, bool) override {}
+    int devVal[7] = { 3, 0, 2, 3, 0, 80, 2 };
+    bool fwInstalled = false;
+    uint32_t fwAt = 0;
+    int deviceValue(Dev d) override { return devVal[(int)d]; }
+    void setDeviceValue(Dev d, int v) override { devVal[(int)d] = v; }
+    void firmwareVersion(char* out, int size) override { std::snprintf(out, size, "1.0.0 test"); }
+    int firmwareFiles(char (*names)[28], int max) override { if (max < 1 || !files.count("/Firmware/tracker-ft6.ptf")) return 0; std::snprintf(names[0], 28, "tracker-ft6.ptf"); return 1; }
+    bool firmwareInstall(const char*) override { fwInstalled = true; fwAt = nowMs; return true; }
+    int firmwareProgress() override { return fwInstalled ? (nowMs - fwAt >= 3000 ? 100 : 50) : 0; }
     void padOn(int, bool) override { padsOn++; }
     void padOff(int) override { padsOn--; }
     void padsReleaseAll() override { padsOn = 0; }
@@ -452,6 +461,51 @@ static void pagesAndProjects()
         app.key(kB1);
         app.key(kB8);
         CHECK(app.screen() == Screen::Main, "Back goes home once the recording is cancelled");
+    }
+    {   // Device settings: groups, values, firmware update
+        FakeHal hal;
+        std::vector<uint8_t> f(100, 1);
+        hal.files["/Firmware/tracker-ft6.ptf"] = f;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kConfig);
+        CHECK(app.screen() == Screen::Device, "Config opens Device settings");
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        CHECK(!app.pageOverflowed() && app.stagesOf(4) <= 5, "the device page fits the drawing budget");
+        app.key(kDown);
+        app.jog(-1);
+        CHECK(hal.devVal[(int)Dev::MidiInChannel] == 0 && hal.devVal[(int)Dev::MidiIn] == 3, "the jog changes the focused row only");
+        app.jog(1);
+        CHECK(hal.devVal[(int)Dev::MidiInChannel] == 1, "jog up moves the MIDI in channel to 1");
+        app.key(kLeft);
+        app.key(kDown);
+        app.key(kDown);
+        app.key(kDown);
+        app.key(kRight);
+        app.jog(-1);
+        CHECK(hal.devVal[(int)Dev::Volume] == 79, "Volume group: the jog changes the volume");
+        app.setShift(true); app.jog(-1); app.setShift(false);
+        CHECK(hal.devVal[(int)Dev::Volume] == 74, "shift + jog moves in larger steps");
+        app.key(kLeft);
+        app.key(kDown); app.key(kDown);
+        app.key(kRight);
+        app.jog(1);
+        CHECK(app.settings().windowIdx == 3, "Four-Track group: the alignment window changes");
+        app.key(kLeft);
+        app.key(kDown);
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        app.key(kB1);
+        CHECK(!hal.fwInstalled, "the updater starts after the update screen has been drawn");
+        hal.nowMs += 800;
+        app.tick();
+        CHECK(hal.fwInstalled, "B1 in the Firmware group starts the update");
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Device, "nothing answers during the update");
+        hal.nowMs += 4000;
+        app.tick();
+        CHECK(app.screen() == Screen::Main, "the emulator returns home when its pretend update ends");
     }
     {   // the Pattern button is home
         FakeHal hal;

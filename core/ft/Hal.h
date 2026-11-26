@@ -30,6 +30,18 @@ struct PadSample
     uint16_t end;
 };
 
+// Device settings that live on the machine, not in a project (Device settings page)
+enum class Dev : uint8_t
+{
+    MidiIn,        // 0 Off, 1 USB, 2 TRS, 3 USB and TRS
+    MidiInChannel, // 0 All, 1 to 16
+    MidiOut,       // 0 Off, 1 USB, 2 TRS, 3 USB and TRS
+    UsbAudio,      // 0 Off, 1 Input, 2 Output, 3 Input and output
+    LineInput,     // 0 Stereo, 1 Mono left, 2 Mono right
+    Volume,        // 0 to 100
+    Brightness     // 0 Low, 1 Medium, 2 High
+};
+
 // One line of an SD card folder listing (Load samples)
 struct BrowseEntry
 {
@@ -115,6 +127,14 @@ class Hal
     virtual bool loadSampleFile(const char* path, int slot) = 0;          // false: not readable or no memory left
     virtual void previewFile(const char* path, bool on) = 0;
     virtual bool previewActive() = 0;
+
+    // Device settings, and the firmware update
+    virtual int deviceValue(Dev d) = 0;
+    virtual void setDeviceValue(Dev d, int value) = 0;
+    virtual void firmwareVersion(char* out, int size) = 0;
+    virtual int firmwareFiles(char (*names)[28], int max) = 0;   // update files on the card
+    virtual bool firmwareInstall(const char* name) = 0;           // hands over to the updater; on a Tracker it does not come back
+    virtual int firmwareProgress() = 0;                           // 0 to 100, or -1 when the updater shows its own progress
 
     // Pads
     virtual void padOn(int pad, bool keysMode) = 0;

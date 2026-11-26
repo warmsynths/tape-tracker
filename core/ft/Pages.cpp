@@ -2,6 +2,7 @@
 // Export, Pads, Memory, and the popups. Each is built into a Canvas (docs/design/screen-requirements.md).
 
 #include "App.h"
+#include "BuildId.h"
 #include "MiniFmt.h"
 #include "Pen.h"
 #include "loop_fill.h"
@@ -252,6 +253,7 @@ void App::keyScreen(int k)
             break;
         case Screen::Load: loadKey(k); break;
         case Screen::Resample: resampleKey(k); break;
+        case Screen::Device: deviceKey(k); break;
         case Screen::Glitch: glitchKey(k); break;
         case Screen::Master: masterKey(k); break;
         case Screen::Input:
@@ -389,6 +391,7 @@ void App::jogScreen(int delta)
         case Screen::PadSample: psChange(delta); break;
         case Screen::Load: loadJog(delta); break;
         case Screen::Resample: resampleJog(delta); break;
+        case Screen::Device: deviceJog(delta); break;
         case Screen::Master: masterJog(delta); break;
         case Screen::Input:
         {
@@ -987,6 +990,7 @@ void App::serviceJob()
         dirtyAll();
         if (job == Job::None && act == 1) newProject();
         else if (act == 2) startLoad(pendingName);
+        else if (act == 3) { current = Screen::Device; fwSavedFirst = true; firmwareGo(); }
         syncPlayer();
         refresh(true);
         return;
@@ -1334,5 +1338,143 @@ void App::resampleJog(int delta)
     if (rsJogSlot) rsSlot = clampi(rsSlot + d, 0, 47);
     else rsLoops = clampi(rsLoops + d, 1, 4);
     if (rsState == Rs::Saved) rsState = Rs::Ready;
+}
+
+//--------------------------------------------------------------------------------------------
+// C5 Device settings (Config button)
+
+int App::deviceRowCount(int g) const
+{
+    static const int n[8] = { 3, 1, 1, 1, 1, 4, 2, 2 };
+    return n[g < 0 || g > 7 ? 0 : g];
+}
+
+void App::deviceOpen()
+{
+    dvGroup = 0;
+    dvRow = 0;
+    dvRows = true;
+    fwCount = hal.firmwareFiles(fwNames, 4);
+    fwSel = 0;
+}
+
+void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
+{
+    static const char* const via[4] = { "Off", "USB", "TRS", "USB and TRS" };
+    static const char* const usb[4] = { "Off", "Input", "Output", "Input and output" };
+    static const char* const line[3] = { "Stereo", "Mono left", "Mono right" };
+    static const char* const bright[3] = { "Low", "Medium", "High" };
+    static const char* const wins[5] = { "Off", "30 ms", "60 ms", "100 ms", "150 ms" };
+    static const char* const rolls[5] = { "0 ms", "60 ms", "120 ms", "250 ms", "500 ms" };
+    static const char* const rounds[3] = { "Off", "0.1 BPM", "1 BPM" };
+    const char* n = "";
+    const char* h = "";
+    value[0] = 0;
+    switch (g)
+    {
+        case 0:
+            if (r == 0) { n = "MIDI in"; fmt(value, size, "%s", via[hal.deviceValue(Dev::MidiIn) & 3]); h = "Where MIDI notes come from. Off ignores them."; }
+            else if (r == 1)
+            {
+                n = "In channel";
+                const int c = hal.deviceValue(Dev::MidiInChannel);
+                if (c == 0) fmt(value, size, "All"); else fmt(value, size, "%d", c);
+                h = "Notes on this channel play the pads. All listens on every channel.";
+            }
+            else { n = "MIDI out"; fmt(value, size, "%s", via[hal.deviceValue(Dev::MidiOut) & 3]); h = "Where the pads send their notes."; }
+            break;
+        case 1: n = "USB audio"; fmt(value, size, "%s", usb[hal.deviceValue(Dev::UsbAudio) & 3]); h = "Audio over USB: the Tracker's output, a computer's audio in, or both."; break;
+        case 2: n = "Line input"; fmt(value, size, "%s", line[hal.deviceValue(Dev::LineInput) % 3]); h = "Stereo uses both line inputs. Mono left or right records one side to both."; break;
+        case 3: n = "Volume"; fmt(value, size, "%d", hal.deviceValue(Dev::Volume)); h = "Headphone and output level. Shift + jog moves in larger steps."; break;
+        case 4: n = "Brightness"; fmt(value, size, "%s", bright[hal.deviceValue(Dev::Brightness) % 3]); h = "How bright the screen is."; break;
+        case 5:
+            if (r == 0) { n = "Alignment window"; fmt(value, size, "%s", wins[set.windowIdx % 5]); h = "A new Part whose first sound lands this close to the loop start is moved onto it."; }
+            else if (r == 1) { n = "Pre-roll"; fmt(value, size, "%s", rolls[set.preRollIdx % 5]); h = "How long before the loop start a Part begins recording, so nothing is missed."; }
+            else if (r == 2) { n = "Tempo rounding"; fmt(value, size, "%s", rounds[set.roundIdx % 3]); h = "The tempo worked out from the first take is rounded to this step."; }
+            else { n = "Wait level"; fmt(value, size, "%d dB", (int)set.waitDb); h = "How loud the input must get before a waiting first take starts."; }
+            break;
+        case 6:
+            if (r == 0) { n = "Installed"; hal.firmwareVersion(value, size); h = "The firmware on this Tracker."; }
+            else
+            {
+                n = "Update file";
+                if (fwCount > 0) { fmt(value, size, "%s", fwNames[fwSel]); fmt(help, size, "B1 installs %s from the card. The project is saved first.", fwNames[fwSel]); { fmt(name, size, "%s", n); return; } }
+                fmt(value, size, "None found");
+                h = "Put a .ptf update file in the Firmware folder on the card.";
+            }
+            break;
+        default:
+            if (r == 0) { n = "Version"; hal.firmwareVersion(value, size); h = "The firmware version of this Tracker."; }
+            else { n = "Build"; fmt(value, size, "%s", FT_BUILD_ID); h = "The build of the Four-Track code. The emulator shows the same id when it runs the same code."; }
+            break;
+    }
+    fmt(help, size, "%s", h);
+    fmt(name, size, "%s", n);
+}
+
+void App::deviceChange(int g, int r, int delta)
+{
+    const int d = delta > 0 ? 1 : -1;
+    auto step = [&](Dev dev, int lo, int hi, int by) { hal.setDeviceValue(dev, clampi(hal.deviceValue(dev) + d * by, lo, hi)); };
+    switch (g)
+    {
+        case 0: if (r == 0) step(Dev::MidiIn, 0, 3, 1); else if (r == 1) step(Dev::MidiInChannel, 0, 16, 1); else step(Dev::MidiOut, 0, 3, 1); break;
+        case 1: step(Dev::UsbAudio, 0, 3, 1); break;
+        case 2: step(Dev::LineInput, 0, 2, 1); break;
+        case 3: step(Dev::Volume, 0, 100, shift ? 5 : 1); break;
+        case 4: step(Dev::Brightness, 0, 2, 1); break;
+        case 5:
+            if (r == 0) set.windowIdx = (uint8_t)clampi(set.windowIdx + d, 0, 4);
+            else if (r == 1) set.preRollIdx = (uint8_t)clampi(set.preRollIdx + d, 0, 4);
+            else if (r == 2) set.roundIdx = (uint8_t)clampi(set.roundIdx + d, 0, 2);
+            else set.waitDb = (int8_t)clampi(set.waitDb + d, -60, -12);
+            break;
+        case 6: if (r == 1 && fwCount > 0) fwSel = clampi(fwSel + d, 0, fwCount - 1); break;
+        default: break;
+    }
+}
+
+void App::firmwareGo()
+{
+    fwUpdating = true;
+    fwInstalled = false;
+    fwStartMs = hal.millis();
+    current = Screen::Device;
+    redraw[4] = true;
+    refresh(true);
+}
+
+void App::deviceKey(int k)
+{
+    if (fwUpdating) return; // nothing answers until the updater is done
+    switch (k)
+    {
+        case kUp: case kDown:
+        {
+            const int d = k == kDown ? 1 : -1;
+            if (dvRows) dvRow = clampi(dvRow + d, 0, deviceRowCount(dvGroup) - 1);
+            else { dvGroup = clampi(dvGroup + d, 0, 7); dvRow = 0; }
+            break;
+        }
+        case kLeft: dvRows = false; break;
+        case kRight: dvRows = true; break;
+        case kB1:
+            if (dvGroup == 6 && fwCount > 0)
+            {
+                if (unsaved) { pendingAction = 3; startSave(); }
+                else firmwareGo();
+            }
+            break;
+        case kB8:
+        case kConfig: back(); return;
+        default: break;
+    }
+}
+
+void App::deviceJog(int delta)
+{
+    if (fwUpdating) return;
+    if (!dvRows) { dvGroup = clampi(dvGroup + (delta > 0 ? 1 : -1), 0, 7); dvRow = 0; return; }
+    deviceChange(dvGroup, dvRow, delta);
 }
 } // namespace ft

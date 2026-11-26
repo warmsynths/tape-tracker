@@ -25,3 +25,10 @@ Mixer 119 and 120 elements, load samples 89, pad sample 64 to 67, resample 61 to
 2. Resample length: whole loops, 1 to 4, as designed.
 3. Config: rebuild all of it per C5. Only the firmware-update code underneath is kept.
 4. Memory figures in the design are to be corrected to the real numbers.
+
+## Built (2026-11-26)
+C1 to C5 are in the shared core and the emulator, and in the firmware builds (not sent). Differences from the design, all small:
+- **Memory figures** are the real ones (about 6 MB for samples, mono 16-bit), not 64 MB.
+- **C4 Resample** renders the mix like an Export (faster than real time, held glitch effects not captured) and loads it through the same loader as C2. B1 while it runs cancels and keeps nothing.
+- **C5** has no "Out channel" and one Volume row, because the stock config has no such settings.
+- The mid-dot and minus characters are plain "-" because the fonts have no such glyphs.

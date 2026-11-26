@@ -72,6 +72,13 @@ class FourTrackHal : public ft::Hal
     void previewFile(const char* path, bool on) override;
     bool previewActive() override;
 
+    int deviceValue(ft::Dev d) override;
+    void setDeviceValue(ft::Dev d, int value) override;
+    void firmwareVersion(char* out, int size) override;
+    int firmwareFiles(char (*names)[28], int max) override;
+    bool firmwareInstall(const char* name) override;
+    int firmwareProgress() override { return -1; }
+
     bool padSample(int slot, ft::PadSample& out) override;
     void setPadSample(int slot, const ft::PadSample& in) override;
     int padSampleWave(int slot, uint8_t* out, int columns) override;
