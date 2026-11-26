@@ -12,6 +12,14 @@ page = page.replace('/*CSS*/', read('src/style.css'))
 page = page.replace('/*FONTS*/', read('fonts.json'))
 page = page.replace('/*WASM*/', base64.b64encode(open('build/ft.wasm', 'rb').read()).decode())
 page = page.replace('/*WORKLET*/', read('src/worklet.js'))
+import json, glob, mimetypes
+stock = {}
+for f in sorted(glob.glob('stock/*')):
+    name, ext = os.path.splitext(os.path.basename(f))
+    if ext.lower() in ('.png', '.bmp', '.jpg', '.jpeg'):
+        mime = {'.png': 'image/png', '.bmp': 'image/bmp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'}[ext.lower()]
+        stock[name] = 'data:' + mime + ';base64,' + base64.b64encode(open(f, 'rb').read()).decode()
+page = page.replace('/*STOCK*/', json.dumps(stock))
 page = page.replace('/*APP*/', read('src/app.js'))
 build_id = os.environ.get('FT_BUILD_ID') or re.search(r'"(FT[^"]*)"', read('../../core/ft/BuildId.h')).group(1)
 page = page.replace('/*BUILDID*/', build_id)

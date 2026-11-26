@@ -17,6 +17,7 @@
     <div class="left-col">
       <div class="screen-frame">
         <div class="screen"><canvas id="screen" width="800" height="480"></canvas>
+          <div id="stock" hidden><img id="stockImg" alt=""><div id="stockCard"></div><div id="stockTag">Stock screen: a picture, not working here. Click or press any button to close.</div></div>
           <div id="overlay"><div>Click anywhere to start the emulator<br><small>It records from a built-in demo instrument or your microphone. Use headphones.</small></div></div>
         </div>
       </div>
@@ -32,16 +33,16 @@
         <div class="jog" id="jog" title="Jog wheel: scroll, drag, or [ and ]"><div class="jog-notch"></div><div class="jog-center"></div></div>
       </div>
       <div class="bank-15">
-        <button class="hw-btn dim" title="Stock screen: not in this emulator">Params</button>
+        <button class="hw-btn dim" data-stock="params" title="Stock screen: shows a picture of it">Params</button>
         <button class="hw-btn" data-key="Perf" title="Performance (G)">Perform</button>
         <button class="hw-btn" data-key="File" title="File (F)">File</button>
-        <button class="hw-btn dim" title="Stock screen: not in this emulator">Config</button>
+        <button class="hw-btn dim" data-stock="config" title="Stock screen: shows a picture of it">Config</button>
         <button class="hw-btn" data-key="Master" title="Master (M)">Master</button>
 
-        <button class="hw-btn dim" title="Stock screen: not in this emulator">Sample<br>Load</button>
-        <button class="hw-btn dim" title="Stock screen: not in this emulator">Sample<br>Play</button>
+        <button class="hw-btn dim" data-stock="sample-load" title="Stock screen: shows a picture of it">Sample<br>Load</button>
+        <button class="hw-btn dim" data-stock="sample-play" title="Stock screen: shows a picture of it">Sample<br>Play</button>
         <button class="hw-btn" data-key="Sample" title="Sample Edit (E)">Sample<br>Edit</button>
-        <button class="hw-btn dim" title="Stock screen: not in this emulator">Sample<br>Rec</button>
+        <button class="hw-btn dim" data-stock="sample-rec" title="Stock screen: shows a picture of it">Sample<br>Rec</button>
         <button class="hw-btn" data-key="Song" title="Song: click on or off (C)">Song</button>
 
         <button class="hw-btn col-g dim" title="Stock screen: not in this emulator">Note</button>
@@ -99,6 +100,7 @@
     <tr><td>C, H</td><td>Song (click), Pattern (home)</td></tr>
   </table>
 </aside>
+<script id="stock-data" type="application/json">/*STOCK*/</script>
 <script id="fonts-data" type="application/json">/*FONTS*/</script>
 <script id="wasm-data" type="text/plain">/*WASM*/</script>
 <script id="worklet-src" type="text/plain">/*WORKLET*/</script>

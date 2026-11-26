@@ -47,3 +47,11 @@ h2 { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(-
 label { display:block; margin:4px 0; } select, input[type=number] { background:#2b2720; color:var(--text); border:1px solid var(--key-border); border-radius:4px; padding:5px; font:inherit; }
 .small { color:var(--dim); font-size:11px; } .keys td { padding:2px 12px 2px 0; vertical-align:top; } .keys td:first-child { color:var(--text); white-space:nowrap; }
 #files button { display:block; margin:2px 0; font-size:11px; }
+#stock { position:absolute; inset:0; background:#000; cursor:pointer; z-index:5; }
+#stock[hidden] { display:none; }
+#stockImg { width:800px; height:480px; display:none; }
+#stockCard { width:800px; height:480px; padding:150px 60px; background:#15130f; color:#e6dcc3; font:15px/1.5 var(--ui); text-align:center; }
+#stockCard b { display:block; font-size:22px; margin-bottom:10px; }
+#stockCard small { color:#91876f; }
+#stockTag { position:absolute; left:0; right:0; bottom:0; padding:6px 12px; background:rgba(0,0,0,.75); color:#d2a94f; font:11px var(--ui); text-align:center; }
+.hw-btn[data-stock] { color:#a89f88; cursor:pointer; }

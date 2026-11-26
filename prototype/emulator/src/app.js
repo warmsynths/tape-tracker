@@ -313,6 +313,28 @@
   });
   function sampleDone(m) { document.getElementById('note').textContent = m.ok ? 'Sample loaded.' : 'No room left in sample memory.'; }
 
+  // Stock screens: the dimmed buttons show a picture of what the Tracker shows there
+  const STOCK = JSON.parse(document.getElementById('stock-data').textContent);
+  const STOCK_TEXT = {
+    'params': ['Params', 'The stock instrument parameters screen.'],
+    'config': ['Config', 'The stock settings screen: the device, audio, MIDI, firmware update.'],
+    'sample-load': ['Sample Load', 'The stock file browser for loading samples and instruments.'],
+    'sample-play': ['Sample Play', 'The stock sample player and play-mode screen.'],
+    'sample-rec': ['Sample Rec', 'The stock sample recorder.'],
+  };
+  const stockBox = document.getElementById('stock');
+  function closeStock() { stockBox.hidden = true; }
+  document.querySelectorAll('[data-stock]').forEach((b) => b.addEventListener('click', () => {
+    const k = b.dataset.stock;
+    const img = document.getElementById('stockImg'), card = document.getElementById('stockCard');
+    if (STOCK[k]) { img.src = STOCK[k]; img.style.display = 'block'; card.style.display = 'none'; }
+    else { img.style.display = 'none'; card.style.display = 'block'; card.innerHTML = '<b>' + STOCK_TEXT[k][0] + '</b>' + STOCK_TEXT[k][1] + '<br><br><small>The picture has not been added yet.</small>'; }
+    stockBox.hidden = false;
+  }));
+  stockBox.addEventListener('click', closeStock);
+  document.querySelectorAll('[data-key], #shift').forEach((b) => b.addEventListener('pointerdown', closeStock));
+  window.addEventListener('keydown', closeStock);
+
   // The device is drawn at its real size and scaled to fit the window
   function fit() {
     const st = document.getElementById('scaleStage');
