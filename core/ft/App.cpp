@@ -121,7 +121,7 @@ void App::key(int k)
         const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
                                current == Screen::Input || current == Screen::Pads || current == Screen::Memory ||
                                current == Screen::Settings;
-        if (transport && k == kPlay) { pressPlay(); refresh(true); return; }
+        if (transport && k == kPlay) { togglePlay(); refresh(true); return; }
         if (transport && k == kStop) { pressStop(); refresh(true); return; }
         keyScreen(k);
         return;
@@ -175,7 +175,7 @@ void App::key(int k)
             if (session.loopFrames() == 0 && session.mode() == FourTrackSession::Mode::Idle && !countingIn) open(Screen::Tempo);
             else pressStop();
             break;
-        case kPlay:
+        case kPlay: togglePlay(); break;
         case kB3: pressPlay(); break;
         case kB4:
         {
@@ -468,6 +468,13 @@ void App::pressStop()
     }
     syncPlayer();
     refresh(true);
+}
+
+// The Play button starts the loop, and stops it when it is already playing
+void App::togglePlay()
+{
+    if (session.mode() == FourTrackSession::Mode::Idle && session.playing()) pressStop();
+    else pressPlay();
 }
 
 void App::pressPlay()
@@ -1351,7 +1358,7 @@ void App::moveKey(int k)
         case kB8: moveMode = false; break;
         case kLeft: moveStep(t, -1, shift); break;
         case kRight: moveStep(t, 1, shift); break;
-        case kPlay: pressPlay(); break;
+        case kPlay: togglePlay(); break;
         case kStop: pressStop(); break;
         default: break;
     }
@@ -1384,7 +1391,7 @@ void App::actionKey(int k)
         case kB7: case kB8: case kJogPress: actionMenu = false; break;
         case kUp: moveSelection(-1); break;
         case kDown: moveSelection(1); break;
-        case kPlay: pressPlay(); break;
+        case kPlay: togglePlay(); break;
         case kStop: pressStop(); break;
         default: break;
     }

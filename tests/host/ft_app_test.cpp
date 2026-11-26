@@ -274,6 +274,23 @@ static void pagesAndProjects()
         app.key(kStop);
         CHECK(app.state().mode() == Mode::Idle && app.popup() == Popup::None, "Stop cancels waiting quietly");
     }
+    {   // the Play button starts and stops, on the main screen and on pages
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        CHECK(hal.playing, "the loop plays after the bars are chosen");
+        app.key(kPlay);
+        CHECK(!hal.playing, "Play stops it");
+        app.key(kPlay);
+        CHECK(hal.playing, "Play again starts it");
+        app.key(kPerformance);
+        app.key(kPlay);
+        CHECK(!hal.playing, "Play stops it on a page");
+        app.key(kPlay);
+        CHECK(hal.playing, "and starts it again");
+    }
     {   // the Pattern button is home
         FakeHal hal;
         App app(hal, palette());

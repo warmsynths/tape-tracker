@@ -102,6 +102,7 @@ class App
     void startRecording(); // after the replace question and the count-in
     void pressStop();
     void pressPlay();
+    void togglePlay();
     void selectTrack(int track);
     void moveSelection(int delta);
     void promptMove(int delta);

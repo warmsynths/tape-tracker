@@ -128,7 +128,7 @@ New: after you stop the first take (or it stops by itself at 24 s), the Tracker 
 Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.
 
 ## Test build FT16: the whole design, one build
-`firmware/PolyendTracker_FT29_full.ptf` (FT16 plus the fixes below; FT29 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
+`firmware/PolyendTracker_FT30_full.ptf` (FT16 plus the fixes below; FT30 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
 
 What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-requirements.md` for each screen):
 - **Main screen:** starting tempo and count-in, click, source per track (line, mic low, mic high, pads), alignment of each Part to the loop (first-note detection and snap, window in Settings), offset, mute, Loop Mode, undo of a replaced take, How many bars.
@@ -187,3 +187,5 @@ FT28: the lane source tag is back on every track (it had been hidden on empty tr
 FT29 (built, being tested in the emulator first): 
 - **Count-in length:** Off, 1 beat, 2 beats, 4 beats (default), 8 beats. Set in the Starting tempo panel (B2 on an empty home screen, Left/Right to the Count-in box, jog) and in Settings (Count-in). With the tempo Free the count-in plays at 120 BPM.
 - **Wait for sound:** the first take can wait for the input to get loud. Switch it on in the Starting tempo panel (the Wait for sound box, Insert) or in Settings; the level (default -36 dB) is set there or with Shift+jog on Input setup, where a marker shows it on the input meter. Rec arms the take (status Armed, "Waiting for sound" with the live level); recording begins at the first sound, keeping the pre-roll before it. Stop cancels quietly. A WAIT tag shows in the top bar. It does not apply to the Pads source.
+
+FT30 (emulator first): the Play button now stops the loop when it is already playing, on the main screen and on every page (before, on a page it could only start). Button 3 under the screen still only starts.
