@@ -40,6 +40,9 @@ Check against the original: port its chord-engine tests as host tests (same chor
 Licence: chroma-chords and circuit-chords are GPL v3. This repo has its own licence file. If the code is all the owner's own, they can license it into this repo; do not copy third-party parts.
 
 ## The pads (MVP)
+Idea from the owner (2026-11-26), like the minichord: chords and scale notes together. Two rows of chords (triads, then 7ths, 9ths and suspended) and two rows of scale notes (24 notes, about three and a half octaves of the chosen scale, every pad in key). A setting chooses the split (all chords, 3 and 1, 2 and 2, all notes). The note rows have three modes: Scale (fixed to the key, the default), Chord (the notes of the chord last played, across octaves), Follow (the scale with the current chord's tones marked, if the pad lights allow). In Keys mode any sample becomes a scale-locked instrument, which works before the synth exists. Up to 6 voices at once (a chord of 3 to 4 notes plus melody).
+
+Original layout, before that idea:
 The Note button opens Chords (design C10). The 48 pads (12 columns by 4 rows) become chord pads for a chosen key, scale and set:
 - 12 columns: the 7 degrees of the scale plus 5 colour chords (borrowed and secondary), in the order of the chosen set.
 - 4 rows: triads, 7ths, 9ths and suspended, open voicings. (Layout to confirm with the owner.)
