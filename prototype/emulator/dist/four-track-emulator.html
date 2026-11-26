@@ -59,7 +59,7 @@ label { display:block; margin:4px 0; } select, input[type=number] { background:#
 #stockCard { width:800px; height:480px; padding:150px 60px; background:#15130f; color:#e6dcc3; font:15px/1.5 var(--ui); text-align:center; }
 #stockCard b { display:block; font-size:22px; margin-bottom:10px; }
 #stockCard small { color:#91876f; }
-#stockTag { position:absolute; left:0; right:0; bottom:0; padding:6px 12px; background:rgba(0,0,0,.75); color:#d2a94f; font:11px var(--ui); text-align:center; }
+#stockTag { position:absolute; top:6px; right:6px; padding:3px 8px; border-radius:3px; background:rgba(0,0,0,.8); color:#d2a94f; font:10px var(--ui); }
 .hw-btn[data-stock] { color:#a89f88; cursor:pointer; }
 </style>
 </head>
@@ -74,7 +74,7 @@ label { display:block; margin:4px 0; } select, input[type=number] { background:#
     <div class="left-col">
       <div class="screen-frame">
         <div class="screen"><canvas id="screen" width="800" height="480"></canvas>
-          <div id="stock" hidden><img id="stockImg" alt=""><div id="stockCard"></div><div id="stockTag">Stock screen: a picture, not working here. Click or press any button to close.</div></div>
+          <div id="stock" hidden><img id="stockImg" alt=""><div id="stockCard"></div><div id="stockTag">Stock screen (picture only). Click to close.</div></div>
           <div id="overlay"><div>Click anywhere to start the emulator<br><small>It records from a built-in demo instrument or your microphone. Use headphones.</small></div></div>
         </div>
       </div>
