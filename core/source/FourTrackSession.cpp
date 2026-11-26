@@ -174,6 +174,11 @@ void FourTrackSession::restore(uint32_t loopFrames, int bars, uint8_t partMask)
     for (int i = 0; i < kTracks; i++) parts[i] = (partMask >> i) & 1;
 }
 
+void FourTrackSession::clearPart(int track)
+{
+    if (track >= 0 && track < kTracks) parts[track] = false;
+}
+
 void FourTrackSession::dropPart(int track)
 {
     if (track < 0 || track >= kTracks) return;

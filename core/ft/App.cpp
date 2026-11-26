@@ -116,6 +116,13 @@ void App::key(int k)
         else refresh(true);
         return;
     }
+    if (noteHint[0] != 0) { noteHint[0] = 0; refresh(true); } // a note in the hint line lasts until the next button
+    if ((k == kCopy || k == kDelete) && current != Screen::Main && job == Job::None && !fwUpdating && current != Screen::NameEntry && current != Screen::Tempo)
+    {
+        back();
+        key(k);
+        return;
+    }
     if (current != Screen::Main && job == Job::None && !fwUpdating && current != Screen::NameEntry && current != Screen::Tempo)
     {
         // A button that opens a page also works from another page: go home, then open it
@@ -164,6 +171,8 @@ void App::key(int k)
         }
         return;
     }
+    if (k == kCopy) { if (shift) undoOp(); else copyOpen(); return; }
+    if (k == kDelete) { clearOpen(shift); return; }
     if (shift)
     {
         switch (k)
@@ -233,6 +242,7 @@ void App::key(int k)
 void App::jog(int delta)
 {
     if (delta == 0) return;
+    if (popupKind == Popup::Copy) { popupKey(delta > 0 ? kRight : kLeft); return; }
     if (popupKind != Popup::None) return;
     if (current != Screen::Main)
     {
@@ -1212,6 +1222,7 @@ void App::fillView()
         fmt(v.hint, sizeof(v.hint), "Track %d: Insert for actions. Shift+Insert move. Shift+B%d mute.", session.selected() + 1, session.selected() + 5);
     if (actionMenu) fmt(v.hint, sizeof(v.hint), "Track %d: choose an action. Insert or B8 closes.", session.selected() + 1);
     if (moveMode) fmt(v.hint, sizeof(v.hint), "Move Track %d: jog or arrows step by the grid, Shift+arrows by 1 ms.", session.selected() + 1);
+    if (noteHint[0] != 0) fmt(v.hint, sizeof(v.hint), "%s", noteHint);
     fmt(v.loopMode, sizeof(v.loopMode), "%s", set.loopOnce ? "Play once" : "Repeat");
     fmt(v.padsMode, sizeof(v.padsMode), "%s", padsKeysMode ? "KEYS" : "PAD");
 

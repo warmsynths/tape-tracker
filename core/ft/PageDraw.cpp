@@ -1165,13 +1165,68 @@ void App::drawPopup(Pen& p)
             line1 = current == Screen::Load ? "Samples cannot be listed or loaded." : "Put the card in to save, open or export.";
             line2 = current == Screen::Load ? "Insert the card and press Retry." : "";
             b7 = "Back"; b8 = "Retry"; break;
-        case Popup::ReplaceSlot: break; // drawn below
+        case Popup::ReplaceSlot: case Popup::Copy: case Popup::Clear: break; // drawn below
         case Popup::Unsaved: head = "Unsaved changes"; line1 = "This project has changes that are not saved."; line2 = "Save them first?"; b7 = "Don't save"; b8 = "Save"; break;
         case Popup::Message:
-            head = popupArg == 3 ? "Cannot open" : popupArg == 4 ? "Nothing to export" : (popupArg == 1 || popupArg == 5) ? "Memory full" : popupArg == 2 ? "Nothing to undo" : popupArg == 6 ? "Cannot load" : popupArg == 7 ? "Nothing to resample" : "Notice";
-            line1 = popupArg == 3 ? "This file is not a Four-Track project." : popupArg == 4 ? "Record something first." : popupArg == 1 ? "No room for another Part." : popupArg == 2 ? "There is no earlier take on this track." : popupArg == 5 ? "This sample does not fit in the sample memory." : popupArg == 6 ? "Only 8, 16 and 24 bit PCM WAV files load." : popupArg == 7 ? "Record a Part first." : "";
+            head = popupArg == 3 ? "Cannot open" : popupArg == 4 ? "Nothing to export" : (popupArg == 1 || popupArg == 5) ? "Memory full" : popupArg == 2 ? "Nothing to undo" : popupArg == 6 ? "Cannot load" : popupArg == 7 ? "Nothing to resample" : popupArg == 8 ? "Nothing to copy or undo" : popupArg == 9 ? "Nothing to clear" : "Notice";
+            line1 = popupArg == 3 ? "This file is not a Four-Track project." : popupArg == 4 ? "Record something first." : popupArg == 1 ? "No room for another Part." : popupArg == 2 ? "There is no earlier take on this track." : popupArg == 5 ? "This sample does not fit in the sample memory." : popupArg == 6 ? "Only 8, 16 and 24 bit PCM WAV files load." : popupArg == 7 ? "Record a Part first." : popupArg == 8 ? "Select a track with a Part. Shift + Copy undoes the last copy or clear." : popupArg == 9 ? "There is no Part to clear." : "";
             break;
         default: break;
+    }
+    if (popupKind == Popup::Copy)
+    {
+        const int src = session.selected();
+        p.rect(150, 104, 500, 236, pal.panel);
+        p.frame(150, 104, 500, 236, pal.frame);
+        p.rect(150, 104, 500, 2, pal.text);
+        char t[40];
+        fmt(t, sizeof t, "Copy Track %d to ...", src + 1);
+        p.text(174, 125, t, F17B, pal.text);
+        for (int i = 0; i < 4; i++)
+        {
+            const int x = 174 + i * 114;
+            const bool source = i == src;
+            p.cell(x, 160, 110, 62, !source && i == copyTarget, pal.cell);
+            fmt(t, sizeof t, "%d %s", i + 1, model.lane[i].name);
+            p.text(x + 10, 171, t, F14B, source ? pal.dim : pal.text);
+            p.text(x + 10, 195, source ? "Source" : (session.hasPart(i) ? "Has a Part" : "Empty"), F12, pal.dim);
+        }
+        if (session.hasPart(copyTarget))
+        {
+            const int w = p.width("REPLACES", F12) + 6;
+            p.rect(174, 242, w, 18, pal.warn);
+            p.text(177, 244, "REPLACES", F12, pal.bg);
+            fmt(t, sizeof t, "Track %d has a Part. Copying replaces it.", copyTarget + 1);
+            p.text(250, 243, t, F14, pal.warn);
+        }
+        p.text(174, 271, "The copy keeps trims, fades and Offset.", F12, pal.dim);
+        p.text(174, 289, "Level, pan and effect slots stay with the target track.", F12, pal.dim);
+        p.text(174, 307, "Shift + Copy undoes it.", F12, pal.dim);
+        const char* lc[8] = { "Track 1", "Track 2", "Track 3", "Track 4", "", "", "Cancel", "Copy" };
+        p.buttons(lc, (uint8_t)(1u << copyTarget), -1, (uint8_t)(1u << src));
+        return;
+    }
+    if (popupKind == Popup::Clear)
+    {
+        p.rect(150, 144, 500, 148, pal.panel);
+        p.frame(150, 144, 500, 148, pal.frame);
+        p.rect(150, 144, 500, 2, pal.text);
+        char t[60];
+        const int sel = session.selected();
+        if (clearAll) p.text(174, 165, "Clear all tracks?", F17B, pal.text);
+        else { fmt(t, sizeof t, "Clear Track %d?", sel + 1); p.text(174, 165, t, F17B, pal.text); }
+        const uint32_t rate = hal.sampleRate() ? hal.sampleRate() : 44100;
+        const uint32_t hund = (uint32_t)((uint64_t)session.loopFrames() * 100 / rate);
+        int parts = 0;
+        for (int i = 0; i < 4; i++) if (session.hasPart(i)) parts++;
+        if (clearAll) fmt(t, sizeof t, "%d Part%s, %u.%02u s each", parts, parts == 1 ? "" : "s", hund / 100, hund % 100);
+        else fmt(t, sizeof t, "%s - %u.%02u s", model.lane[sel].name, hund / 100, hund % 100);
+        p.text(174, 201, t, F14, pal.text);
+        p.text(174, 221, "The Loop and tempo stay as they are.", F14, pal.text);
+        p.text(174, 251, clearAll ? "Shift + Copy brings them back." : "Shift + Copy brings it back. Shift + Delete clears all tracks.", F12, pal.dim);
+        const char* lc[8] = { "", "", "", "", "", "", "Cancel", "Clear" };
+        p.buttons(lc, 0, 7);
+        return;
     }
     if (popupKind == Popup::ReplaceSlot)
     {

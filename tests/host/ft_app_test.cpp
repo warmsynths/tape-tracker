@@ -575,6 +575,43 @@ static void pagesAndProjects()
         cols.advance(app2, 3000);
         CHECK(!app2.view().lane[0].bitmap && cols.masks.empty(), "with columns nothing is uploaded");
     }
+    {   // Copy and Clear, with one undo step
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kCopy);
+        CHECK(app.popup() == Popup::Message, "Copy with nothing recorded says so");
+        app.key(kB8);
+        recordLoop(hal, app);
+        const uint32_t loop = app.state().loopFrames();
+        app.key(kCopy);
+        CHECK(app.popup() == Popup::Copy, "Copy opens its panel");
+        for (int st = 0; st < app.stagesOf(5); st++) app.draw(5, st, gfx);
+        CHECK(!app.pageOverflowed(), "the copy panel fits");
+        app.key(kB7);
+        CHECK(app.popup() == Popup::None && !app.state().hasPart(1), "Cancel copies nothing");
+        app.key(kCopy);
+        app.key(kB3);
+        app.key(kB8);
+        CHECK(app.state().hasPart(2) && !app.state().hasPart(1), "B3 chooses Track 3 and Copy copies onto it");
+        CHECK(std::memcmp(hal.mem[0].data(), hal.mem[2].data(), loop * 2) == 0, "the audio is the same");
+        CHECK(app.state().loopFrames() == loop, "the Loop is unchanged");
+        app.setShift(true); app.key(kCopy); app.setShift(false);
+        CHECK(!app.state().hasPart(2) && app.state().hasPart(0), "Shift + Copy undoes the copy");
+        app.key(kDelete);
+        CHECK(app.popup() == Popup::Clear, "Delete opens the clear question");
+        for (int st = 0; st < app.stagesOf(5); st++) app.draw(5, st, gfx);
+        app.key(kB8);
+        CHECK(!app.state().hasPart(0) && app.state().loopFrames() == loop, "Clear removes the Part and keeps the Loop");
+        app.setShift(true); app.key(kCopy); app.setShift(false);
+        CHECK(app.state().hasPart(0), "Shift + Copy brings the Part back");
+        CHECK(std::memcmp(hal.mem[0].data(), hal.files["undo/t0.raw"].data(), loop * 2) == 0, "with its audio");
+        app.setShift(true); app.key(kDelete); app.setShift(false);
+        CHECK(app.popup() == Popup::Clear, "Shift + Delete asks to clear all tracks");
+        app.key(kB8);
+        CHECK(!app.state().hasPart(0) && app.state().loopFrames() == loop, "Clear all keeps the Loop too");
+    }
     {   // the Pattern button is home
         FakeHal hal;
         App app(hal, palette());

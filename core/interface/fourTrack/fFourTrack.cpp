@@ -46,6 +46,8 @@ static void functPattern() { functKey(ft::kPattern); } // home
 static void functParams() { functKey(ft::kParams); } // the track mixer
 static void functSamplePlay() { functKey(ft::kSamplePlay); } // pad sample settings
 static void functConfig() { functKey(ft::kConfig); } // device settings
+static void functCopy() { functKey(ft::kCopy); }     // copy a Part (Shift: undo)
+static void functDelete() { functKey(ft::kDelete); } // clear a Part (Shift: all)
 static void functSampleRec() { functKey(ft::kSampleRec); } // resample the mix
 static void functSampleLoad() { functKey(ft::kSampleLoad); } // load samples from the card
 static void functSong() { functKey(ft::kSong); } // the Song button switches the click on or off
@@ -102,6 +104,8 @@ void cFourTrack::start(uint32_t options)
     ip->setButtonObj(interfaceButtonFile, buttonPress, functFile);
     ip->setButtonObj(interfaceButtonSampleRec, buttonPress, functSampleRec);
     ip->setButtonObj(interfaceButtonSampleLoad, buttonPress, functSampleLoad);
+    ip->setButtonObj(interfaceButtonCopy, buttonPress, functCopy);
+    ip->setButtonObj(interfaceButtonDelete, buttonPress, functDelete);
     ip->setButtonObj(interfaceButtonSong, buttonPress, functSong);
     ip->setButtonObj(interfaceButtonPattern, buttonPress, functPattern);
 

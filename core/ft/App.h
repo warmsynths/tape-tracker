@@ -32,6 +32,8 @@ enum Key
     kSampleLoad,   // load samples from the SD card
     kSampleRec,    // resample the mix into a pad slot
     kConfig,       // device settings
+    kCopy,         // copy a Part to another track
+    kDelete,       // clear a Part (Shift: all)
     kKeyCount
 };
 
@@ -42,7 +44,7 @@ enum class Screen : uint8_t
 
 enum class Popup : uint8_t
 {
-    None, Replace, NoSound, NotArmed, SdMissing, Unsaved, Message, ReplaceSlot
+    None, Replace, NoSound, NotArmed, SdMissing, Unsaved, Message, ReplaceSlot, Copy, Clear
 };
 
 struct Settings
@@ -349,6 +351,24 @@ class App
     int appliedSource = -1;
     bool focusUser = false;       // the selected track is open in focus (pressed twice)
     int liveDone = 0;             // columns of the take being recorded that are final
+    // Copy and Clear (C8, C9), with one undo step for the last of either (Shift + Copy)
+    struct LastOp
+    {
+        uint8_t kind = 0;      // 0 none, 1 copy, 2 clear, 3 clear all
+        uint8_t mask = 0;      // tracks it changed
+        uint8_t prevHad = 0;   // which of them had a Part before
+        TrackCfg cfg[4];
+        int32_t align[4] = {}, user[4] = {};
+    } lastOp;
+    int copyTarget = 0;
+    bool clearAll = false;
+    char noteHint[72] = {};
+    void copyOpen();
+    void clearOpen(bool all);
+    void doCopy();
+    void doClear();
+    void undoOp();
+    void snapshotForUndo(int track);
     void computeLive(int track);
     void uploadMasks(int track);
     uint8_t wave600[4][600] = {};

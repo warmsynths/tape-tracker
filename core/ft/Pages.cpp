@@ -134,6 +134,21 @@ void App::popupKey(int k)
             else if (k == kB7) { close(); job = Job::None; }
             else if (k == kB8) { close(); }
             break;
+        case Popup::Copy:
+        {
+            const int src = session.selected();
+            auto move = [&](int d) { int t = copyTarget; for (int i = 0; i < 4; i++) { t = (t + d + 4) % 4; if (t != src) { copyTarget = t; break; } } };
+            if (k == kB7) close();
+            else if (k == kB8) { close(); doCopy(); }
+            else if (k >= kB1 && k <= kB4) { if (k - kB1 != src) copyTarget = k - kB1; showPopup(Popup::Copy); }
+            else if (k == kLeft || k == kUp) { move(-1); showPopup(Popup::Copy); }
+            else if (k == kRight || k == kDown) { move(1); showPopup(Popup::Copy); }
+            break;
+        }
+        case Popup::Clear:
+            if (k == kB7) close();
+            else if (k == kB8) { close(); doClear(); }
+            break;
         case Popup::ReplaceSlot:
             if (k == kB7) close();
             else if (k == kB8) { close(); ldConfirmed = true; loadDo(ldAdvance != 0); }
@@ -1492,5 +1507,153 @@ void App::deviceJog(int delta)
     if (fwUpdating) return;
     if (!dvRows) { dvGroup = clampi(dvGroup + (delta > 0 ? 1 : -1), 0, 7); dvRow = 0; return; }
     deviceChange(dvGroup, dvRow, delta);
+}
+
+//--------------------------------------------------------------------------------------------
+// C8 Copy a Part and C9 Clear, with one undo step (Shift + Copy)
+
+// Keep a track as it is before a copy or a clear, so Shift + Copy can bring it back
+void App::snapshotForUndo(int t)
+{
+    lastOp.cfg[t] = hal.bank().cfg[t];
+    lastOp.align[t] = alignShift[t];
+    lastOp.user[t] = userOffset[t];
+    if (!session.hasPart(t)) return;
+    const uint32_t frames = session.loopFrames();
+    const int32_t trailer[2] = { alignShift[t], userOffset[t] };
+    char path[24];
+    fmt(path, sizeof(path), "undo/t%d.raw", t);
+    if (hal.fileWrite(path, partData[t], frames * 2, false)) hal.fileWrite(path, trailer, 8, true);
+    hasUndoTake[t] = false;
+    lastOp.prevHad |= (uint8_t)(1u << t);
+}
+
+void App::copyOpen()
+{
+    const int src = session.selected();
+    if (session.mode() != FourTrackSession::Mode::Idle || session.loopFrames() == 0 || !session.hasPart(src)) { showPopup(Popup::Message, 8); return; }
+    // the next empty track first, else the next one along
+    copyTarget = -1;
+    for (int k = 1; k < 4 && copyTarget < 0; k++) { const int t = (src + k) % 4; if (!session.hasPart(t)) copyTarget = t; }
+    if (copyTarget < 0) copyTarget = (src + 1) % 4;
+    showPopup(Popup::Copy);
+}
+
+void App::clearOpen(bool all)
+{
+    const int t = session.selected();
+    bool any = false;
+    for (int i = 0; i < 4; i++) if (session.hasPart(i)) any = true;
+    if (session.mode() != FourTrackSession::Mode::Idle || (all ? !any : !session.hasPart(t))) { showPopup(Popup::Message, 9); return; }
+    clearAll = all;
+    showPopup(Popup::Clear);
+}
+
+void App::doCopy()
+{
+    const int src = session.selected(), dst = copyTarget;
+    const uint32_t frames = session.loopFrames();
+    if (dst == src || frames == 0 || !session.hasPart(src)) return;
+    if (!hal.sdPresent()) { showPopup(Popup::SdMissing); return; }
+    lastOp = LastOp();
+    lastOp.kind = 1;
+    lastOp.mask = (uint8_t)(1u << dst);
+    snapshotForUndo(dst);
+    int16_t* to = hal.region(dst);
+    const int16_t* from = partData[src];
+    for (uint32_t i = 0; i < frames; i++) to[i] = from[i];
+    partData[dst] = to;
+    alignShift[dst] = alignShift[src];
+    userOffset[dst] = userOffset[src];
+    // the copy keeps trims, fades and Offset; level, pan, tone and effect slots stay with the target
+    TrackCfg& c = hal.bank().cfg[dst];
+    const TrackCfg& o = hal.bank().cfg[src];
+    c.trimStart = o.trimStart; c.trimEnd = o.trimEnd; c.fadeIn = o.fadeIn; c.fadeOut = o.fadeOut; c.gain = o.gain;
+    uint8_t mask = 0;
+    for (int i = 0; i < 4; i++) if (session.hasPart(i)) mask |= (uint8_t)(1u << i);
+    const int keep = session.selected();
+    session.restore(frames, session.bars(), (uint8_t)(mask | (1u << dst)));
+    session.selectTrack(keep);
+    noteAt[dst] = -2;
+    waveDirty[dst] = true;
+    unsaved = true;
+    pushBank();
+    syncPlayer();
+    fmt(noteHint, sizeof noteHint, "Track %d copied to Track %d. Shift + Copy undoes it.", src + 1, dst + 1);
+    refresh(true);
+}
+
+void App::doClear()
+{
+    const uint32_t frames = session.loopFrames();
+    const int sel = session.selected();
+    lastOp = LastOp();
+    lastOp.kind = clearAll ? 3 : 2;
+    uint8_t mask = 0;
+    for (int i = 0; i < 4; i++) if (session.hasPart(i) && (clearAll || i == sel)) mask |= (uint8_t)(1u << i);
+    if (mask == 0) return;
+    if (!hal.sdPresent()) { showPopup(Popup::SdMissing); return; }
+    lastOp.mask = mask;
+    for (int i = 0; i < 4; i++)
+        if ((mask >> i) & 1)
+        {
+            snapshotForUndo(i);
+            session.clearPart(i);
+            partData[i] = nullptr;
+            alignShift[i] = 0;
+            userOffset[i] = 0;
+            TrackCfg& c = hal.bank().cfg[i];
+            c.trimStart = 0; c.trimEnd = 0xFFFFFFFFu; c.fadeIn = 0; c.fadeOut = 0; c.gain = 1.0f;
+            noteAt[i] = -2;
+            waveDirty[i] = true;
+        }
+    (void)frames;
+    unsaved = true;
+    pushBank();
+    syncPlayer();
+    if (clearAll) fmt(noteHint, sizeof noteHint, "All tracks cleared. Shift + Copy brings them back.");
+    else fmt(noteHint, sizeof noteHint, "Track %d cleared. Shift + Copy brings it back.", sel + 1);
+    refresh(true);
+}
+
+void App::undoOp()
+{
+    if (lastOp.kind == 0 || session.mode() != FourTrackSession::Mode::Idle) { showPopup(Popup::Message, 8); return; }
+    const uint32_t frames = session.loopFrames();
+    uint8_t mask = 0;
+    for (int i = 0; i < 4; i++) if (session.hasPart(i)) mask |= (uint8_t)(1u << i);
+    for (int t = 0; t < 4; t++)
+    {
+        if (!((lastOp.mask >> t) & 1)) continue;
+        if ((lastOp.prevHad >> t) & 1)
+        {
+            char path[24];
+            fmt(path, sizeof(path), "undo/t%d.raw", t);
+            int32_t trailer[2] = { 0, 0 };
+            if (hal.fileRead(path, 0, hal.region(t), frames * 2) != frames * 2) { showPopup(Popup::SdMissing); return; }
+            hal.fileRead(path, frames * 2, trailer, 8);
+            partData[t] = hal.region(t);
+            alignShift[t] = lastOp.align[t];
+            userOffset[t] = lastOp.user[t];
+            mask |= (uint8_t)(1u << t);
+        }
+        else
+        {
+            mask &= (uint8_t)~(1u << t);
+            partData[t] = nullptr;
+        }
+        hal.bank().cfg[t] = lastOp.cfg[t];
+        noteAt[t] = -2;
+        waveDirty[t] = true;
+    }
+    const int keep = session.selected();
+    session.restore(frames, session.bars(), mask);
+    session.selectTrack(keep);
+    lastOp = LastOp();
+    unsaved = true;
+    pushBank();
+    syncPlayer();
+    fmt(noteHint, sizeof noteHint, "Undone.");
+    refresh(true);
 }
 } // namespace ft

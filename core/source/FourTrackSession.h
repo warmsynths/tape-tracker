@@ -68,6 +68,7 @@ class FourTrackSession
     void restore(uint32_t loopFrames, int bars, uint8_t partMask);
     // A later take was cancelled or replaced: forget the Part on a track.
     void dropPart(int track);
+    void clearPart(int track); // like dropPart, but the Loop and tempo stay
 
   private:
     void finishFirst(uint32_t frames);
