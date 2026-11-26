@@ -87,6 +87,7 @@ void App::leave()
     countingIn = false;
     moveMode = false;
     actionMenu = false;
+    if (waitingSound) cancelWait();
     if (session.mode() != FourTrackSession::Mode::Idle) pressStop();
     if (session.playing()) session.pressStop();
     hal.playerStop();
@@ -377,7 +378,7 @@ void App::pressRecord()
     replaceConfirmed = false;
     // A first take at a set tempo starts with a bar of clicks
     const bool firstTake = session.loopFrames() == 0 || (session.partCount() == 1 && session.hasPart(t));
-    if (firstTake && set.countIn && set.tempoTenths < 2400)
+    if (firstTake && set.countBeats() > 0 && set.tempoTenths < 2400)
     {
         countingIn = true;
         countInStart = hal.millis();
@@ -408,6 +409,10 @@ void App::startRecording()
         hal.playerStop();
         applySource(trackSource[track]);
         hal.recordStart(track, trackSource[track]);
+        takeOffset = 0;
+        waitScanned = 0;
+        waitLevelDb = -60;
+        waitingSound = set.waitSound && trackSource[track] != Source::Pads;
     }
     else if (session.mode() == FourTrackSession::Mode::Armed)
     {
@@ -424,10 +429,16 @@ void App::pressStop()
         refresh(true);
         return;
     }
+    if (session.mode() == FourTrackSession::Mode::RecordingFirst && waitingSound)
+    {
+        cancelWait();
+        refresh(true);
+        return;
+    }
     if (session.mode() == FourTrackSession::Mode::RecordingFirst)
     {
         hal.recordStop();
-        session.firstRecordedFrames(hal.recordLength(), hal.recordFull());
+        session.firstRecordedFrames(hal.recordLength() - takeOffset, hal.recordFull());
         if (session.mode() == FourTrackSession::Mode::RecordingFirst) session.pressStop();
         onFirstTakeFinished();
     }
@@ -493,6 +504,53 @@ void App::undoTake()
 //--------------------------------------------------------------------------------------------
 // Recording and playing
 
+void App::cancelWait()
+{
+    waitingSound = false;
+    takeOffset = 0;
+    hal.recordStop();
+    session.pressStop();
+    if (session.mode() == FourTrackSession::Mode::ChoosingBars) session.cancelBars();
+}
+
+// While waiting, the input is already being recorded; the take starts at the first sound
+void App::serviceWait()
+{
+    const int track = session.recordingTrack() < 0 ? session.selected() : session.recordingTrack();
+    const uint32_t rate = hal.sampleRate();
+    const uint32_t got = hal.recordLength();
+    int16_t* r = hal.region(track);
+    float amp = 32767.0f;
+    for (int i = 0; i > set.waitDb; i--) amp *= 0.89125f; // 10^(-1/20) per dB
+    const int32_t thr = (int32_t)amp;
+    uint32_t end = got < waitScanned + 4096 ? got : waitScanned + 4096;
+    int32_t peak = 0;
+    for (uint32_t i = waitScanned; i < end; i++)
+    {
+        const int32_t s = r[i] < 0 ? -(int32_t)r[i] : (int32_t)r[i];
+        if (s > peak) peak = s;
+        if (s >= thr)
+        {
+            uint32_t pre = preRollFrames();
+            if (pre < rate / 50) pre = rate / 50;
+            takeOffset = i > pre ? i - pre : 0;
+            waitingSound = false;
+            lastClickBeat = -1;
+            refresh(true);
+            return;
+        }
+    }
+    waitScanned = end;
+    waitLevelDb = peak > 0 ? ampToDb((float)peak / 32768.0f) : -60;
+    // a long wait would fill the memory: start the recording again
+    if (got > rate * 20)
+    {
+        hal.recordStop();
+        hal.recordStart(track, trackSource[track]);
+        waitScanned = 0;
+    }
+}
+
 void App::cancelRecording()
 {
     if (session.mode() == FourTrackSession::Mode::RecordingFirst || session.mode() == FourTrackSession::Mode::RecordingPart)
@@ -538,7 +596,7 @@ void App::onFirstTakeFinished()
     if (session.mode() == FourTrackSession::Mode::ChoosingBars && rec >= 0)
     {
         const uint32_t frames = session.pendingFrames();
-        const int onset = findFirstOnset(hal.region(rec), 0, frames, hal.sampleRate());
+        const int onset = findFirstOnset(hal.region(rec) + takeOffset, 0, frames, hal.sampleRate());
         if (onset < 0)
         {
             // Nothing was heard: throw it away
@@ -548,7 +606,7 @@ void App::onFirstTakeFinished()
         }
         else
         {
-            partData[rec] = hal.region(rec) + onset;
+            partData[rec] = hal.region(rec) + takeOffset + onset;
             session.setPendingFrames(frames - (uint32_t)onset);
         }
     }
@@ -557,13 +615,14 @@ void App::onFirstTakeFinished()
         partData[session.selected()] = hal.region(session.selected());
     }
     for (int t = 0; t < FourTrackSession::kTracks; t++) waveDirty[t] = true;
+    takeOffset = 0;
     hal.playerStop();
 }
 
 void App::serviceFirstTake()
 {
     const bool stoppedByItself = !hal.recordActive();
-    session.firstRecordedFrames(hal.recordLength(), hal.recordFull() || stoppedByItself);
+    session.firstRecordedFrames(hal.recordLength() - takeOffset, hal.recordFull() || stoppedByItself);
     if (session.mode() == FourTrackSession::Mode::RecordingFirst && stoppedByItself) session.pressStop();
     if (session.mode() != FourTrackSession::Mode::RecordingFirst)
     {
@@ -694,12 +753,13 @@ void App::serviceCountIn()
         hal.click(true);
         countInBeats = 1;
     }
-    while (countInBeats <= beats && countInBeats < 4)
+    const int total = set.countBeats();
+    while (countInBeats <= beats && countInBeats < total)
     {
         hal.click(false);
         countInBeats++;
     }
-    if (beats >= 4)
+    if (beats >= total)
     {
         countingIn = false;
         startRecording();
@@ -713,7 +773,7 @@ void App::tick()
     hal.tick();
     switch (session.mode())
     {
-        case FourTrackSession::Mode::RecordingFirst: serviceFirstTake(); break;
+        case FourTrackSession::Mode::RecordingFirst: if (waitingSound) serviceWait(); else serviceFirstTake(); break;
         case FourTrackSession::Mode::Armed: serviceArmed(); break;
         case FourTrackSession::Mode::RecordingPart: servicePartRecording(); break;
         case FourTrackSession::Mode::Idle:
@@ -821,6 +881,7 @@ void App::fillView()
     fmt(v.input, sizeof(v.input), "%s", sourceName(trackSource[session.selected()]));
     v.monitor = monitorFor(trackSource[session.selected()]);
     v.click = set.click;
+    v.wait = set.waitSound;
     {
         float l = 0.0f, r = 0.0f;
         hal.inputLevels(l, r);
@@ -837,6 +898,12 @@ void App::fillView()
     {
         v.statusKind = 3;
         fmt(v.status, sizeof(v.status), "Count-in");
+    }
+    else if (mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
+    {
+        v.statusKind = 3;
+        fmt(v.status, sizeof(v.status), "Armed");
+        fmt(v.statusNote, sizeof(v.statusNote), "No Loop yet");
     }
     else if (mode == FourTrackSession::Mode::RecordingFirst)
     {
@@ -920,12 +987,19 @@ void App::fillView()
         if (!L.hasPart) L.waveCount = 0;
 
         fmt(L.tag, sizeof(L.tag), "%s", sourceName(trackSource[t])); // every track shows where it records from
-        if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
+        if (L.active && mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
+        {
+            fmt(L.msg1, sizeof(L.msg1), "Waiting for sound");
+            fmt(L.msg2, sizeof(L.msg2), "%d dB", waitLevelDb);
+            fmt(L.side1, sizeof(L.side1), "Starts at %d dB", (int)set.waitDb);
+        }
+        else if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
         {
             fmt(L.msg1, sizeof(L.msg1), "First take - elapsed");
-            formatTime(L.msg2, sizeof(L.msg2), hal.recordLength(), rate);
+            const uint32_t took = hal.recordLength() > takeOffset ? hal.recordLength() - takeOffset : 0;
+            formatTime(L.msg2, sizeof(L.msg2), took, rate);
             const uint32_t maxFrames = rate * 24;
-            const uint32_t got = hal.recordLength() < maxFrames ? hal.recordLength() : maxFrames;
+            const uint32_t got = took < maxFrames ? took : maxFrames;
             const uint32_t leftTenths = (maxFrames - got) * 10 / rate;
             L.progress = (uint8_t)(got * 100 / maxFrames);
             L.warn = leftTenths <= 30;
@@ -951,7 +1025,7 @@ void App::fillView()
         else if (countingIn && t == session.selected())
         {
             fmt(L.msg1, sizeof(L.msg1), "Count-in");
-            fmt(L.msg2, sizeof(L.msg2), "Beat %d of 4", countInBeats > 4 ? 4 : (countInBeats < 1 ? 1 : countInBeats));
+            fmt(L.msg2, sizeof(L.msg2), "Beat %d of %d", countInBeats > set.countBeats() ? set.countBeats() : (countInBeats < 1 ? 1 : countInBeats), set.countBeats());
         }
         else if (!L.hasPart)
         {
@@ -1003,7 +1077,8 @@ void App::fillView()
     if (countingIn) fmt(v.hint, sizeof(v.hint), "Count-in, then the first take starts. Stop cancels.");
     else if (mode == FourTrackSession::Mode::RecordingFirst)
     {
-        if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 24 s the take stops by itself and keeps everything.");
+        if (waitingSound) fmt(v.hint, sizeof(v.hint), "Recording starts when the input reaches %d dB. Stop cancels.", (int)set.waitDb);
+        else if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 24 s the take stops by itself and keeps everything.");
         else fmt(v.hint, sizeof(v.hint), "B2 or Stop ends the take. Then: How many bars?");
     }
     else if (mode == FourTrackSession::Mode::Armed) fmt(v.hint, sizeof(v.hint), "Records one Loop from the loop start, then stops. B1 again disarms.");

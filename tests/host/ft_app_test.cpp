@@ -40,6 +40,7 @@ struct FakeHal : Hal
     std::map<std::string, std::vector<uint8_t>> files;
     int clicks = 0;
     int curSample = 0;
+    uint32_t quiet = 0; // frames of silence at the start of a take
 
     FakeHal()
     {
@@ -121,7 +122,7 @@ struct FakeHal : Hal
                     captured = true;
                     startPos = pos;
                 }
-                for (int i = 0; i < 128; i++) mem[recTrack][recLen + i] = (int16_t)(((recLen + i) / 50 % 2) ? 9000 : -9000);
+                for (int i = 0; i < 128; i++) mem[recTrack][recLen + i] = (recLen + i) < quiet ? 0 : (int16_t)(((recLen + i) / 50 % 2) ? 9000 : -9000);
                 recLen += 128;
                 if (recLen + 128 > regionFrames()) { recActive = false; full = true; }
             }
@@ -232,6 +233,46 @@ static void pagesAndProjects()
         app.key(kB4);
         CHECK(app.screen() == Screen::Input, "Shift+B4 opens Input setup");
         app.setShift(false);
+    }
+    {   // count-in length and waiting for sound
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kB2);                 // Starting tempo
+        app.key(kRight);              // the count-in box
+        app.jog(1);                   // 4 beats -> 8 beats
+        CHECK(app.settings().countBeats() == 8, "the count-in can be 8 beats");
+        app.key(kRight);              // the wait box
+        app.key(kJogPress);
+        CHECK(app.settings().waitSound, "Insert switches Wait for sound on");
+        app.key(kB7);
+        hal.quiet = FakeHal::kRate * 3 / 2;
+        app.key(kRec);
+        hal.advance(app, FakeHal::kRate * 3);
+        CHECK(app.state().mode() == Mode::Idle, "still counting in after three seconds");
+        hal.advance(app, FakeHal::kRate * 3 / 2);
+        CHECK(hal.clicks == 8, "eight clicks before it arms");
+        CHECK(app.state().mode() == Mode::RecordingFirst, "it is armed and recording is running");
+        CHECK(app.view().statusKind == 3 && std::strstr(app.view().hint, "starts when") != nullptr, "it shows Armed, waiting for sound");
+        hal.advance(app, FakeHal::kRate * 2);
+        CHECK(app.view().statusKind == 2, "the sound starts the take");
+        app.key(kStop);
+        CHECK(app.state().mode() == Mode::ChoosingBars, "Stop asks how many bars");
+        const uint32_t pending = app.state().pendingFrames();
+        CHECK(pending > FakeHal::kRate && pending < hal.recLen - FakeHal::kRate / 2, "the time spent waiting is not in the take");
+    }
+    {   // Stop cancels a wait without a popup
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kB2); app.key(kRight); app.key(kRight); app.key(kJogPress); app.key(kB7);
+        app.key(kRec);
+        hal.quiet = FakeHal::kRate * 100;
+        hal.advance(app, FakeHal::kRate * 4);
+        app.key(kStop);
+        CHECK(app.state().mode() == Mode::Idle && app.popup() == Popup::None, "Stop cancels waiting quietly");
     }
     {   // the Pattern button is home
         FakeHal hal;

@@ -105,12 +105,22 @@ void App::drawTempo(Pen& p)
     else fmt(b, sizeof b, "Free");
     p.text(232, 296, b, F17B, set_ ? pal.text : pal.dim);
     if (tempoFocus) p.text(452, 278, "JOG", F12, pal.text);
-    p.cell(516, 270, 270, 58, set_ && sRow == 1, pal.cell);
+    static const char* const countName[5] = { "Off", "1 beat", "2 beats", "4 beats", "8 beats" };
+    p.cell(516, 270, 270, 58, sRow == 1, pal.cell);
     p.text(528, 278, "Count-in", F12, pal.dim);
-    p.text(528, 296, set.countIn ? "On" : "Off", F17B, pal.text);
-    p.text(570, 299, "four clicks", F12, pal.dim);
-    p.text(14, 344, "Free: the first take sets the Loop, and the tempo is worked out from its length.", F12, pal.dim);
-    p.text(14, 362, "Set: four clicks of count-in play, then the first take lands on the grid.", F12, pal.dim);
+    p.text(528, 296, countName[set.countIdx > 4 ? 4 : set.countIdx], F17B, pal.text);
+    if (sRow == 1) p.text(740, 278, "JOG", F12, pal.text);
+    p.text(528 + 90, 299, "clicks before the first take", F12, pal.dim);
+    p.cell(1, 322, 197, 52, sRow == 2, pal.cell);
+    p.text(13, 328, "Wait for sound", F12, pal.dim);
+    char w[24];
+    if (set.waitSound) fmt(w, sizeof w, "On at %d dB", (int)set.waitDb);
+    else fmt(w, sizeof w, "Off");
+    p.text(13, 344, w, F17B, pal.text);
+    if (sRow == 2) p.text(150, 328, "JOG", F12, pal.text);
+    p.text(220, 340, "Free: the take sets the Loop and the tempo is worked out from its length.", F12, pal.dim);
+    p.text(220, 358, "Set: the take lands on the grid. Left/Right choose a box, Insert switches it.", F12, pal.dim);
+    p.text(220, 376, "Wait for sound: Rec arms, and recording begins when the input is loud enough.", F12, pal.dim);
 }
 
 //--------------------------------------------------------------------------------------------
@@ -357,6 +367,14 @@ void App::drawInput(Pen& p)
     if (db > inputPeakDb) inputPeakDb = db; else if (inputPeakDb > -48) inputPeakDb--;
     const int pk = inputPeakDb;
     p.rect(14 + (pk + 48) * 772 / 48 - 2, 160, 2, 16, pal.text);
+    if (set.waitSound)
+    {
+        const int wx = 14 + ((int)set.waitDb + 48) * 772 / 48;
+        p.rect(wx, 156, 2, 24, pal.warn);
+        char wb[40];
+        fmt(wb, sizeof wb, "Wait for sound: starts at %d dB (Shift+jog changes it)", (int)set.waitDb);
+        p.text(14, 198, wb, F12, pal.warn);
+    }
     for (int i = 0; i < 5; i++)
     {
         const int x = 14 + (ticks[i] + 48) * 772 / 48;
@@ -468,36 +486,43 @@ void App::drawSettings(Pen& p)
     fmt(b, sizeof b, "This project - saved with %s", projectName);
     p.text(14, 68, b, F12, pal.dim);
     p.rect(0, 87, 800, 1, pal.frame);
-    const char* names[10] = { "Loop Mode", "Click", "Grid", "Snap cuts to zero", "Alignment window", "Pre-roll", "Tempo rounding", "Input source", "Gain", "Monitoring default" };
-    char v[10][24];
+    const char* names[13] = { "Loop Mode", "Click", "Count-in", "Wait for sound", "Grid", "Snap cuts to zero", "Alignment window", "Pre-roll", "Tempo rounding", "Wait level", "Input source", "Gain", "Monitoring default" };
+    static const char* const countName[5] = { "Off", "1 beat", "2 beats", "4 beats", "8 beats" };
+    char v[13][24];
     fmt(v[0], 24, "%s", set.loopOnce ? "Play once" : "Repeat");
     fmt(v[1], 24, "%s", set.click ? "On" : "Off");
-    fmt(v[2], 24, "%s", gridName(set.gridIdx));
-    fmt(v[3], 24, "%s", set.snapZero ? "On" : "Off");
-    fmt(v[4], 24, "%s", kWindowName[set.windowIdx]);
-    fmt(v[5], 24, "%s", kPreRollName[set.preRollIdx]);
-    fmt(v[6], 24, "%s", kRoundName[set.roundIdx]);
-    fmt(v[7], 24, "%s", kSourceName[(int)trackSource[session.selected()]]);
+    fmt(v[2], 24, "%s", countName[set.countIdx > 4 ? 4 : set.countIdx]);
+    fmt(v[3], 24, "%s", set.waitSound ? "On" : "Off");
+    fmt(v[4], 24, "%s", gridName(set.gridIdx));
+    fmt(v[5], 24, "%s", set.snapZero ? "On" : "Off");
+    fmt(v[6], 24, "%s", kWindowName[set.windowIdx]);
+    fmt(v[7], 24, "%s", kPreRollName[set.preRollIdx]);
+    fmt(v[8], 24, "%s", kRoundName[set.roundIdx]);
+    fmt(v[9], 24, "%d dB", (int)set.waitDb);
+    fmt(v[10], 24, "%s", kSourceName[(int)trackSource[session.selected()]]);
     const Source s = trackSource[session.selected()];
-    if (s == Source::Pads) fmt(v[8], 24, "-");
-    else fmt(v[8], 24, "+%d dB", hal.gain(s) * (s == Source::Line ? 22 : s == Source::MicLow ? 25 : 44) / 100);
-    fmt(v[9], 24, "Line %s - Mic %s", set.monitorLine ? "on" : "off", set.monitorMic ? "on" : "off");
-    for (int i = 0; i < 10; i++)
+    if (s == Source::Pads) fmt(v[11], 24, "-");
+    else fmt(v[11], 24, "+%d dB", hal.gain(s) * (s == Source::Line ? 22 : s == Source::MicLow ? 25 : 44) / 100);
+    fmt(v[12], 24, "Line %s - Mic %s", set.monitorLine ? "on" : "off", set.monitorMic ? "on" : "off");
+    for (int i = 0; i < 13; i++)
     {
-        if (i == 4) { p.text(14, 212, "This device - every project", F12, pal.dim); p.rect(0, 231, 800, 1, pal.frame); }
-        const int y = 90 + i * 28 + (i >= 4 ? 28 : 0);
-        if (i == sRow) { p.rect(0, y - 6, 800, 28, pal.sel); p.rect(0, y - 6, 800, 2, pal.text); }
+        if (i == 6) { p.text(14, 90 + 6 * 22 + 2, "This device - every project", F12, pal.dim); p.rect(0, 90 + 6 * 22 + 21, 800, 1, pal.frame); }
+        const int y = 90 + i * 22 + (i >= 6 ? 24 : 0);
+        if (i == sRow) { p.rect(0, y - 4, 800, 22, pal.sel); p.rect(0, y - 4, 800, 2, pal.text); }
         p.text(24, y, names[i], F14, pal.text);
         p.text(330, y - 1, v[i], F17B, pal.text);
     }
-    static const char* const help[10] = {
+    static const char* const help[13] = {
         "Repeat wraps a shifted Part round the Loop; Play once cuts what passes the end.",
-        "A click plays with the loop, and a count-in plays before the first take.",
+        "A click plays with the loop (the Song button switches it too).",
+        "How many clicks play before the first take. Free tempo counts at 120 BPM.",
+        "The first take waits: Rec arms it and recording begins when the input is loud enough.",
         "The steps for moving a Part and cutting in the Part Editor.",
         "Cuts in the Part Editor land on the nearest zero crossing, so they do not click.",
         "A new Part whose first sound lands this close to the loop start is moved onto it.",
         "How long before the loop start a Part begins recording, so nothing is missed.",
         "Rounds the tempo worked out from the first take.",
+        "How loud the input has to be to start a take that is waiting for sound.",
         "Where the selected track records from.",
         "The input gain for that source.",
         "Monitoring on or off when a source is chosen." };

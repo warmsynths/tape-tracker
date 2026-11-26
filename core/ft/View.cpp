@@ -123,6 +123,12 @@ void Painter::drawTop()
         rect(610, 7, textWidth("CLICK", kF12) + 11, 18, pal.meter);
         T(615, 9, "CLICK", kF12, pal.bg);
     }
+    if (v.wait)
+    {
+        const int wx = v.click ? 610 + textWidth("CLICK", kF12) + 17 : 610;
+        rect(wx, 7, textWidth("WAIT", kF12) + 11, 18, pal.marker);
+        T(wx + 5, 9, "WAIT", kF12, pal.bg);
+    }
     if (v.fb[0] != 0)
     {
         const int w = textWidth(v.fb, kF12) + 12;

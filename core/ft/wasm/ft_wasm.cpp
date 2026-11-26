@@ -414,6 +414,7 @@ int16_t* ft_sample_prepare(int slot, uint32_t frames)
 char* ft_sample_name_ptr(int slot) { return g_slot[slot].name; }
 void ft_sample_clear(int slot) { if (slot >= 0 && slot < kSampleSlots) g_slot[slot].length = 0; }
 int ft_state_screen() { return (int)g_app->screen(); }
+int ft_state_waiting() { return g_app->waiting() ? 1 : 0; }
 void ft_audio(int n) { g_hal.audioBlock(n); }
 void ft_tick(uint32_t ms) { g_hal.nowMs = ms; g_app->tick(); }
 void ft_key(int k) { g_app->key(k); }

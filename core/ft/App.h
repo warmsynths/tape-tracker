@@ -45,7 +45,10 @@ struct Settings
     uint8_t preRollIdx = 2;    // device: pre-roll 0, 60, 120, 250, 500 ms
     uint8_t roundIdx = 0;      // device: tempo rounding off, 0.1, 1
     uint16_t tempoTenths = 0;  // starting tempo in tenths of a BPM, 0: Free
-    bool countIn = true;
+    uint8_t countIdx = 3;      // count-in: 0 Off, 1 beat, 2 beats, 4 beats, 8 beats
+    bool waitSound = false;    // project: the first take waits for the input to get loud
+    int8_t waitDb = -36;       // device: how loud, in dB
+    int countBeats() const { static const int b[5] = { 0, 1, 2, 4, 8 }; return b[countIdx > 4 ? 4 : countIdx]; }
     bool monitorLine = true;   // device: monitoring default for line
     bool monitorMic = false;   // device: monitoring default for the mics
     uint8_t gridIdx = 4;       // project: move and snap grid: 0 Off (1 ms), 1 Bar, 2 1/4, 3 1/8, 4 1/16
@@ -89,6 +92,7 @@ class App
     Screen screen() const { return current; }
     Popup popup() const { return popupKind; }
     const Settings& settings() const { return set; }
+    bool waiting() const { return waitingSound; }
     bool pageOverflowed() const { return page.overflowed() || popupPage.overflowed(); }
     int pageStages() const { return page.stageCount(); }
 
@@ -222,7 +226,9 @@ class App
     uint16_t listTempo[16] = {};
     int inputPeakDb = -48;
     uint16_t tempoEntry = 0;
-    bool countEntry = true;
+    uint8_t countEntry = 3;
+    bool waitEntry = false;
+    int8_t waitDbEntry = -36;
     char projectName[20] = "Untitled";
     bool unsaved = false;
     char nameEdit[17] = {};
@@ -274,6 +280,13 @@ class App
     int promptSelected = 0;
 
     // count-in before a first take at a set tempo
+    // Waiting for sound: the take records from the start, and begins (less the pre-roll) at the first
+    // sound above the level. takeOffset is how much of the recording to leave out at its start.
+    bool waitingSound = false;
+    uint32_t takeOffset = 0, waitScanned = 0;
+    int waitLevelDb = -60;
+    void serviceWait();
+    void cancelWait();
     bool countingIn = false;
     uint32_t countInStart = 0;
     int countInBeats = 0;

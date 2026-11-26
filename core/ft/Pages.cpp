@@ -74,7 +74,7 @@ void slotValue(const FxSlot& s, char* out, size_t n)
 
 void App::open(Screen s)
 {
-    if (s == Screen::Tempo) { tempoEntry = set.tempoTenths; countEntry = set.countIn; sRow = 0; }
+    if (s == Screen::Tempo) { tempoEntry = set.tempoTenths; countEntry = set.countIdx; waitEntry = set.waitSound; waitDbEntry = set.waitDb; sRow = 0; }
     current = s;
     promptShown = false;
     redraw[4] = true;
@@ -165,11 +165,12 @@ void App::keyScreen(int k)
             if (k == kB1) { set.tempoTenths = 0; unsaved = true; back(); return; }
             else if (k == kB2) { if (set.tempoTenths == 0) set.tempoTenths = 1200; sRow = 0; }
             else if (k == kB7) { unsaved = true; back(); return; }
-            else if (k == kB8) { set.tempoTenths = tempoEntry; set.countIn = countEntry; back(); return; }
-            else if (k == kLeft || k == kRight) { if (set.tempoTenths > 0) sRow = k == kLeft ? 0 : 1; }
+            else if (k == kB8) { set.tempoTenths = tempoEntry; set.countIdx = countEntry; set.waitSound = waitEntry; set.waitDb = waitDbEntry; back(); return; }
+            else if (k == kLeft) sRow = clampi(sRow - 1, set.tempoTenths > 0 ? 0 : 1, 2);
+            else if (k == kRight) sRow = clampi(sRow + 1, set.tempoTenths > 0 ? 0 : 1, 2);
             else if (k == kUp) jogScreen(1);
             else if (k == kDown) jogScreen(-1);
-            else if (k == kJogPress) set.countIn = !set.countIn;
+            else if (k == kJogPress) { if (sRow == 1) set.countIdx = (uint8_t)((set.countIdx + 1) % 5); else if (sRow == 2) set.waitSound = !set.waitSound; }
             break;
         case Screen::Editor:
         {
@@ -226,8 +227,8 @@ void App::keyScreen(int k)
         case Screen::Project:
         case Screen::NameEntry: if (current == Screen::Project) projectKey(k); else nameKey(k); break;
         case Screen::Settings:
-            if (k == kUp) sRow = clampi(sRow - 1, 0, 9);
-            else if (k == kDown) sRow = clampi(sRow + 1, 0, 9);
+            if (k == kUp) sRow = clampi(sRow - 1, 0, 12);
+            else if (k == kDown) sRow = clampi(sRow + 1, 0, 12);
             else if (k == kLeft) settingsJog(-1);
             else if (k == kRight) settingsJog(1);
             else if (k == kB8) back();
@@ -271,7 +272,8 @@ void App::jogScreen(int delta)
                 else t += delta * (shift ? 10 : 1);
                 set.tempoTenths = (uint16_t)clampi(t, 400, 2400);
             }
-            else set.countIn = !set.countIn;
+            else if (sRow == 1) set.countIdx = (uint8_t)clampi(set.countIdx + (delta > 0 ? 1 : -1), 0, 4);
+            else { if (!set.waitSound) set.waitSound = true; else set.waitDb = (int8_t)clampi(set.waitDb + delta, -60, -12); }
             break;
         case Screen::Editor:
         {
@@ -335,7 +337,8 @@ void App::jogScreen(int delta)
         case Screen::Input:
         {
             const Source s = trackSource[session.selected()];
-            if (s != Source::Pads) hal.setGain(s, clampi(hal.gain(s) + delta * (shift ? 5 : 1), 0, 100));
+            if (shift) set.waitDb = (int8_t)clampi(set.waitDb + (delta > 0 ? 1 : -1), -60, -12);
+            else if (s != Source::Pads) hal.setGain(s, clampi(hal.gain(s) + delta * (shift ? 5 : 1), 0, 100));
             break;
         }
         case Screen::Settings: settingsJog(delta > 0 ? 1 : -1); break;
@@ -547,14 +550,17 @@ void App::settingsJog(int delta)
     {
         case 0: set.loopOnce = !set.loopOnce; pushBank(); break;
         case 1: set.click = !set.click; break;
-        case 2: set.gridIdx = (uint8_t)clampi(set.gridIdx + delta, 0, 4); break;
-        case 3: set.snapZero = !set.snapZero; break;
-        case 4: set.windowIdx = (uint8_t)clampi(set.windowIdx + delta, 0, 4); break;
-        case 5: set.preRollIdx = (uint8_t)clampi(set.preRollIdx + delta, 0, 4); break;
-        case 6: set.roundIdx = (uint8_t)clampi(set.roundIdx + delta, 0, 2); break;
-        case 7: trackSource[session.selected()] = (Source)(((int)trackSource[session.selected()] + (delta > 0 ? 1 : 3)) % 4); applySource(trackSource[session.selected()]); break;
-        case 8: { const Source s = trackSource[session.selected()]; if (s != Source::Pads) hal.setGain(s, clampi(hal.gain(s) + delta * 5, 0, 100)); break; }
-        case 9: if (delta > 0) set.monitorLine = !set.monitorLine; else set.monitorMic = !set.monitorMic; hal.setMonitor(monitorFor(trackSource[session.selected()])); break;
+        case 2: set.countIdx = (uint8_t)clampi(set.countIdx + (delta > 0 ? 1 : -1), 0, 4); break;
+        case 3: set.waitSound = !set.waitSound; break;
+        case 4: set.gridIdx = (uint8_t)clampi(set.gridIdx + delta, 0, 4); break;
+        case 5: set.snapZero = !set.snapZero; break;
+        case 6: set.windowIdx = (uint8_t)clampi(set.windowIdx + delta, 0, 4); break;
+        case 7: set.preRollIdx = (uint8_t)clampi(set.preRollIdx + delta, 0, 4); break;
+        case 8: set.roundIdx = (uint8_t)clampi(set.roundIdx + delta, 0, 2); break;
+        case 9: set.waitDb = (int8_t)clampi(set.waitDb + (delta > 0 ? 1 : -1), -60, -12); break;
+        case 10: trackSource[session.selected()] = (Source)(((int)trackSource[session.selected()] + (delta > 0 ? 1 : 3)) % 4); applySource(trackSource[session.selected()]); break;
+        case 11: { const Source s = trackSource[session.selected()]; if (s != Source::Pads) hal.setGain(s, clampi(hal.gain(s) + delta * 5, 0, 100)); break; }
+        case 12: if (delta > 0) set.monitorLine = !set.monitorLine; else set.monitorMic = !set.monitorMic; hal.setMonitor(monitorFor(trackSource[session.selected()])); break;
         default: break;
     }
     unsaved = true;
@@ -744,7 +750,7 @@ void App::startSave()
     uint8_t mask = 0;
     for (int t = 0; t < 4; t++) if (session.hasPart(t)) mask |= (uint8_t)(1u << t);
     w.u8(mask);
-    w.u8((set.loopOnce ? 1u : 0u) | (set.click ? 2u : 0u) | (set.countIn ? 4u : 0u) | (set.snapZero ? 8u : 0u));
+    w.u8((set.loopOnce ? 1u : 0u) | (set.click ? 2u : 0u) | (set.countIdx > 0 ? 4u : 0u) | (set.snapZero ? 8u : 0u) | ((uint32_t)set.countIdx << 4) | (set.waitSound ? 128u : 0u));
     w.u8(set.gridIdx);
     w.u16(set.tempoTenths);
     for (int t = 0; t < 4; t++)
@@ -786,7 +792,8 @@ void App::startLoad(const char* name)
     set.tempoTenths = (uint16_t)r.u16();
     set.loopOnce = flags & 1;
     set.click = flags & 2;
-    set.countIn = flags & 4;
+    { const uint32_t ci = (flags >> 4) & 7; set.countIdx = (uint8_t)(ci ? (ci > 4 ? 4 : ci) : ((flags & 4) ? 3 : 0)); }
+    set.waitSound = (flags & 128) != 0;
     set.snapZero = flags & 8;
     set.gridIdx = (uint8_t)(gridByte % 5);
     hal.playerStop();

@@ -114,6 +114,12 @@ class Pen
             rect(610, 7, width("CLICK", F12) + 11, 18, p.meter);
             text(615, 9, "CLICK", F12, p.bg);
         }
+        if (v.wait)
+        {
+            const int wx = v.click ? 610 + width("CLICK", F12) + 17 : 610;
+            rect(wx, 7, width("WAIT", F12) + 11, 18, p.marker);
+            text(wx + 5, 9, "WAIT", F12, p.bg);
+        }
         if (v.fb[0] != 0)
         {
             rect(716, 7, width(v.fb, F12) + 12, 18, p.warn);

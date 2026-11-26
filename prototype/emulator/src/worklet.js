@@ -155,8 +155,11 @@ class FourTrackProcessor extends AudioWorkletProcessor {
     const input = inputs[0];
     // The demo instrument only sounds while a take is being recorded (first take or a Part)
     const mode = this.x.ft_state_mode();
+    // While the take waits for sound the demo instrument stays quiet for two seconds, then plays
+    if (this.x.ft_state_waiting()) this.waitBlocks = (this.waitBlocks || 0) + 1; else this.waitBlocks = 0;
+    const quietWait = this.waitBlocks > 0 && this.waitBlocks < (2 * sampleRate) / 128;
     if (this.demo) {
-      if (mode === 1 || mode === 3) this.demoBlock(this.inL, this.inR);
+      if ((mode === 1 || mode === 3) && !quietWait) this.demoBlock(this.inL, this.inR);
       else { this.inL.fill(0); this.inR.fill(0); }
     } else if (input && input.length > 0) {
       this.inL.set(input[0]);
