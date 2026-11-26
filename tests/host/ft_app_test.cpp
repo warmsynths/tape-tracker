@@ -101,7 +101,43 @@ struct FakeHal : Hal
         return n;
     }
     int sampleCount() override { return 0; }
-    bool sampleName(int, char*, int) override { return false; }
+    std::map<int, std::string> loaded; // slot -> file loaded onto it
+    bool previewing = false;
+    bool sampleName(int slot, char* out, int size) override
+    {
+        auto it = loaded.find(slot);
+        if (it == loaded.end()) return false;
+        std::snprintf(out, size, "%s", it->second.c_str());
+        return true;
+    }
+    int browse(const char* dir, BrowseEntry* out, int max) override
+    {
+        std::string d = dir;
+        if (d.empty() || d.back() != '/') d += '/';
+        std::map<std::string, int> folders;
+        std::vector<std::pair<std::string, uint32_t>> found;
+        for (auto& kv : files)
+        {
+            if (kv.first.compare(0, d.size(), d) != 0) continue;
+            const std::string rest = kv.first.substr(d.size());
+            const size_t slash = rest.find('/');
+            if (slash != std::string::npos) folders[rest.substr(0, slash)]++;
+            else if (rest.size() > 4 && rest.compare(rest.size() - 4, 4, ".wav") == 0) found.push_back({ rest, (uint32_t)kv.second.size() });
+        }
+        int n = 0;
+        for (auto& f : folders) if (n < max) { std::snprintf(out[n].name, sizeof out[n].name, "%s", f.first.c_str()); out[n].dir = true; out[n].bytes = 0; out[n].count = f.second; n++; }
+        for (auto& f : found) if (n < max) { std::snprintf(out[n].name, sizeof out[n].name, "%s", f.first.c_str()); out[n].dir = false; out[n].bytes = f.second; out[n].count = 0; n++; }
+        return n;
+    }
+    uint32_t rawRead(const char* path, uint32_t off, void* buf, uint32_t n) override { return fileRead(path, off, buf, n); }
+    bool loadSampleFile(const char* path, int slot) override
+    {
+        const char* base = std::strrchr(path, '/');
+        loaded[slot] = base ? base + 1 : path;
+        return true;
+    }
+    void previewFile(const char*, bool on) override { previewing = on; }
+    bool previewActive() override { return previewing; }
     int currentSample() override { return curSample; }
     void setCurrentSample(int s) override { curSample = s; }
     void sampleMemory(uint32_t& u, uint32_t& t) override { u = 0; t = 2600000; }
@@ -339,6 +375,47 @@ static void pagesAndProjects()
         for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
         app.pad(3, true); app.pad(3, false);
         CHECK(hal.curSample == 3, "a pad chooses its sample on this page");
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Main, "Back goes home");
+    }
+    {   // Load samples: browse the card, load into slots, replace asks first
+        FakeHal hal;
+        auto wav = [&](const char* path, uint32_t frames)
+        {
+            std::vector<uint8_t> f(44 + frames * 2, 0);
+            wavHeader(f.data(), frames * 2, 44100);
+            hal.files[path] = f;
+        };
+        wav("/Samples/Drums/Kick.wav", 4000);
+        wav("/Samples/Drums/Snare.wav", 2000);
+        wav("/Samples/Drums/808/Hat.wav", 1000);
+        wav("/Samples/Keys/A.wav", 3000);
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kSampleLoad);
+        CHECK(app.screen() == Screen::Load, "Sample Load opens the load page");
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        CHECK(!app.pageOverflowed() && app.stagesOf(4) <= 5, "the load page fits the drawing budget");
+        app.key(kJogPress);             // the first entry is the folder Drums
+        app.key(kDown);                 // 808 is a folder, so the first file is the one below it
+        app.key(kB1);
+        CHECK(hal.loaded.count(0) && hal.loaded[0] == "Kick.wav", "Load puts the file in the first empty slot");
+        app.key(kRight);
+        app.key(kB4);
+        app.key(kB4);
+        CHECK(hal.loaded.count(1) && hal.loaded[1] == "Kick.wav" && hal.loaded.count(2) && hal.loaded[2] == "Snare.wav", "Load next moves on to the next file and slot");
+        app.key(kLeft); app.key(kLeft);
+        app.key(kB1);
+        CHECK(app.popup() == Popup::ReplaceSlot, "loading onto a used slot asks first");
+        for (int st = 0; st < app.stagesOf(5); st++) app.draw(5, st, gfx);
+        app.key(kB7);
+        CHECK(app.popup() == Popup::None && hal.loaded[0] == "Kick.wav", "Cancel keeps the sample");
+        app.key(kB2);
+        CHECK(hal.previewing, "Preview plays the highlighted file");
+        app.key(kB2);
+        CHECK(!hal.previewing, "Preview again stops it");
+        app.key(kB3);
         app.key(kB8);
         CHECK(app.screen() == Screen::Main, "Back goes home");
     }

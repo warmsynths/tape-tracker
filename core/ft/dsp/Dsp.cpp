@@ -555,4 +555,43 @@ size_t wavHeader(uint8_t* o, uint32_t dataBytes, uint32_t rate)
     w32(40, dataBytes);
     return 44;
 }
+
+//------------------------------------------------------------------------------------------
+bool parseWav(const uint8_t* h, uint32_t len, WavInfo& o)
+{
+    o = WavInfo();
+    if (len < 12 || h[0] != 'R' || h[1] != 'I' || h[2] != 'F' || h[3] != 'F' || h[8] != 'W' || h[9] != 'A' || h[10] != 'V' || h[11] != 'E') return false;
+    auto r32 = [&](uint32_t at) { return (uint32_t)h[at] | ((uint32_t)h[at + 1] << 8) | ((uint32_t)h[at + 2] << 16) | ((uint32_t)h[at + 3] << 24); };
+    auto r16 = [&](uint32_t at) { return (uint16_t)(h[at] | (h[at + 1] << 8)); };
+    bool haveFmt = false;
+    uint32_t at = 12;
+    while (at + 8 <= len)
+    {
+        const uint32_t size = r32(at + 4);
+        if (h[at] == 'f' && h[at + 1] == 'm' && h[at + 2] == 't' && h[at + 3] == ' ' && size >= 16 && at + 8 + 16 <= len)
+        {
+            const uint16_t tag = r16(at + 8);
+            if (tag != 1 && tag != 0xFFFE) return false;
+            o.channels = r16(at + 10);
+            o.rate = r32(at + 12);
+            o.bits = r16(at + 22);
+            haveFmt = true;
+        }
+        else if (h[at] == 'd' && h[at + 1] == 'a' && h[at + 2] == 't' && h[at + 3] == 'a')
+        {
+            o.dataOffset = at + 8;
+            o.dataBytes = size;
+            return haveFmt && o.channels >= 1 && o.channels <= 8 && (o.bits == 8 || o.bits == 16 || o.bits == 24);
+        }
+        at += 8 + size + (size & 1);
+    }
+    return false;
+}
+
+int16_t wavSample16(const uint8_t* f, int ch, int bits)
+{
+    if (bits == 8) return (int16_t)(((int)f[ch] - 128) * 256);
+    if (bits == 16) return (int16_t)(f[ch * 2] | (f[ch * 2 + 1] << 8));
+    return (int16_t)(f[ch * 3 + 1] | (f[ch * 3 + 2] << 8));
+}
 } // namespace ft

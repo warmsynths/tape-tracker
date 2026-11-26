@@ -224,6 +224,20 @@ int main()
         CHECK(wavHeader(h, 1000, 44100) == 44, "a WAV header is 44 bytes");
         CHECK(h[0] == 'R' && h[8] == 'W' && h[40] == 0xE8 && h[41] == 0x03, "the header names RIFF, WAVE and the data size");
         CHECK(h[24] == 0x44 && h[25] == 0xAC, "the sample rate is 44100");
+        WavInfo w;
+        CHECK(parseWav(h, 44, w) && w.channels == 1 && w.bits == 16 && w.rate == 44100 && w.dataOffset == 44 && w.dataBytes == 1000 && w.frames() == 500, "a WAV header written here reads back");
+        h[20] = 3; // float data
+        CHECK(!parseWav(h, 44, w), "float WAV files are refused");
+        const uint8_t junk[16] = { 1, 2, 3 };
+        CHECK(!parseWav(junk, 16, w), "something that is not a WAV is refused");
+        // a WAV with an extra chunk before the data
+        uint8_t g[60] = {};
+        wavHeader(g, 400, 48000);
+        for (int i = 0; i < 4; i++) g[36 + i] = "LIST"[i];
+        g[40] = 8; g[41] = g[42] = g[43] = 0; // 8 bytes of list data
+        for (int i = 0; i < 4; i++) g[52 + i] = "data"[i];
+        g[56] = 0x90; g[57] = 0x01;
+        CHECK(parseWav(g, 60, w) && w.dataOffset == 60 - 0 && w.dataBytes == 400 && w.rate == 48000, "a chunk before the data is skipped");
     }
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
     return failures ? 1 : 0;

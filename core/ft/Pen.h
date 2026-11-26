@@ -127,14 +127,14 @@ class Pen
         }
     }
     // The row of eight buttons under the screen; `on` has a bit for each button shown as chosen
-    void buttons(const char* const* labels, uint8_t on = 0, int accentButton = -1)
+    void buttons(const char* const* labels, uint8_t on = 0, int accentButton = -1, uint8_t dimMask = 0)
     {
         rect(0, 440, 800, 40, p.frame);
         for (int b = 0; b < 8; b++)
         {
             cell(b * 100 + 1, 441, 97, 39, (on >> b) & 1, p.cell);
             if (labels[b] != nullptr && labels[b][0] != 0)
-                textMid(b * 100 + 1, 97, 451, labels[b], F14, b == accentButton ? p.rec : p.text);
+                textMid(b * 100 + 1, 97, 451, labels[b], F14, b == accentButton ? p.rec : ((dimMask >> b) & 1) ? p.dim : p.text);
         }
     }
     // The line above the buttons, with its text

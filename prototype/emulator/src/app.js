@@ -8,7 +8,7 @@
   const WORKLET = document.getElementById('worklet-src').textContent;
 
   // Key ids, same order as core/ft/App.h
-  const K = { B1: 0, B2: 1, B3: 2, B4: 3, B5: 4, B6: 5, B7: 6, B8: 7, Up: 8, Down: 9, Left: 10, Right: 11, Rec: 12, Play: 13, Stop: 14, Jog: 15, Sample: 16, Perf: 17, Master: 18, File: 19, Song: 20, Pattern: 21, Params: 22, SamplePlay: 23 };
+  const K = { B1: 0, B2: 1, B3: 2, B4: 3, B5: 4, B6: 5, B7: 6, B8: 7, Up: 8, Down: 9, Left: 10, Right: 11, Rec: 12, Play: 13, Stop: 14, Jog: 15, Sample: 16, Perf: 17, Master: 18, File: 19, Song: 20, Pattern: 21, Params: 22, SamplePlay: 23, SampleLoad: 24 };
 
   // Colours, in the order of the Palette in core/ft/Gfx.h: bg, top, topText, frame, text, dim,
   // cell, sel, panel, rec, meter, track, wave, waveBg, waveOff, marker, warn
@@ -112,7 +112,7 @@
       else if (m.type === 'sample-result') sampleDone(m);
       else if (m.type === 'ready') document.getElementById('rate').textContent = m.sampleRate + ' Hz';
     };
-    node.port.postMessage({ type: 'init', wasm: WASM, palette: PALETTE, advances: advances(), files: await loadSaved() });
+    node.port.postMessage({ type: 'init', wasm: WASM, palette: PALETTE, advances: advances(), files: (await loadSaved()).concat(demoCard()) });
     node.connect(audio.destination);
     setInput('demo');
     if (audio.state === 'suspended') await audio.resume();
@@ -206,6 +206,7 @@
     if (e.key === 'h') { press(K.Pattern); return; }
     if (e.key === 'p') { press(K.Params); return; }
     if (e.key === 'l') { press(K.SamplePlay); return; }
+    if (e.key === 'o') { press(K.SampleLoad); return; }
     if (e.key === 'e') { press(K.Sample); return; }
     if (e.key === 'g') { press(K.Perf); return; }
     if (e.key === 'm') { press(K.Master); return; }
@@ -241,6 +242,54 @@
     });
   }
   async function dbPut(path, data) { try { const d = await db(); d.transaction('files', 'readwrite').objectStore('files').put(data, path); } catch (e) { /* storage unavailable */ } }
+  // A few sounds on the pretend SD card so Load samples has something to browse. Not kept in
+  // browser storage; files you add yourself are.
+  function wavBytes(chans, rate) {
+    const ch = chans.length, n = chans[0].length, out = new Uint8Array(44 + n * ch * 2), dv = new DataView(out.buffer);
+    const w4 = (at, t) => { for (let i = 0; i < 4; i++) out[at + i] = t.charCodeAt(i); };
+    w4(0, 'RIFF'); dv.setUint32(4, 36 + n * ch * 2, true); w4(8, 'WAVE'); w4(12, 'fmt '); dv.setUint32(16, 16, true);
+    dv.setUint16(20, 1, true); dv.setUint16(22, ch, true); dv.setUint32(24, rate, true); dv.setUint32(28, rate * ch * 2, true);
+    dv.setUint16(32, ch * 2, true); dv.setUint16(34, 16, true); w4(36, 'data'); dv.setUint32(40, n * ch * 2, true);
+    for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++) dv.setInt16(44 + (i * ch + c) * 2, Math.max(-1, Math.min(1, chans[c][i])) * 30000, true);
+    return out;
+  }
+  function demoCard() {
+    const R = 44100;
+    let seed = 7;
+    const noise = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2147483648 - 1; };
+    const make = (sec, fn) => { const n = Math.floor(R * sec), a = new Float32Array(n); let ph = 0, lp = 0; for (let i = 0; i < n; i++) { const e = 1 - i / n; a[i] = fn(i / R, e, () => noise(), (f) => (ph += f / R), (v, k) => (lp = lp * k + v * (1 - k))); } return a; };
+    const tri = (p) => 4 * Math.abs(p - Math.floor(p + 0.5)) - 1;
+    const kick = (len, lo, hi) => make(len, (t, e, nz, ph) => tri(ph(lo + hi * e * e * e)) * e * e);
+    const hat = (len) => make(len, (t, e, nz, ph, lp) => { const x = nz(); return (x - lp(x, 0.5)) * e * e * e; });
+    const snare = (len) => make(len, (t, e, nz, ph) => (tri(ph(190)) * 0.4 + nz() * 0.6) * e * e);
+    const tom = (len, f) => make(len, (t, e, nz, ph) => tri(ph(f * (0.7 + 0.3 * e))) * e * e);
+    const clap = (len) => make(len, (t, e, nz) => nz() * e * e * (Math.floor(t * 100) % 3 === 2 ? 1 : 0.5) * 0.7);
+    const rim = (len) => make(len, (t, e, nz, ph) => (tri(ph(1700)) * 0.6 + nz() * 0.3) * e * e * e);
+    const tone = (len, f) => make(len, (t, e, nz, ph) => Math.sin(2 * Math.PI * ph(f)) * e * 0.8);
+    const files = [
+      ['Drums/Clap 01.wav', [clap(0.42)]], ['Drums/Hat closed.wav', [hat(0.18)]], ['Drums/Hat open.wav', [hat(0.86)]],
+      ['Drums/Kick 04.wav', [kick(0.64, 42, 120)]], ['Drums/Rim.wav', [rim(0.12)]], ['Drums/Snare 02.wav', [snare(0.51)]],
+      ['Drums/Tom low.wav', [tom(0.92, 90)]],
+      ['Drums/808/Kick 808.wav', [kick(0.9, 38, 90)]], ['Drums/808/Snare 808.wav', [snare(0.35)]], ['Drums/808/Hat 808.wav', [hat(0.1)]],
+      ['Drums/Acoustic/Kick wood.wav', [kick(0.4, 60, 70)]], ['Drums/Acoustic/Snare rim.wav', [snare(0.28)]], ['Drums/Acoustic/Tom hi.wav', [tom(0.5, 180)]],
+      ['Keys/Sine A3.wav', [tone(1.5, 220)]], ['Keys/Sine C4 stereo.wav', [tone(1.2, 261.63), tone(1.2, 262.5)]],
+    ];
+    return files.map(([p, ch]) => ({ path: '/Samples/' + p, data: wavBytes(ch, R) }));
+  }
+  const addToCard = async (e) => {
+    await start();
+    for (const f of e.target.files) {
+      const rel = f.webkitRelativePath || f.name;
+      const path = '/Samples/' + rel;
+      const data = new Uint8Array(await f.arrayBuffer());
+      send({ type: 'putfile', path, data });
+      dbPut(path, data);
+    }
+    document.getElementById('note').textContent = e.target.files.length + ' file(s) added to the card under Samples.';
+    e.target.value = '';
+  };
+  document.getElementById('sdFiles').addEventListener('change', addToCard);
+  document.getElementById('sdFolder').addEventListener('change', addToCard);
   async function dbDel(path) { try { const d = await db(); d.transaction('files', 'readwrite').objectStore('files').delete(path); } catch (e) { /* ignore */ } }
   async function loadSaved() {
     try {

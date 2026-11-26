@@ -94,15 +94,32 @@ __attribute__((import_module("host"), import_name("file_write"))) int host_file_
 __attribute__((import_module("host"), import_name("file_read"))) uint32_t host_file_read(const char* path, uint32_t offset, void* buf, uint32_t len);
 __attribute__((import_module("host"), import_name("file_size"))) uint32_t host_file_size(const char* path);
 __attribute__((import_module("host"), import_name("file_remove"))) int host_file_remove(const char* path);
+__attribute__((import_module("host"), import_name("file_browse"))) int host_file_browse(const char* dir, uint8_t* out, int maxEntries);
 __attribute__((import_module("host"), import_name("file_list"))) int host_file_list(const char* dir, char* out, int maxNames);
 }
 
 constexpr int kSampleSlots = 48;
-constexpr uint32_t kSamplePool = 1300000; // frames: about 2.6 MB, like the Tracker's sample memory
+constexpr uint32_t kSamplePool = 3000000; // frames: about 6 MB, what the Tracker has left for samples with 16 s tracks
 int16_t g_samples[kSamplePool];
 struct SampleSlot { uint32_t start, length; char name[24]; int8_t tuneSt = 0, tuneCt = 0; uint8_t volume = 100; int8_t pan = 0; bool loop = false; uint16_t pStart = 0, pEnd = 65535; };
-SampleSlot g_slot[kSampleSlots];
+constexpr int kScratchSlot = kSampleSlots; // a sample being previewed from the card; it lives in the free tail
+SampleSlot g_slot[kSampleSlots + 1];
 uint32_t g_samplesUsed = 0;
+
+// Room for a sample on a pad. The old sample's room is reclaimed only if it was the last one loaded.
+int16_t* prepareSlot(int slot, uint32_t frames)
+{
+    if (slot < 0 || slot >= kSampleSlots) return nullptr;
+    if (g_slot[slot].length > 0 && g_slot[slot].start + g_slot[slot].length == g_samplesUsed) g_samplesUsed = g_slot[slot].start;
+    if (g_samplesUsed + frames > kSamplePool) return nullptr;
+    SampleSlot& s = g_slot[slot];
+    s.start = g_samplesUsed;
+    s.length = frames;
+    s.name[0] = 0;
+    s.tuneSt = 0; s.tuneCt = 0; s.volume = 100; s.pan = 0; s.loop = false; s.pStart = 0; s.pEnd = 65535; // global constructors are not run
+    g_samplesUsed += frames;
+    return g_samples + s.start;
+}
 
 //------------------------------------------------------------------------------------------
 // The machine
@@ -176,7 +193,7 @@ class EmuHal : public Hal
     bool fileRemove(const char* path) override { return host_file_remove(path) != 0; }
     int fileList(const char* dir, char (*names)[24], int maxNames) override { return host_file_list(dir, &names[0][0], maxNames); }
 
-    int sampleCount() override { int n = 0; for (auto& s : g_slot) if (s.length > 0) n++; return n; }
+    int sampleCount() override { int n = 0; for (int i = 0; i < kSampleSlots; i++) if (g_slot[i].length > 0) n++; return n; }
     bool sampleName(int slot, char* out, int size) override
     {
         if (slot < 0 || slot >= kSampleSlots || g_slot[slot].length == 0) return false;
@@ -193,7 +210,7 @@ class EmuHal : public Hal
     {
         int slot = 0;
         for (int i = 0; i < 8; i++) if (!voices[i].on) { slot = i; break; }
-        if (smp >= 0 && smp < kSampleSlots && g_slot[smp].length > 0)
+        if (smp >= 0 && smp <= kSampleSlots && g_slot[smp].length > 0)
         {
             const SampleSlot& s = g_slot[smp];
             float r = ratio;
@@ -212,6 +229,97 @@ class EmuHal : public Hal
             voices[slot] = Voice{ true, pad, 0.0f, f / (float)rate, 0.3f, true, -1, 1.0f, 0.0f, 0.0f, 0.0f, false };
         }
     }
+    int browse(const char* dir, BrowseEntry* out, int max) override
+    {
+        static uint8_t rec[48 * 40];
+        const int n = host_file_browse(dir, rec, max < 48 ? max : 48);
+        for (int i = 0; i < n; i++)
+        {
+            const uint8_t* r = rec + i * 40;
+            out[i].dir = r[0] != 0;
+            for (int c = 0; c < 28; c++) out[i].name[c] = (char)r[4 + c];
+            out[i].name[27] = 0;
+            out[i].bytes = r[32] | (r[33] << 8) | (r[34] << 16) | ((uint32_t)r[35] << 24);
+            out[i].count = r[36] | (r[37] << 8) | (r[38] << 16) | ((uint32_t)r[39] << 24);
+        }
+        return n;
+    }
+    uint32_t rawRead(const char* path, uint32_t offset, void* buf, uint32_t len) override { return host_file_read(path, offset, buf, len); }
+
+    // A WAV file from the card, mixed to mono and brought to this machine's rate. `slot` is a pad
+    // slot, or the scratch slot for a preview (which takes only the free tail and keeps nothing).
+    bool loadWav(const char* path, int slot)
+    {
+        uint8_t head[1024];
+        const uint32_t hn = host_file_read(path, 0, head, sizeof head);
+        WavInfo w;
+        if (hn == 0 || !parseWav(head, hn, w) || w.frames() == 0 || w.rate == 0) return false;
+        uint32_t out = (uint32_t)((uint64_t)w.frames() * rate / w.rate);
+        if (out < 2) return false;
+        int16_t* dst;
+        if (slot == kScratchSlot)
+        {
+            if (g_samplesUsed >= kSamplePool) return false;
+            if (out > kSamplePool - g_samplesUsed) out = kSamplePool - g_samplesUsed;
+            SampleSlot& s = g_slot[slot];
+            s.start = g_samplesUsed; s.length = out; s.name[0] = 0;
+            s.tuneSt = 0; s.tuneCt = 0; s.volume = 100; s.pan = 0; s.loop = false; s.pStart = 0; s.pEnd = 65535;
+            dst = g_samples + s.start;
+        }
+        else
+        {
+            dst = prepareSlot(slot, out);
+            if (dst == nullptr) return false;
+        }
+        const uint32_t fb = w.frameBytes(), frames = w.frames();
+        static uint8_t chunk[256 * 8 * 3];
+        uint32_t first = 0, have = 0;
+        auto at = [&](uint32_t idx) -> int
+        {
+            if (idx >= frames) idx = frames - 1;
+            if (idx < first || idx >= first + have)
+            {
+                first = idx;
+                const uint32_t want = frames - idx < 256 ? frames - idx : 256;
+                have = host_file_read(path, w.dataOffset + idx * fb, chunk, want * fb) / fb;
+                if (have == 0) return 0;
+            }
+            int sum = 0;
+            for (int c = 0; c < w.channels; c++) sum += wavSample16(chunk + (idx - first) * fb, c, w.bits);
+            return sum / w.channels;
+        };
+        for (uint32_t o = 0; o < out; o++)
+        {
+            const uint64_t num = (uint64_t)o * w.rate;
+            const uint32_t i0 = (uint32_t)(num / rate);
+            const float fr = (float)(num % rate) / (float)rate;
+            const int a = at(i0), b = at(i0 + 1);
+            dst[o] = (int16_t)((float)a + (float)(b - a) * fr);
+        }
+        if (slot != kScratchSlot)
+        {
+            const char* base = path;
+            for (const char* c = path; *c; c++) if (*c == '/') base = c + 1;
+            int i = 0;
+            for (; i < 23 && base[i] && !(base[i] == '.' && base[i + 1] == 'w'); i++) g_slot[slot].name[i] = base[i];
+            g_slot[slot].name[i] = 0;
+        }
+        return true;
+    }
+    bool loadSampleFile(const char* path, int slot) override
+    {
+        previewFile("", false);
+        return loadWav(path, slot);
+    }
+    void previewFile(const char* path, bool on) override
+    {
+        for (auto& v : voices) if (v.on && v.pad == 950) v.on = false;
+        if (!on) return;
+        if (!loadWav(path, kScratchSlot)) return;
+        startVoice(950, kScratchSlot, 1.0f);
+    }
+    bool previewActive() override { for (auto& v : voices) if (v.on && v.pad == 950) return true; return false; }
+
     void padOn(int pad, bool keysMode) override
     {
         const int semis = keysMode ? (pad % 12) + 12 * ((pad / 12) % 4) - 12 : 0;
@@ -453,19 +561,7 @@ void ft_shift(int held) { g_app->setShift(held != 0); }
 void ft_key_up(int k) { g_app->keyUp(k); }
 
 // Loading a sample onto a pad: the page asks for room, writes the audio there, then names it.
-int16_t* ft_sample_prepare(int slot, uint32_t frames)
-{
-    if (slot < 0 || slot >= kSampleSlots) return nullptr;
-    // reclaim the old sample's room only if it was the last one loaded
-    if (g_slot[slot].length > 0 && g_slot[slot].start + g_slot[slot].length == g_samplesUsed) g_samplesUsed = g_slot[slot].start;
-    if (g_samplesUsed + frames > kSamplePool) return nullptr;
-    g_slot[slot].start = g_samplesUsed;
-    g_slot[slot].length = frames;
-    g_slot[slot].name[0] = 0;
-    g_slot[slot].tuneSt = 0; g_slot[slot].tuneCt = 0; g_slot[slot].volume = 100; g_slot[slot].pan = 0; g_slot[slot].loop = false; g_slot[slot].pStart = 0; g_slot[slot].pEnd = 65535;
-    g_samplesUsed += frames;
-    return g_samples + g_slot[slot].start;
-}
+int16_t* ft_sample_prepare(int slot, uint32_t frames) { return prepareSlot(slot, frames); }
 char* ft_sample_name_ptr(int slot) { return g_slot[slot].name; }
 void ft_sample_clear(int slot) { if (slot >= 0 && slot < kSampleSlots) g_slot[slot].length = 0; }
 int ft_state_screen() { return (int)g_app->screen(); }

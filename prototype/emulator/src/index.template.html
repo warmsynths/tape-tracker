@@ -39,7 +39,7 @@
         <button class="hw-btn dim" data-stock="config" title="Stock screen: shows a picture of it">Config</button>
         <button class="hw-btn" data-key="Master" title="Master (M)">Master</button>
 
-        <button class="hw-btn dim" data-stock="sample-load" title="Stock screen: shows a picture of it">Sample<br>Load</button>
+        <button class="hw-btn" data-key="SampleLoad" title="Sample Load: load samples from the SD card (O)">Sample<br>Load</button>
         <button class="hw-btn" data-key="SamplePlay" title="Sample Play: pad sample settings (L)">Sample<br>Play</button>
         <button class="hw-btn" data-key="Sample" title="Sample Edit (E)">Sample<br>Edit</button>
         <button class="hw-btn dim" data-stock="sample-rec" title="Stock screen: shows a picture of it">Sample<br>Rec</button>
@@ -87,6 +87,9 @@
   <p class="small">Eight sounds are built in. Load your own onto a pad slot:</p>
   <label>Slot <input id="sampleSlot" type="number" min="1" max="48" value="9" style="width:4em"></label>
   <input id="sampleFile" type="file" accept="audio/*">
+  <h2>SD card samples</h2>
+  <p class="small">The pretend card has a Samples folder with a few sounds. Add your own WAV files (a whole folder works too); they stay in this browser.</p>
+  <input id="sdFiles" type="file" accept=".wav,audio/wav" multiple> <input id="sdFolder" type="file" webkitdirectory>
   <h2>Keys</h2>
   <table class="keys">
     <tr><td>1 to 8</td><td>buttons under the screen</td></tr>

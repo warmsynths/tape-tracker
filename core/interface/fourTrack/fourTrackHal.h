@@ -66,6 +66,12 @@ class FourTrackHal : public ft::Hal
     void setCurrentSample(int slot) override;
     void sampleMemory(uint32_t& usedBytes, uint32_t& totalBytes) override;
 
+    int browse(const char* dir, ft::BrowseEntry* out, int max) override;
+    uint32_t rawRead(const char* path, uint32_t offset, void* buf, uint32_t len) override;
+    bool loadSampleFile(const char* path, int slot) override;
+    void previewFile(const char* path, bool on) override;
+    bool previewActive() override;
+
     bool padSample(int slot, ft::PadSample& out) override;
     void setPadSample(int slot, const ft::PadSample& in) override;
     int padSampleWave(int slot, uint8_t* out, int columns) override;

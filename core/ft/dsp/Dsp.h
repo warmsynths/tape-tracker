@@ -142,6 +142,19 @@ class Lofi
 //------------------------------------------------------------------------------------------
 // WAV file header for 16-bit mono PCM; `dataBytes` is the size of the audio that follows.
 size_t wavHeader(uint8_t* out, uint32_t dataBytes, uint32_t sampleRate);
+
+// What a WAV file holds, read from its first bytes (a kilobyte is enough). Only PCM of 8, 16
+// or 24 bits is understood.
+struct WavInfo
+{
+    uint16_t channels = 0, bits = 0;
+    uint32_t rate = 0, dataOffset = 0, dataBytes = 0;
+    uint32_t frames() const { return (channels > 0 && bits > 0) ? dataBytes / (channels * (bits / 8u)) : 0; }
+    uint32_t frameBytes() const { return channels * (bits / 8u); }
+};
+bool parseWav(const uint8_t* head, uint32_t len, WavInfo& out);
+// One sample of one frame of PCM data as a 16-bit value (channels are mixed down by the caller)
+int16_t wavSample16(const uint8_t* frame, int channel, int bits);
 } // namespace ft
 
 #endif /* FT_DSP_H_ */

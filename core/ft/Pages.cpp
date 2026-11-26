@@ -83,6 +83,7 @@ void App::open(Screen s)
 
 void App::back()
 {
+    if (current == Screen::Load) loadStopPreview();
     if (auditioning)
     {
         auditioning = false;
@@ -123,8 +124,17 @@ void App::popupKey(int k)
             if (k == kB8) close();
             break;
         case Popup::SdMissing:
-            if (k == kB7) { close(); job = Job::None; }
+            if (current == Screen::Load)
+            {
+                if (k == kB7) { close(); back(); }
+                else if (k == kB8) { close(); loadOpen(); }
+            }
+            else if (k == kB7) { close(); job = Job::None; }
             else if (k == kB8) { close(); }
+            break;
+        case Popup::ReplaceSlot:
+            if (k == kB7) close();
+            else if (k == kB8) { close(); ldConfirmed = true; loadDo(ldAdvance != 0); }
             break;
         case Popup::Unsaved:
             if (k == kB6) { close(); pendingAction = 0; }
@@ -239,6 +249,7 @@ void App::keyScreen(int k)
             else if (k == kB8 || k == kSamplePlay) { if (psAuditioning) { psAuditioning = false; hal.padAudition(hal.currentSample(), false); } back(); return; }
             for (int i = 0; i < 48; i++) padModeKeys[i] = padsKeysMode;
             break;
+        case Screen::Load: loadKey(k); break;
         case Screen::Glitch: glitchKey(k); break;
         case Screen::Master: masterKey(k); break;
         case Screen::Input:
@@ -374,6 +385,7 @@ void App::jogScreen(int delta)
             break;
         }
         case Screen::PadSample: psChange(delta); break;
+        case Screen::Load: loadJog(delta); break;
         case Screen::Master: masterJog(delta); break;
         case Screen::Input:
         {
@@ -1004,5 +1016,193 @@ void App::psChange(int delta)
     }
     hal.setPadSample(slot, s);
     unsaved = true;
+}
+
+//--------------------------------------------------------------------------------------------
+// C2 Load samples (Sample Load button)
+
+static bool pathIs(const char* a, const char* b)
+{
+    while (*a != 0 && *a == *b) { a++; b++; }
+    return *a == *b;
+}
+static size_t textLen(const char* s) { size_t n = 0; while (s[n] != 0) n++; return n; }
+static char* lastSlash(char* s)
+{
+    char* r = nullptr;
+    for (; *s != 0; s++) if (*s == '/') r = s;
+    return r;
+}
+
+void App::loadOpen()
+{
+    ldCard = hal.sdPresent();
+    ldCount = 0;
+    ldSel = ldTop = 0;
+    ldWaveOk = false;
+    ldPreviewing = false;
+    if (!ldCard) { showPopup(Popup::SdMissing); return; }
+    // the first empty slot is the destination
+    ldSlot = hal.currentSample() >= 0 ? hal.currentSample() : 0;
+    for (int i = 0; i < 48; i++)
+    {
+        char n[4];
+        if (!hal.sampleName(i, n, sizeof n)) { ldSlot = i; break; }
+    }
+    loadList();
+}
+
+void App::loadList()
+{
+    ldCount = hal.browse(ldDir, ldEntry, kLdMax);
+    if (ldCount < 0) ldCount = 0;
+    if (ldCount == 0 && pathIs(ldDir, "/Samples")) { fmt(ldDir, sizeof ldDir, "/"); ldCount = hal.browse(ldDir, ldEntry, kLdMax); if (ldCount < 0) ldCount = 0; }
+    for (int i = 0; i < kLdMax; i++) { ldHasMeta[i] = false; ldMs[i] = 0; ldChannels[i] = 0; }
+    ldSel = ldTop = 0;
+    ldWaveOk = false;
+    if (ldCount > 0) loadSelect(0);
+}
+
+void App::loadPath(int i, char* out, int size) const
+{
+    if (pathIs(ldDir, "/")) fmt(out, size, "/%s", ldEntry[i].name);
+    else fmt(out, size, "%s/%s", ldDir, ldEntry[i].name);
+}
+
+void App::loadMeta(int i)
+{
+    if (i < 0 || i >= ldCount || ldEntry[i].dir || ldHasMeta[i]) return;
+    ldHasMeta[i] = true;
+    char path[140];
+    loadPath(i, path, sizeof path);
+    uint8_t head[1024];
+    const uint32_t n = hal.rawRead(path, 0, head, sizeof head);
+    WavInfo w;
+    if (n == 0 || !parseWav(head, n, w) || w.rate == 0) return;
+    ldChannels[i] = (uint8_t)w.channels;
+    ldMs[i] = (uint32_t)((uint64_t)w.frames() * 1000 / w.rate);
+}
+
+void App::loadStopPreview()
+{
+    if (ldPreviewing) { hal.previewFile("", false); ldPreviewing = false; }
+}
+
+void App::loadSelect(int i)
+{
+    if (ldCount <= 0) return;
+    i = clampi(i, 0, ldCount - 1);
+    loadStopPreview();
+    ldSel = i;
+    if (ldSel < ldTop) ldTop = ldSel;
+    if (ldSel >= ldTop + kLdRows) ldTop = ldSel - kLdRows + 1;
+    for (int r = 0; r < kLdRows; r++) loadMeta(ldTop + r);
+    // the picture of the highlighted file, from short reads spread along it
+    ldWaveOk = false;
+    if (ldEntry[ldSel].dir) return;
+    char path[140];
+    loadPath(ldSel, path, sizeof path);
+    uint8_t head[1024];
+    const uint32_t n = hal.rawRead(path, 0, head, sizeof head);
+    WavInfo w;
+    if (n == 0 || !parseWav(head, n, w) || w.frames() == 0) return;
+    const uint32_t fb = w.frameBytes(), frames = w.frames();
+    uint8_t buf[16 * 8 * 3];
+    for (int c = 0; c < 58; c++)
+    {
+        const uint32_t from = (uint32_t)((uint64_t)c * frames / 58), to = (uint32_t)((uint64_t)(c + 1) * frames / 58);
+        uint32_t take = to > from ? to - from : 1;
+        if (take > 16) take = 16;
+        const uint32_t got = hal.rawRead(path, w.dataOffset + from * fb, buf, take * fb) / fb;
+        int peak = 0;
+        for (uint32_t f = 0; f < got; f++)
+            for (int ch = 0; ch < w.channels; ch++)
+            {
+                int v = wavSample16(buf + f * fb, ch, w.bits);
+                if (v < 0) v = -v;
+                if (v > peak) peak = v;
+            }
+        ldWave[c] = (uint8_t)(__builtin_sqrtf((float)peak / 32768.0f) * 255.0f);
+    }
+    ldWaveOk = true;
+}
+
+void App::loadDo(bool advance)
+{
+    if (ldCount <= 0 || ldEntry[ldSel].dir) return;
+    loadMeta(ldSel);
+    if (ldChannels[ldSel] == 0) { showPopup(Popup::Message, 6); return; }
+    char old[4];
+    const bool used = hal.sampleName(ldSlot, old, sizeof old);
+    if (used && !ldConfirmed) { ldAdvance = advance ? 1 : 0; showPopup(Popup::ReplaceSlot); return; }
+    ldConfirmed = false;
+    uint32_t usedBytes = 0, totalBytes = 0;
+    hal.sampleMemory(usedBytes, totalBytes);
+    PadSample was;
+    const uint32_t freed = hal.padSample(ldSlot, was) ? was.bytes : 0;
+    const uint32_t need = ldMs[ldSel] * 88u;
+    if ((int64_t)usedBytes - (int64_t)freed + (int64_t)need > (int64_t)totalBytes) { showPopup(Popup::Message, 5); return; }
+    loadStopPreview();
+    char path[140];
+    loadPath(ldSel, path, sizeof path);
+    if (!hal.loadSampleFile(path, ldSlot)) { showPopup(Popup::Message, 5); return; }
+    hal.setCurrentSample(ldSlot);
+    unsaved = true;
+    if (advance)
+    {
+        int n = ldSel + 1;
+        while (n < ldCount && ldEntry[n].dir) n++;
+        if (n < ldCount) loadSelect(n);
+        if (ldSlot < 47) ldSlot++;
+    }
+    refresh(true);
+}
+
+void App::loadKey(int k)
+{
+    switch (k)
+    {
+        case kUp: loadSelect(ldSel - 1); break;
+        case kDown: loadSelect(ldSel + 1); break;
+        case kLeft: ldSlot = clampi(ldSlot - (shift ? 12 : 1), 0, 47); break;
+        case kRight: ldSlot = clampi(ldSlot + (shift ? 12 : 1), 0, 47); break;
+        case kB1: ldConfirmed = false; loadDo(false); break;
+        case kB4: ldConfirmed = false; loadDo(true); break;
+        case kB2:
+        case kJogPress:
+            if (ldCount > 0 && ldEntry[ldSel].dir && k == kJogPress)
+            {
+                loadStopPreview();
+                if (pathIs(ldDir, "/")) fmt(ldDir, sizeof ldDir, "/%s", ldEntry[ldSel].name);
+                else { const size_t l = textLen(ldDir); fmt(ldDir + l, sizeof ldDir - l, "/%s", ldEntry[ldSel].name); }
+                loadList();
+            }
+            else if (ldPreviewing) loadStopPreview();
+            else if (ldCount > 0 && !ldEntry[ldSel].dir && ldWaveOk)
+            {
+                char path[140];
+                loadPath(ldSel, path, sizeof path);
+                hal.previewFile(path, true);
+                ldPreviewing = true;
+                ldPreviewAt = hal.millis();
+            }
+            break;
+        case kB3:
+        {
+            loadStopPreview();
+            char* cut = lastSlash(ldDir);
+            if (cut != nullptr && cut != ldDir) { *cut = 0; loadList(); }
+            else if (!pathIs(ldDir, "/")) { fmt(ldDir, sizeof ldDir, "/"); loadList(); }
+            break;
+        }
+        case kB8:
+        case kSampleLoad: back(); return;
+        default: break;
+    }
+}
+
+void App::loadJog(int delta)
+{
+    loadSelect(ldSel + (delta > 0 ? kLdRows : -kLdRows));
 }
 } // namespace ft

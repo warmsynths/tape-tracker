@@ -28,17 +28,18 @@ enum Key
     kPattern,      // back to the main screen from any page
     kParams,       // the track mixer
     kSamplePlay,   // settings of the pad sample
+    kSampleLoad,   // load samples from the SD card
     kKeyCount
 };
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load
 };
 
 enum class Popup : uint8_t
 {
-    None, Replace, NoSound, NotArmed, SdMissing, Unsaved, Message
+    None, Replace, NoSound, NotArmed, SdMissing, Unsaved, Message, ReplaceSlot
 };
 
 struct Settings
@@ -160,6 +161,31 @@ class App
     int psField = 0;              // pad sample page: 0 tune, 1 volume, 2 pan, 3 play mode, 4 start, 5 end
     bool psAuditioning = false;
     void psChange(int delta);
+    // C2 Load samples: the SD card's folders and WAV files, a preview, a destination slot
+    static constexpr int kLdMax = 48;
+    static constexpr int kLdRows = 9;
+    void drawLoad(class Pen& p);
+    void loadOpen();
+    void loadList();
+    void loadSelect(int i);
+    void loadKey(int k);
+    void loadJog(int delta);
+    void loadMeta(int i);
+    void loadPath(int i, char* out, int size) const;
+    void loadDo(bool advance);
+    void loadStopPreview();
+    BrowseEntry ldEntry[kLdMax];
+    uint32_t ldMs[kLdMax] = {};
+    uint8_t ldChannels[kLdMax] = {};
+    bool ldHasMeta[kLdMax] = {};
+    int ldCount = 0, ldSel = 0, ldTop = 0, ldSlot = 0;
+    char ldDir[96] = "/Samples";
+    bool ldPreviewing = false, ldCard = true;
+    uint8_t ldWave[58] = {};
+    bool ldWaveOk = false;
+    uint32_t ldPreviewAt = 0;
+    bool ldConfirmed = false;
+    int ldAdvance = 0;
     int mxTrack = 0, mxField = 0; // mixer: the column and the control in focus (0 level, 1 pan, 2 tone)
     void drawPopup(class Pen& p);
     void showPopup(Popup kind, int arg = 0);

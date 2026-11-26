@@ -119,7 +119,7 @@ void App::key(int k)
     {
         // Play and Stop work on the pages that sit beside the recorder
         const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
-                               current == Screen::Input || current == Screen::Pads || current == Screen::Memory || current == Screen::Mixer || current == Screen::PadSample ||
+                               current == Screen::Input || current == Screen::Pads || current == Screen::Memory || current == Screen::Mixer || current == Screen::PadSample || current == Screen::Load ||
                                current == Screen::Settings;
         if (transport && k == kPlay) { togglePlay(); refresh(true); return; }
         if (transport && k == kStop) { pressStop(); refresh(true); return; }
@@ -207,6 +207,7 @@ void App::key(int k)
         case kMaster: open(Screen::Master); break;
         case kParams: mxTrack = session.selected(); open(Screen::Mixer); break;
         case kSamplePlay: psField = 0; open(Screen::PadSample); break;
+        case kSampleLoad: open(Screen::Load); loadOpen(); break;
         case kFile: refreshProjectList(); open(Screen::Project); break;
         default: break;
     }
@@ -1200,6 +1201,7 @@ void App::refresh(bool force)
         }
         if (force || metersUpdated) redraw[1] = true;
     }
+    if (current == Screen::Load && ldPreviewing && !hal.previewActive()) ldPreviewing = false;
     if (current != Screen::Main)
     {
         // Pages are rebuilt when something they show changes (live readouts about 10 times a second)

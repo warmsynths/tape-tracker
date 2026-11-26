@@ -70,6 +70,7 @@ void App::buildPage()
         case Screen::Memory: drawMemory(p); break;
         case Screen::Mixer: drawMixer(p); break;
         case Screen::PadSample: drawPadSample(p); break;
+        case Screen::Load: drawLoad(p); break;
         default: break;
     }
     if (popupKind != Popup::None)
@@ -336,6 +337,159 @@ void App::drawPadSample(Pen& p)
     p.text(14 + 98 + 12, 324, b, F17, pal.text);
     const char* l[8] = { "Audition", "Keys", "Pad", "", "", "", "", "Back" };
     p.buttons(l, (uint8_t)((psAuditioning ? 1 : 0) | (padsKeysMode ? 2 : 4)));
+}
+
+//--------------------------------------------------------------------------------------------
+// C2 Load samples (Sample Load button)
+static void tenthsMb(char* out, int size, uint32_t bytes)
+{
+    const uint32_t t = bytes / 100000;
+    fmt(out, size, "%u.%u", t / 10, t % 10);
+}
+
+void App::drawLoad(Pen& p)
+{
+    heading(p, model, "Load samples");
+    char b[96];
+    // the folder, as a path from the card
+    {
+        int n = fmt(b, sizeof b, "SD");
+        const char* d = ldDir;
+        while (*d != 0 && n < 90)
+        {
+            if (*d == '/') { if (d[1] != 0) { b[n++] = ' '; b[n++] = '/'; b[n++] = ' '; } }
+            else b[n++] = *d;
+            d++;
+        }
+        b[n] = 0;
+        p.text(140, 42, ldCard ? b : "SD", F12, pal.dim);
+    }
+    p.rect(480, 32, 1, 368, pal.frame);
+    p.rect(481, 32, 319, 368, pal.panel);
+    const bool haveFile = ldCard && ldCount > 0 && !ldEntry[ldSel].dir;
+    // ---- the list on the left
+    if (ldCard && ldCount > 0)
+    {
+        p.text(44, 63, "Name", F12, pal.dim);
+        p.text(290, 63, "Length", F12, pal.dim);
+        p.text(390, 63, "Size", F12, pal.dim);
+        for (int r = 0; r < kLdRows; r++)
+        {
+            const int i = ldTop + r;
+            if (i >= ldCount) break;
+            const int y = 88 + r * 34;
+            const bool sel = i == ldSel;
+            if (sel) { p.rect(0, y - 8, 480, 32, pal.sel); p.rect(0, y - 8, 4, 32, pal.text); }
+            // names that are too long lose their end
+            char nm[32];
+            int len = 0;
+            for (; len < 27 && ldEntry[i].name[len] != 0; len++) nm[len] = ldEntry[i].name[len];
+            nm[len] = 0;
+            while (len > 3 && p.width(nm, sel ? F14B : F14) > 236) { nm[--len] = 0; nm[len - 1] = '.'; }
+            p.text(44, y, nm, sel ? F14B : F14, pal.text);
+            if (ldEntry[i].dir)
+            {
+                p.frame(24, y + 4, 12, 9, pal.dim);
+                fmt(b, sizeof b, "%u file%s", ldEntry[i].count, ldEntry[i].count == 1 ? "" : "s");
+                p.text(290, y, b, F14, pal.dim);
+            }
+            else
+            {
+                if (ldChannels[i] != 0) { fmt(b, sizeof b, "%u.%02u s", ldMs[i] / 1000, (ldMs[i] % 1000) / 10); p.text(290, y, b, F14, pal.text); }
+                else p.text(290, y, "?", F14, pal.dim);
+                fmt(b, sizeof b, "%u KB", (ldEntry[i].bytes + 500) / 1000);
+                p.text(390, y, b, F14, pal.text);
+            }
+        }
+    }
+    else if (ldCard)
+    {
+        p.text(24, 83, "No WAV files in this folder.", F14, pal.text);
+        p.text(24, 105, "B3 goes up a folder.", F12, pal.dim);
+    }
+    // ---- the right panel
+    p.text(494, 41, "Preview", F12, pal.dim);
+    p.rect(494, 78, 292, 90, pal.waveBg);
+    if (!ldCard) p.textMid(494, 292, 116, "No card", F14, pal.dim);
+    else if (ldCount == 0) p.textMid(494, 292, 116, "Nothing to preview", F14, pal.dim);
+    else
+    {
+        char nm[32];
+        int len = 0;
+        for (; len < 27 && ldEntry[ldSel].name[len] != 0; len++) nm[len] = ldEntry[ldSel].name[len];
+        nm[len] = 0;
+        while (len > 3 && p.width(nm, F14B) > 290) { nm[--len] = 0; nm[len - 1] = '.'; }
+        p.text(494, 57, nm, F14B, pal.text);
+        if (haveFile && ldWaveOk)
+        {
+            uint8_t h[58];
+            for (int c = 0; c < 58; c++) h[c] = (uint8_t)(2 + ldWave[c] * 76 / 255);
+            p.g.color(pal.wave);
+            p.g.bars(496, 123, 5, 4, h, 58);
+            if (ldPreviewing && ldMs[ldSel] > 0)
+            {
+                uint32_t at = (hal.millis() - ldPreviewAt) * 292 / ldMs[ldSel];
+                if (at > 291) at = 291;
+                p.rect(494 + (int)at, 78, 1, 90, pal.text);
+            }
+        }
+        else if (haveFile) p.textMid(494, 292, 116, "Cannot read this file", F14, pal.dim);
+        if (haveFile && ldPreviewing)
+        {
+            for (int d = -6; d <= 6; d++) p.rect(495, 184 + d, 13 - (d < 0 ? -d : d) * 2, 1, pal.text);
+            fmt(b, sizeof b, "Previewing - %u.%02u s", ldMs[ldSel] / 1000, (ldMs[ldSel] % 1000) / 10);
+            p.text(512, 176, b, F12, pal.dim);
+        }
+        else if (haveFile)
+        {
+            fmt(b, sizeof b, "%u.%02u s - %s", ldMs[ldSel] / 1000, (ldMs[ldSel] % 1000) / 10, ldChannels[ldSel] == 1 ? "mono" : "stereo");
+            p.text(494, 176, b, F12, pal.dim);
+        }
+        else
+        {
+            fmt(b, sizeof b, "%u WAV file%s inside", ldEntry[ldSel].count, ldEntry[ldSel].count == 1 ? "" : "s");
+            p.text(494, 176, b, F12, pal.dim);
+        }
+    }
+    p.rect(481, 200, 319, 1, pal.frame);
+    p.text(494, 211, "To slot", F12, pal.dim);
+    fmt(b, sizeof b, "%d", ldSlot + 1);
+    const int ex = p.text(494, 229, b, F17B, pal.text);
+    char old[28];
+    const bool used = ldCard && hal.sampleName(ldSlot, old, sizeof old);
+    p.text(ex + 16, 231, used ? old : "Empty", F14, used ? pal.text : pal.dim);
+    if (used && haveFile) p.text(494, 255, "Loading replaces it", F12, pal.warn);
+    else p.text(494, 255, "Left/Right change the slot", F12, pal.dim);
+    p.rect(481, 280, 319, 1, pal.frame);
+    p.text(494, 291, "Memory left", F12, pal.dim);
+    uint32_t usedBytes = 0, totalBytes = 0;
+    hal.sampleMemory(usedBytes, totalBytes);
+    char l1[16], l2[16];
+    if (ldCard)
+    {
+        tenthsMb(l1, sizeof l1, totalBytes - usedBytes);
+        tenthsMb(l2, sizeof l2, totalBytes);
+        fmt(b, sizeof b, "%s of %s MB", l1, l2);
+        p.text(494, 309, b, F14, pal.text);
+    }
+    else p.text(494, 309, "-", F14, pal.text);
+    p.rect(494, 334, 292, 6, pal.track);
+    if (ldCard && totalBytes > 0) p.rect(494, 334, (int)((uint64_t)usedBytes * 292 / totalBytes), 6, pal.text);
+    if (ldCard && haveFile && ldChannels[ldSel] != 0)
+    {
+        PadSample was;
+        const uint32_t freed = hal.padSample(ldSlot, was) ? was.bytes : 0;
+        const uint32_t need = ldMs[ldSel] * 88u;
+        const int64_t left = (int64_t)totalBytes - (int64_t)usedBytes + (int64_t)freed - (int64_t)need;
+        if (left >= 0) { tenthsMb(l1, sizeof l1, (uint32_t)left); fmt(b, sizeof b, "After loading: %s MB", l1); p.text(494, 349, b, F12, pal.dim); }
+        else p.text(494, 349, "Does not fit", F12, pal.warn);
+    }
+    // ---- the hint and the buttons
+    p.hint(!ldCard ? "Insert the SD card to list samples." : ldCount == 0 ? "Only WAV files are listed." : "Up/Down choose. Jog scrolls. Left/Right change the slot.");
+    const char* l[8] = { "Load", "Preview", "Up folder", "Load next", "", "To track", "", "Back" };
+    uint8_t dim = 1u << 5;
+    if (!haveFile) dim |= (1u << 0) | (1u << 1) | (1u << 3);
+    p.buttons(l, ldPreviewing ? 2 : 0, -1, dim);
 }
 
 //--------------------------------------------------------------------------------------------
@@ -813,13 +967,42 @@ void App::drawPopup(Pen& p)
             head = "No sound"; line1 = l1; line2 = "Check the source and gain in Input setup.";
             b7 = "Cancel"; b8 = "Retry"; break;
         case Popup::NotArmed: head = "Nothing to record"; line1 = "Record a first take, then choose a track."; break;
-        case Popup::SdMissing: head = "SD card missing"; line1 = "Put the card in to save, open or export."; b7 = "Back"; b8 = "Retry"; break;
+        case Popup::SdMissing:
+            head = "SD card missing";
+            line1 = current == Screen::Load ? "Samples cannot be listed or loaded." : "Put the card in to save, open or export.";
+            line2 = current == Screen::Load ? "Insert the card and press Retry." : "";
+            b7 = "Back"; b8 = "Retry"; break;
+        case Popup::ReplaceSlot: break; // drawn below
         case Popup::Unsaved: head = "Unsaved changes"; line1 = "This project has changes that are not saved."; line2 = "Save them first?"; b7 = "Don't save"; b8 = "Save"; break;
         case Popup::Message:
-            head = popupArg == 3 ? "Cannot open" : popupArg == 4 ? "Nothing to export" : popupArg == 1 ? "Memory full" : popupArg == 2 ? "Nothing to undo" : "Notice";
-            line1 = popupArg == 3 ? "This file is not a Four-Track project." : popupArg == 4 ? "Record something first." : popupArg == 1 ? "No room for another Part." : popupArg == 2 ? "There is no earlier take on this track." : "";
+            head = popupArg == 3 ? "Cannot open" : popupArg == 4 ? "Nothing to export" : (popupArg == 1 || popupArg == 5) ? "Memory full" : popupArg == 2 ? "Nothing to undo" : popupArg == 6 ? "Cannot load" : "Notice";
+            line1 = popupArg == 3 ? "This file is not a Four-Track project." : popupArg == 4 ? "Record something first." : popupArg == 1 ? "No room for another Part." : popupArg == 2 ? "There is no earlier take on this track." : popupArg == 5 ? "This sample does not fit in the sample memory." : popupArg == 6 ? "Only 8, 16 and 24 bit PCM WAV files load." : "";
             break;
         default: break;
+    }
+    if (popupKind == Popup::ReplaceSlot)
+    {
+        char n[28], a[48], b[56];
+        int len = 0;
+        hal.sampleName(ldSlot, n, sizeof n);
+        fmt(a, sizeof a, "Slot %d has %s.", ldSlot + 1, n);
+        char nm[28];
+        for (; len < 27 && ldEntry[ldSel].name[len] != 0; len++) nm[len] = ldEntry[ldSel].name[len];
+        nm[len] = 0;
+        if (len > 4 && nm[len - 4] == '.') nm[len - 4] = 0;
+        fmt(b, sizeof b, "%s takes its place on the pads.", nm);
+        p.rect(150, 144, 500, 148, pal.panel);
+        p.frame(150, 144, 500, 148, pal.frame);
+        p.rect(150, 144, 500, 2, pal.text);
+        char h[28];
+        fmt(h, sizeof h, "Replace slot %d?", ldSlot + 1);
+        p.text(174, 165, h, F17B, pal.text);
+        p.text(174, 201, a, F14, pal.text);
+        p.text(174, 221, b, F14, pal.text);
+        p.text(174, 251, "Parts already recorded from the pads do not change.", F12, pal.dim);
+        const char* l2[8] = { "", "", "", "", "", "", "Cancel", "Replace" };
+        p.buttons(l2);
+        return;
     }
     p.rect(150, 157, 500, 122, pal.panel);
     p.frame(150, 157, 500, 122, pal.frame);

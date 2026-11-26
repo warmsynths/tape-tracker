@@ -1,6 +1,7 @@
 #include "fourTrackHal.h"
 
 #include "Platform.h"
+#include "fileManager.h"
 #include "Recorder.h"
 #include "mtAudioEngine.h"
 #include "mtConfig.h"
@@ -215,7 +216,12 @@ void FourTrackHal::click(bool accent) { engine.makeMetronomeTick(accent ? 1 : 0)
 //--------------------------------------------------------------------------------------------
 // Files: everything lives in the FourTrack folder on the SD card
 
-void FourTrackHal::fullPath(const char* path, char* out, size_t size) { snprintf(out, size, "FourTrack/%s", path); }
+// Paths that start with '/' run from the card's root (the samples); the others are under FourTrack/.
+void FourTrackHal::fullPath(const char* path, char* out, size_t size)
+{
+    if (path[0] == '/') snprintf(out, size, "%s", path + 1);
+    else snprintf(out, size, "FourTrack/%s", path);
+}
 
 bool FourTrackHal::sdPresent() { return platform->getFileSystem()->isSdCardInserted(); }
 
@@ -426,3 +432,115 @@ void FourTrackHal::padAudition(int slot, bool on)
     if (on) padOn(slot, false);
     else padOff(slot);
 }
+
+//--------------------------------------------------------------------------------------------
+// The SD card's samples (Load samples)
+
+static bool isWavName(const char* n)
+{
+    const size_t l = strlen(n);
+    return l > 4 && n[0] != '.' && strcasecmp(n + l - 4, ".wav") == 0;
+}
+
+uint32_t FourTrackHal::rawRead(const char* path, uint32_t offset, void* buf, uint32_t len) { return fileRead(path, offset, buf, len); }
+
+int FourTrackHal::browse(const char* dir, ft::BrowseEntry* out, int max)
+{
+    FileSystem* fs = platform->getFileSystem();
+    closeFiles();
+    if (!fs->isSdCardInserted()) return 0;
+    char full[96];
+    fullPath(dir, full, sizeof full);
+    if (full[0] == 0) snprintf(full, sizeof full, "/");
+    static char buffer[48 * 28];
+    char* list[48];
+    int n = 0;
+    // folders first
+    int count = max < 48 ? max : 48;
+    fs->listDirContents(full, FileSystem::kFolders, [](const char* name) { return name[0] != '.'; }, buffer, sizeof buffer, 28, count, list);
+    for (int i = 0; i < count && n < max; i++)
+    {
+        if (list[i] == nullptr || list[i][0] == 0) continue;
+        snprintf(out[n].name, sizeof out[n].name, "%s", list[i]);
+        out[n].dir = true;
+        out[n].bytes = 0;
+        out[n].count = 0;
+        n++;
+    }
+    const int folders = n;
+    count = (max - n) < 48 ? (max - n) : 48;
+    if (count > 0)
+    {
+        fs->listDirContents(full, FileSystem::kFiles, isWavName, buffer, sizeof buffer, 28, count, list);
+        for (int i = 0; i < count && n < max; i++)
+        {
+            if (list[i] == nullptr || list[i][0] == 0) continue;
+            snprintf(out[n].name, sizeof out[n].name, "%s", list[i]);
+            out[n].dir = false;
+            char path[128];
+            snprintf(path, sizeof path, "%s/%s", full, list[i]);
+            out[n].bytes = (uint32_t)fs->getFileSize(path);
+            out[n].count = 0;
+            n++;
+        }
+    }
+    // how many WAV files each folder holds
+    for (int i = 0; i < folders; i++)
+    {
+        char sub[128];
+        snprintf(sub, sizeof sub, "%s/%s", full, out[i].name);
+        int c = 48;
+        fs->listDirContents(sub, FileSystem::kFiles, isWavName, buffer, sizeof buffer, 28, c, list);
+        out[i].count = c > 0 ? (uint32_t)c : 0;
+    }
+    // sorted by name inside each group
+    auto before = [](const ft::BrowseEntry& a, const ft::BrowseEntry& b) { return strcasecmp(a.name, b.name) < 0; };
+    for (int a = 1; a < n; a++)
+        for (int b = a; b > 0 && out[b].dir == out[b - 1].dir && before(out[b], out[b - 1]); b--)
+        {
+            const ft::BrowseEntry t = out[b]; out[b] = out[b - 1]; out[b - 1] = t;
+        }
+    return n;
+}
+
+// The stock importer reads a file named by the explorer; it runs in the main loop's update, so
+// this waits for it to finish.
+bool FourTrackHal::loadSampleFile(const char* path, int slot)
+{
+    if (slot < 0 || slot >= kSampleInstrumentsCount) return false;
+    previewFile("", false);
+    char folder[128], name[64];
+    const char* cut = strrchr(path, '/');
+    if (cut == nullptr) return false;
+    snprintf(folder, sizeof folder, "%.*s", (int)(cut - path) > 0 ? (int)(cut - path) : 1, path);
+    snprintf(name, sizeof name, "%s", cut + 1);
+    const size_t l = strlen(name);
+    if (l > 4) name[l - 4] = 0; // the importer adds ".wav"
+    char* f = folder[0] == '/' && folder[1] != 0 ? folder + 1 : folder;
+    if (!newFileManager.importSampleToProject(f, name, (uint8_t)slot)) return false;
+    for (int i = 0; i < 20000 && newFileManager.getStatus() != fmIdle; i++)
+    {
+        newFileManager.update();
+        engine.updateSdStream();
+    }
+    return mtProject.instrument[slot].isActive;
+}
+
+void FourTrackHal::previewFile(const char* path, bool on)
+{
+    if (!on)
+    {
+        newFileManager.stopPrevievSamplefromSD();
+        return;
+    }
+    const char* cut = strrchr(path, '/');
+    if (cut == nullptr) return;
+    char* names = newFileManager.getExplorerList()[0];
+    delete[] names;
+    newFileManager.getExplorerList()[0] = new char[strlen(cut + 1) + 1];
+    strcpy(newFileManager.getExplorerList()[0], cut + 1);
+    snprintf(newFileManager.getExplorerPath(), 255, "%.*s", (int)(cut - path) > 0 ? (int)(cut - path) - 0 : 1, path[0] == '/' ? path + 1 : path);
+    newFileManager.previevSamplefromSD(0, 0, 65535);
+}
+
+bool FourTrackHal::previewActive() { return newFileManager.getStatus() == fmPreviewSampleFromSd; }

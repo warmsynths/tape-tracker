@@ -203,3 +203,6 @@ Emulator: the five stock-screen buttons now show the real pictures (Params, Conf
 
 ## FT32 (not sent)
 Round 5 so far: 16 s tracks, track mixer on Params (level, pan, tone, mute, solo, reset), pad sample settings on Sample Play (tune, volume, pan, play mode, start, end, audition, Keys or Pad). Emulator only for now; firmware built but not sent.
+
+## FT33 (not sent)
+Round 5 C2: Sample Load opens Load samples. Browse SD folders and WAV files, preview, choose the slot, Load or Load next, replace asks first, empty folder and no card states. Emulator: a pretend card with a Samples folder (Drums, Keys) and a way to add your own WAV files in the settings drawer; sample memory now 6 MB. Firmware: uses the stock importer and previewer for the loading and preview (waits for the importer to finish); not tried on a device yet, and a risk to check first.

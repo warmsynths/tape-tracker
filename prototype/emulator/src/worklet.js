@@ -56,6 +56,33 @@ class FourTrackProcessor extends AudioWorkletProcessor {
       },
       file_size(pathPtr) { const f = self.files.get(self.str(pathPtr)); return f ? f.len : 0; },
       file_remove(pathPtr) { const p = self.str(pathPtr); self.changed.add(p); return self.files.delete(p) ? 1 : 0; },
+      // The card's samples: folders first, then .wav files. Each entry is 40 bytes: a folder flag,
+      // the name (28 bytes at 4), the size at 32 and the number of WAV files inside at 36.
+      file_browse(dirPtr, outPtr, max) {
+        let dir = self.str(dirPtr);
+        if (!dir.endsWith('/')) dir += '/';
+        const folders = new Map(), files = [];
+        for (const [p, f] of self.files) {
+          if (!p.startsWith(dir)) continue;
+          const rest = p.slice(dir.length);
+          const slash = rest.indexOf('/');
+          const isWav = (n) => n.toLowerCase().endsWith('.wav');
+          if (slash >= 0) { if (isWav(rest)) { const n = rest.slice(0, slash); folders.set(n, (folders.get(n) || 0) + 1); } }
+          else if (isWav(rest)) files.push([rest, f.len]);
+        }
+        const by = (a, b) => a[0].toLowerCase().localeCompare(b[0].toLowerCase());
+        const list = [...[...folders].sort(by).map(([n, c]) => [n, 0, c, 1]), ...files.sort(by).map(([n, l]) => [n, l, 0, 0])].slice(0, max);
+        const out = new Uint8Array(self.x.memory.buffer, outPtr, max * 40);
+        out.fill(0);
+        const dv = new DataView(self.x.memory.buffer, outPtr, max * 40);
+        list.forEach(([n, size, count, dir], i) => {
+          out[i * 40] = dir;
+          out.set(ascii(n).slice(0, 27), i * 40 + 4);
+          dv.setUint32(i * 40 + 32, size, true);
+          dv.setUint32(i * 40 + 36, count, true);
+        });
+        return list.length;
+      },
       file_list(dirPtr, outPtr, max) {
         const prefix = self.str(dirPtr) + '/';
         const out = new Uint8Array(self.x.memory.buffer, outPtr, max * 24);
@@ -92,6 +119,8 @@ class FourTrackProcessor extends AudioWorkletProcessor {
         this.ready = true;
         this.port.postMessage({ type: 'ready', sampleRate });
       });
+    } else if (m.type === 'putfile') {
+      this.files.set(m.path, { buf: m.data, len: m.data.length });
     } else if (m.type === 'getfile') {
       const f = this.files.get(m.path);
       this.port.postMessage({ type: 'file', path: m.path, data: f ? f.buf.slice(0, f.len) : null, why: m.why });

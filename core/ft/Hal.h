@@ -30,6 +30,15 @@ struct PadSample
     uint16_t end;
 };
 
+// One line of an SD card folder listing (Load samples)
+struct BrowseEntry
+{
+    char name[28];
+    bool dir;
+    uint32_t bytes;   // file size (files)
+    uint32_t count;   // WAV files inside (folders)
+};
+
 // Everything the application needs from the machine. The Tracker firmware implements it with the
 // audio engine and the recorder; the web emulator with the browser's audio.
 class Hal
@@ -99,6 +108,13 @@ class Hal
     virtual void setPadSample(int slot, const PadSample& in) = 0;
     virtual int padSampleWave(int slot, uint8_t* out, int columns) = 0; // peaks 0..255, returns columns (0 if empty)
     virtual void padAudition(int slot, bool on) = 0;
+
+    // The SD card's samples. Paths start with '/' and run from the card's root ("/Samples/Drums").
+    virtual int browse(const char* dir, BrowseEntry* out, int max) = 0;   // folders first, then .wav files, each sorted by name
+    virtual uint32_t rawRead(const char* path, uint32_t offset, void* buf, uint32_t len) = 0;
+    virtual bool loadSampleFile(const char* path, int slot) = 0;          // false: not readable or no memory left
+    virtual void previewFile(const char* path, bool on) = 0;
+    virtual bool previewActive() = 0;
 
     // Pads
     virtual void padOn(int pad, bool keysMode) = 0;
