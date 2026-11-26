@@ -1345,7 +1345,7 @@ void App::resampleJog(int delta)
 
 int App::deviceRowCount(int g) const
 {
-    static const int n[8] = { 3, 1, 1, 1, 2, 4, 2, 2 };
+    static const int n[8] = { 3, 1, 1, 1, 3, 4, 2, 2 };
     return n[g < 0 || g > 7 ? 0 : g];
 }
 
@@ -1388,6 +1388,11 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
         case 3: n = "Volume"; fmt(value, size, "%d", hal.deviceValue(Dev::Volume)); h = "Headphone and output level. Shift + jog moves in larger steps."; break;
         case 4:
             if (r == 0) { n = "Brightness"; fmt(value, size, "%s", bright[hal.deviceValue(Dev::Brightness) % 3]); h = "How bright the screen is."; }
+            else if (r == 2)
+            {
+                n = "Waveforms"; fmt(value, size, "%s", set.waveBitmap ? "Bitmaps" : "Columns");
+                h = "Bitmaps draw each waveform once in the screen chip and are lighter and finer. Columns are the fallback.";
+            }
             else
             {
                 static const char* const grids[4] = { "Off", "Bars", "Bars and beats", "With sixteenths" };
@@ -1430,7 +1435,10 @@ void App::deviceChange(int g, int r, int delta)
         case 1: step(Dev::UsbAudio, 0, 3, 1); break;
         case 2: step(Dev::LineInput, 0, 2, 1); break;
         case 3: step(Dev::Volume, 0, 100, shift ? 5 : 1); break;
-        case 4: if (r == 0) step(Dev::Brightness, 0, 2, 1); else set.homeGrid = (uint8_t)clampi(set.homeGrid + d, 0, 3); break;
+        case 4:
+            if (r == 0) step(Dev::Brightness, 0, 2, 1);
+            else if (r == 2) { set.waveBitmap = !set.waveBitmap; for (int t = 0; t < 4; t++) waveDirty[t] = true; refresh(true); }
+            else set.homeGrid = (uint8_t)clampi(set.homeGrid + d, 0, 3); break;
         case 5:
             if (r == 0) set.windowIdx = (uint8_t)clampi(set.windowIdx + d, 0, 4);
             else if (r == 1) set.preRollIdx = (uint8_t)clampi(set.preRollIdx + d, 0, 4);

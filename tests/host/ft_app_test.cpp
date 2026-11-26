@@ -146,6 +146,15 @@ struct FakeHal : Hal
     void setPadSample(int slot, const PadSample& in) override { if (slot >= 0 && slot < 48) sampleData[slot] = in; }
     int padSampleWave(int, uint8_t* out, int columns) override { for (int i = 0; i < columns; i++) out[i] = (uint8_t)(i % 200); return columns; }
     void padAudition(int, bool) override {}
+    bool useMask = true;
+    std::map<int, std::vector<uint8_t>> masks;
+    bool maskDefault() override { return useMask; }
+    void maskWrite(int slot, uint32_t off, const uint8_t* d, uint32_t n) override
+    {
+        auto& m = masks[slot];
+        if (m.size() < off + n) m.resize(off + n);
+        std::memcpy(m.data() + off, d, n);
+    }
     int devVal[7] = { 3, 0, 2, 3, 0, 80, 2 };
     bool fwInstalled = false;
     uint32_t fwAt = 0;
@@ -540,6 +549,31 @@ static void pagesAndProjects()
         CHECK(bytes() < 7500, "the overview with four Parts is under 7.5 KB");
         app.key(kB5); hal.advance(app, 2000);
         CHECK(app.view().focusLane == 0 && bytes() < 7500, "the focus layout is under 7.5 KB");
+    }
+    {   // waveform bitmaps: one-bit pictures of the loop, drawn once per Part
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        hal.advance(app, 3000);
+        CHECK(app.view().lane[0].bitmap, "the Part's waveform is a bitmap");
+        CHECK(hal.masks.count(0) && hal.masks.count(1) && hal.masks.count(2) && hal.masks[0].size() == 12 * 75 * 7, "three sizes were uploaded for track 1");
+        int setBits = 0;
+        for (uint8_t b : hal.masks[0]) for (int k = 0; k < 8; k++) setBits += (b >> k) & 1;
+        CHECK(setBits > 600 * 2 && setBits < 600 * 84, "the picture has the waveform in it");
+        // the middle rows of the overview picture are set for every column that has sound
+        int middle = 0;
+        for (int c = 0; c < 600; c++) middle += (hal.masks[0][41 * 75 + (c >> 3)] >> (7 - (c & 7))) & 1;
+        CHECK(middle == 600, "the centre line is drawn along the whole width");
+        FakeHal cols;
+        cols.useMask = false;
+        App app2(cols, palette());
+        app2.setMeasure(&gfx);
+        app2.enter();
+        recordLoop(cols, app2);
+        cols.advance(app2, 3000);
+        CHECK(!app2.view().lane[0].bitmap && cols.masks.empty(), "with columns nothing is uploaded");
     }
     {   // the Pattern button is home
         FakeHal hal;

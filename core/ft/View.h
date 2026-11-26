@@ -27,6 +27,7 @@ struct Lane
     char side2[16];    // first take: time left
     uint8_t progress;  // first take: 0..100, 255 when not shown
     bool warn;         // memory warning on the side notes
+    bool bitmap;       // the Part's waveform is in a bitmap (Mask.h), not columns
     uint8_t liveCount; // columns of the take being recorded (drawn in the record colour)
     uint8_t live[120];
 };

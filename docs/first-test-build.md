@@ -224,3 +224,8 @@ Home screen redesign (round 5 design, 4.1), with waveform columns (plan A):
 - Grid lines over the lanes: bars, beats and optionally sixteenths, set in Device settings, Display, Grid. Default Bars and beats.
 - The armed lane shows the live input meters and the Wait level mark; the take being recorded grows as red columns.
 - Home with four Parts is about 7.0 KB by the cost model, under the 8,172 byte limit (a test keeps it under 7.5 KB).
+
+## FT38 (not sent)
+Waveform bitmaps (plan D) behind a switch: Config, Display, Waveforms: Bitmaps or Columns. On the Tracker it starts on Columns (safe); the emulator starts on Bitmaps.
+- Each Part's waveform is drawn once into three one-bit pictures per track (84, 250 and 28 px high, 600 px wide, 27,152 bytes per track, 108,608 for four) and written to the display chip's graphics memory from address 200,000 (the stock images end near 128,800; the picture viewer starts at 350,000). The home screen draws one bitmap per lane in the track colour. Home with four Parts is about 5.2 KB (overview) and 4.7 KB (focus) with bitmaps, against about 7.0 KB with columns.
+- To try on the device: switch Waveforms to Bitmaps, record a Part, look at the home screen. What to watch for: no waveform or garbage (bitmap setup wrong: the 600 px width needs the extended size command), a pause when a take ends (about 27 KB goes over the slow link per Part, estimated 15 ms), flicker, or the picture viewer or other screens drawing wrong afterwards (graphics memory overlap). If anything is wrong, switch back to Columns; nothing else depends on it.

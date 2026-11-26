@@ -35,7 +35,7 @@ uint8_t g_adv[5][128];
 
 //------------------------------------------------------------------------------------------
 // Commands for the canvas: 7 ints each.
-enum Op { kColor = 1, kRect = 2, kLine = 3, kDot = 4, kText = 5, kBars = 6, kAlpha = 7 };
+enum Op { kColor = 1, kRect = 2, kLine = 3, kDot = 4, kText = 5, kBars = 6, kAlpha = 7, kMask = 8 };
 constexpr int kMaxCommands = 4096;
 constexpr int kPoolSize = 32768;
 int32_t g_cmd[kMaxCommands * 7];
@@ -48,6 +48,7 @@ class BufferGfx : public Gfx
   public:
     void color(uint32_t rgb) override { push(kColor, (int)rgb, 0, 0, 0, 0, 0); }
     void alpha(int a) override { push(kAlpha, a, 0, 0, 0, 0, 0); }
+    void mask(int slot, int x, int y, int w, int h) override { push(kMask, slot, x, y, w, h, 0); }
     void rect(int x, int y, int w, int h) override { push(kRect, x, y, w, h, 0, 0); }
     void line(int x0, int y0, int x1, int y1) override { push(kLine, x0, y0, x1, y1, 0, 0); }
     void dot(int x, int y, int radius) override { push(kDot, x, y, radius, 0, 0, 0); }
@@ -95,6 +96,7 @@ __attribute__((import_module("host"), import_name("file_write"))) int host_file_
 __attribute__((import_module("host"), import_name("file_read"))) uint32_t host_file_read(const char* path, uint32_t offset, void* buf, uint32_t len);
 __attribute__((import_module("host"), import_name("file_size"))) uint32_t host_file_size(const char* path);
 __attribute__((import_module("host"), import_name("file_remove"))) int host_file_remove(const char* path);
+__attribute__((import_module("host"), import_name("mask_write"))) void host_mask_write(int slot, uint32_t offset, const uint8_t* data, uint32_t len);
 __attribute__((import_module("host"), import_name("file_browse"))) int host_file_browse(const char* dir, uint8_t* out, int maxEntries);
 __attribute__((import_module("host"), import_name("file_list"))) int host_file_list(const char* dir, char* out, int maxNames);
 }
@@ -320,6 +322,9 @@ class EmuHal : public Hal
         startVoice(950, kScratchSlot, 1.0f);
     }
     bool previewActive() override { for (auto& v : voices) if (v.on && v.pad == 950) return true; return false; }
+
+    bool maskDefault() override { return true; }
+    void maskWrite(int slot, uint32_t offset, const uint8_t* data, uint32_t len) override { host_mask_write(slot, offset, data, len); }
 
     // device settings and the firmware update (a pretend update: it counts up and then restarts)
     int devVal[7] = { 3, 0, 2, 3, 0, 80, 2 };

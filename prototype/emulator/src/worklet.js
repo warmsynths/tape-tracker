@@ -58,6 +58,11 @@ class FourTrackProcessor extends AudioWorkletProcessor {
       file_remove(pathPtr) { const p = self.str(pathPtr); self.changed.add(p); return self.files.delete(p) ? 1 : 0; },
       // The card's samples: folders first, then .wav files. Each entry is 40 bytes: a folder flag,
       // the name (28 bytes at 4), the size at 32 and the number of WAV files inside at 36.
+      // A band of a waveform bitmap: sent to the page, which keeps the pictures
+      mask_write(slot, offset, ptr, len) {
+        const data = new Uint8Array(self.x.memory.buffer, ptr, len).slice();
+        self.port.postMessage({ type: 'mask', slot, offset, data }, [data.buffer]);
+      },
       file_browse(dirPtr, outPtr, max) {
         let dir = self.str(dirPtr);
         if (!dir.endsWith('/')) dir += '/';

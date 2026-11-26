@@ -5,6 +5,7 @@
 #include "FourTrackSession.h"
 #include "Gfx.h"
 #include "Hal.h"
+#include "Mask.h"
 #include "View.h"
 #include "loop_bars.h"
 
@@ -60,6 +61,7 @@ struct Settings
     bool monitorMic = false;   // device: monitoring default for the mics
     uint8_t gridIdx = 4;       // project: move and snap grid: 0 Off (1 ms), 1 Bar, 2 1/4, 3 1/8, 4 1/16
     bool snapZero = true;      // project: cut points land on a zero crossing
+    bool waveBitmap = false;   // device: waveforms as bitmaps in the display chip (plan D); false: columns (plan A)
     uint8_t homeGrid = 2;      // device: lines over the lanes: 0 off, 1 bars, 2 bars and beats, 3 also sixteenths
 };
 
@@ -348,6 +350,9 @@ class App
     bool focusUser = false;       // the selected track is open in focus (pressed twice)
     int liveDone = 0;             // columns of the take being recorded that are final
     void computeLive(int track);
+    void uploadMasks(int track);
+    uint8_t wave600[4][600] = {};
+    bool maskOk[4] = {};
     uint32_t blinkAt = 0;
     bool blinkOn = false;
     bool padsKeysMode = true;

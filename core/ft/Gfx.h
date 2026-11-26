@@ -24,6 +24,8 @@ class Gfx
     virtual void bars(int x0, int cy, int step, int barWidth, const uint8_t* heights, int count) = 0;
     // How see-through the next fills are, 0 to 255. Always put it back to 255 straight after use.
     virtual void alpha(int /*a*/) {}
+    // Draws a waveform bitmap (see Mask.h) with its top left at (x, y) in the current colour.
+    virtual void mask(int /*slot*/, int /*x*/, int /*y*/, int /*w*/, int /*h*/) {}
 };
 
 // Colour roles used by the screens: the design's 17 roles (docs/design). Filled from the

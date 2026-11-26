@@ -19,6 +19,21 @@ class DisplayGfx : public ft::Gfx
 
     void color(uint32_t rgb) override { API_COLOR(rgb); }
     void alpha(int a) override { API_COLOR_A((uint8_t)a); }
+    // A waveform bitmap from the chip's graphics memory (see Mask.h and FourTrackHal::maskWrite)
+    void mask(int slot, int x, int y, int w, int h) override
+    {
+        const uint32_t addr = ft::kMaskBase + (uint32_t)(slot / 3) * ft::kMaskPerTrack + (uint32_t)ft::kMaskOffset[slot % 3];
+        API_SAVE_CONTEXT();
+        API_BITMAP_HANDLE(30);
+        API_BITMAP_SOURCE(addr);
+        API_BITMAP_LAYOUT(L1, ft::kMaskStride, h);
+        API_BITMAP_SIZE(NEAREST, BORDER, BORDER, w, h);
+        API_BITMAP_SIZE_H(w >> 9, h >> 9); // 600 px is wider than the 511 the plain command takes
+        API_BEGIN(BITMAPS);
+        API_VERTEX2F(x, y);
+        API_END();
+        API_RESTORE_CONTEXT();
+    }
     void rect(int x, int y, int w, int h) override
     {
         API_BEGIN(RECTS);

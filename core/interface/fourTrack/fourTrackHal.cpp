@@ -3,6 +3,8 @@
 #include "Platform.h"
 #include "fileManager.h"
 #include "configEditor/configMenuActions.h"
+#include "display.h"
+#include "Mask.h"
 #include "core/interfaceDefs.h"
 #include "mtConfig.h"
 #include "Recorder.h"
@@ -617,4 +619,12 @@ bool FourTrackHal::firmwareInstall(const char* name)
     snprintf(file, sizeof file, "%s", name);
     platform->runBootloader(file);
     return true;
+}
+
+// A band of a waveform bitmap into the display chip's graphics memory (see Mask.h)
+void FourTrackHal::maskWrite(int slot, uint32_t byteOffset, const uint8_t* data, uint32_t len)
+{
+    if (slot < 0 || slot >= 12) return;
+    const uint32_t addr = ft::kMaskBase + (uint32_t)(slot / 3) * ft::kMaskPerTrack + (uint32_t)ft::kMaskOffset[slot % 3] + byteOffset;
+    display.getDisplayDriver()->writeDataRAMG(data, len, addr);
 }

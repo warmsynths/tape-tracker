@@ -34,6 +34,7 @@ App::App(Hal& h, const Palette& palette)
   , session(h.sampleRate() * kMaxTakeSeconds)
 {
     for (int i = 0; i < 48; i++) padModeKeys[i] = true;
+    set.waveBitmap = hal.maskDefault();
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
         FxSlot defaults[4] = { { FxType::RandomJumps, false, 50, 0, 50 }, { FxType::PitchSteps, false, 50, 0, 40 }, { FxType::Stutter, false, 50, 7, 100 }, { FxType::Reverse, false, 50, 7, 100 } };
@@ -856,18 +857,19 @@ void App::computeWave(int track)
     if (data == nullptr || frames == 0)
     {
         lane.waveCount = 0;
+        maskOk[track] = false;
         return;
     }
-    const int columns = 120;
+    // 600 columns, one per pixel; the 120 columns of plan A are the peaks of five of them
+    const int columns = 600;
     const int32_t off = alignShift[track] + userOffset[track];
     for (int c = 0; c < columns; c++)
     {
         // The waveform shows the loop as it plays, so a shifted Part is drawn shifted
         int64_t from = (int64_t)(((uint64_t)c * frames) / columns) - off;
-        int64_t to = (int64_t)(((uint64_t)(c + 1) * frames) / columns) - off;
         const int64_t L = (int64_t)frames;
         from = ((from % L) + L) % L;
-        to = from + (int64_t)(frames / columns);
+        const int64_t to = from + (int64_t)(frames / columns);
         uint16_t peak = 0;
         const uint32_t span = (uint32_t)(to - from);
         if ((uint32_t)from + span <= frames) peak = loopPeakBlock(data + from, span, 0, (int)span);
@@ -877,9 +879,48 @@ void App::computeWave(int track)
         }
         const float norm = squareRoot((float)peak / 32767.0f);
         const int h = (int)(norm * 255.0f);
-        lane.wave[c] = (uint8_t)(h > 255 ? 255 : h);
+        wave600[track][c] = (uint8_t)(h > 255 ? 255 : h);
     }
-    lane.waveCount = columns;
+    for (int c = 0; c < 120; c++)
+    {
+        uint8_t m = 0;
+        for (int k = 0; k < 5; k++) if (wave600[track][c * 5 + k] > m) m = wave600[track][c * 5 + k];
+        lane.wave[c] = m;
+    }
+    lane.waveCount = 120;
+    if (set.waveBitmap) uploadMasks(track);
+    else maskOk[track] = false;
+}
+
+// The three bitmaps of a track's waveform, drawn from the 600 peaks and sent to the display chip a
+// band of rows at a time (so only a small buffer is needed)
+void App::uploadMasks(int track)
+{
+    constexpr int kBand = 16;
+    uint8_t buf[kBand * kMaskStride];
+    for (int size = 0; size < kMaskSizes; size++)
+    {
+        const int h = kMaskHeight[size];
+        const int mid = h / 2;
+        for (int r0 = 0; r0 < h; r0 += kBand)
+        {
+            const int rows = (h - r0) < kBand ? (h - r0) : kBand;
+            for (int i = 0; i < rows * kMaskStride; i++) buf[i] = 0;
+            for (int c = 0; c < kMaskW; c++)
+            {
+                // half the height of this column in pixels, at least one pixel each side of the centre
+                const int half = 1 + (wave600[track][c] * (mid - 1)) / 255;
+                for (int r = 0; r < rows; r++)
+                {
+                    const int row = r0 + r;
+                    const int dist = row < mid ? mid - 1 - row : row - mid;
+                    if (dist < half) buf[r * kMaskStride + (c >> 3)] |= (uint8_t)(0x80 >> (c & 7));
+                }
+            }
+            hal.maskWrite(maskSlot(track, size), (uint32_t)(r0 * kMaskStride), buf, (uint32_t)(rows * kMaskStride));
+        }
+    }
+    maskOk[track] = true;
 }
 
 // The take being recorded, as columns that grow behind the playhead
@@ -1061,7 +1102,8 @@ void App::fillView()
             computeWave(t);
             waveVersion[t]++;
         }
-        if (!L.hasPart) L.waveCount = 0;
+        if (!L.hasPart) { L.waveCount = 0; maskOk[t] = false; }
+        L.bitmap = set.waveBitmap && maskOk[t] && L.hasPart;
 
         fmt(L.tag, sizeof(L.tag), "%s", sourceName(trackSource[t])); // every track shows where it records from
         if (L.active && mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
@@ -1255,6 +1297,7 @@ void App::refresh(bool force)
         sig = hashBytes(sig, &L.active, sizeof(L.active));
         sig = hashBytes(sig, &L.muted, sizeof(L.muted));
         sig = hashBytes(sig, &L.glitch, sizeof(L.glitch));
+        sig = hashBytes(sig, &L.bitmap, sizeof(L.bitmap));
         sig = hashBytes(sig, &waveVersion[t], sizeof(waveVersion[t]));
     }
 

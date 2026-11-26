@@ -278,7 +278,12 @@ void Painter::drawLane(int i)
     // waveform, or what the lane says
     if (L.hasPart && !L.active && L.waveCount > 0)
     {
-        columns(L, y, h, strip ? 30 : (focus ? 120 : 60), tc);
+        if (L.bitmap)
+        {
+            g.color(tc);
+            g.mask(i * 3 + (strip ? 2 : (focus ? 1 : 0)), kWaveX, y, 600, h);
+        }
+        else columns(L, y, h, strip ? 30 : (focus ? 120 : 60), tc);
         if (L.muted) tint(168, y, 604, h, 0x000000, 153); // a muted lane is darker still
     }
     else if (focus && L.active)

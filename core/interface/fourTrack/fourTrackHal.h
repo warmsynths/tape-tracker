@@ -72,6 +72,7 @@ class FourTrackHal : public ft::Hal
     void previewFile(const char* path, bool on) override;
     bool previewActive() override;
 
+    void maskWrite(int slot, uint32_t byteOffset, const uint8_t* data, uint32_t len) override;
     int deviceValue(ft::Dev d) override;
     void setDeviceValue(ft::Dev d, int value) override;
     void firmwareVersion(char* out, int size) override;

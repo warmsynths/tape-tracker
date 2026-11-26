@@ -51,6 +51,34 @@
     return c;
   }
 
+  // Waveform bitmaps: 1 bit per pixel, 600 wide (75 bytes a row), one per track and lane size
+  const MASK_H = [84, 250, 28];
+  const masks = {}; // slot -> Uint8Array
+  const maskCache = {}; // slot|color -> canvas
+  function putMask(m) {
+    const h = MASK_H[m.slot % 3];
+    const buf = masks[m.slot] || (masks[m.slot] = new Uint8Array(75 * h));
+    buf.set(m.data.subarray(0, Math.max(0, Math.min(m.data.length, buf.length - m.offset))), m.offset);
+    for (const k of Object.keys(maskCache)) if (k.split('|')[0] === String(m.slot)) delete maskCache[k];
+  }
+  function maskImage(slot, color) {
+    const key = slot + '|' + color;
+    let c = maskCache[key];
+    if (c) return c;
+    const h = MASK_H[slot % 3], bits = masks[slot];
+    c = document.createElement('canvas'); c.width = 600; c.height = h;
+    if (bits) {
+      const g = c.getContext('2d'), img = g.createImageData(600, h);
+      const r = (color >> 16) & 255, gr = (color >> 8) & 255, b = color & 255;
+      for (let y = 0; y < h; y++) for (let x = 0; x < 600; x++) {
+        if (bits[y * 75 + (x >> 3)] & (0x80 >> (x & 7))) { const i = (y * 600 + x) * 4; img.data[i] = r; img.data[i + 1] = gr; img.data[i + 2] = b; img.data[i + 3] = 255; }
+      }
+      g.putImageData(img, 0, 0);
+    }
+    maskCache[key] = c;
+    return c;
+  }
+
   function advances() { return FONTS[fontSet].map((f) => f.adv); }
 
   function draw(f) {
@@ -76,6 +104,7 @@
           x += FONTS[fontSet][c].adv[ch & 127];
         }
       } else if (op === 7) { ctx.globalAlpha = a / 255;
+      } else if (op === 8) { ctx.drawImage(maskImage(a, color), b, c);
       } else if (op === 6) {
         for (let k = 0; k < n; k++) {
           const h = pool[e + k];
@@ -109,6 +138,7 @@
     node.port.onmessage = (e) => {
       const m = e.data;
       if (m.type === 'frame') frame = m;
+      else if (m.type === 'mask') putMask(m);
       else if (m.type === 'changed') filesChanged(m.paths);
       else if (m.type === 'file') fileArrived(m);
       else if (m.type === 'sample-result') sampleDone(m);
