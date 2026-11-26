@@ -14,7 +14,6 @@
 #include "performanceMode/performanceMode.h"
 #include "projectEditor/projectEditor.h"
 #include "sampleEditor/sampleEditor.h"
-#include "sampleImporter/sampleImporter.h"
 #include "samplePlayback/samplePlayback.h"
 #include "sampleRecorder/sampleRecorder.h"
 
@@ -50,7 +49,7 @@ extern uint8_t isAudioOutMuted();
 const uint8_t Interface::modulesCount = 14;
 const hModule Interface::modules[modulesCount] = {
     &projectEditor,    // 0
-    &sampleImporter,   // 1
+    nullptr,           // 1 (Sample loader removed)
     &patternEditor,    // 2
     &samplePlayback,   // 3
     nullptr,           // 4 (Song editor removed)
