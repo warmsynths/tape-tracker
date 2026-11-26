@@ -230,7 +230,7 @@ void App::key(int k)
             break;
         case kMaster: open(Screen::Master); break;
         case kParams: mxTrack = session.selected(); open(Screen::Mixer); break;
-        case kSamplePlay: psField = 0; open(Screen::PadSample); break;
+        case kSamplePlay: psField = 0; padWaveFor = -1; open(Screen::PadSample); break;
         case kSampleLoad: open(Screen::Load); loadOpen(); break;
         case kSampleRec: resampleOpen(); open(Screen::Resample); break;
         case kConfig: deviceOpen(); open(Screen::Device); break;

@@ -53,11 +53,12 @@
 
   // Waveform bitmaps: 1 bit per pixel, 600 wide (75 bytes a row), one per track and lane size
   const MASK_H = [84, 250, 28];
+  const maskW = (slot) => (slot >= 12 ? 760 : 600), maskH = (slot) => (slot >= 12 ? 200 : MASK_H[slot % 3]);
   const masks = {}; // slot -> Uint8Array
   const maskCache = {}; // slot|color -> canvas
   function putMask(m) {
-    const h = MASK_H[m.slot % 3];
-    const buf = masks[m.slot] || (masks[m.slot] = new Uint8Array(75 * h));
+    const h = maskH(m.slot);
+    const buf = masks[m.slot] || (masks[m.slot] = new Uint8Array((maskW(m.slot) / 8) * h));
     buf.set(m.data.subarray(0, Math.max(0, Math.min(m.data.length, buf.length - m.offset))), m.offset);
     for (const k of Object.keys(maskCache)) if (k.split('|')[0] === String(m.slot)) delete maskCache[k];
   }
@@ -65,13 +66,13 @@
     const key = slot + '|' + color;
     let c = maskCache[key];
     if (c) return c;
-    const h = MASK_H[slot % 3], bits = masks[slot];
-    c = document.createElement('canvas'); c.width = 600; c.height = h;
+    const h = maskH(slot), w = maskW(slot), stride = w / 8, bits = masks[slot];
+    c = document.createElement('canvas'); c.width = w; c.height = h;
     if (bits) {
-      const g = c.getContext('2d'), img = g.createImageData(600, h);
+      const g = c.getContext('2d'), img = g.createImageData(w, h);
       const r = (color >> 16) & 255, gr = (color >> 8) & 255, b = color & 255;
-      for (let y = 0; y < h; y++) for (let x = 0; x < 600; x++) {
-        if (bits[y * 75 + (x >> 3)] & (0x80 >> (x & 7))) { const i = (y * 600 + x) * 4; img.data[i] = r; img.data[i + 1] = gr; img.data[i + 2] = b; img.data[i + 3] = 255; }
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        if (bits[y * stride + (x >> 3)] & (0x80 >> (x & 7))) { const i = (y * w + x) * 4; img.data[i] = r; img.data[i + 1] = gr; img.data[i + 2] = b; img.data[i + 3] = 255; }
       }
       g.putImageData(img, 0, 0);
     }

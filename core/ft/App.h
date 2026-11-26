@@ -268,7 +268,10 @@ class App
     EditParams editStack[16];
     EditParams editEntry{};
     bool auditioning = false;
-    uint8_t editWave[150];
+    uint8_t editWave[760];
+    uint8_t padWave[760];
+    int padWaveFor = -1;          // the pad slot whose picture is in the page bitmap, -1 none
+    void uploadPageMask(const uint8_t* peaks, int maxHalf);
     bool editWaveDirty = true;
     void computeEditWave();
 

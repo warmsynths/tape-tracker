@@ -624,7 +624,7 @@ bool FourTrackHal::firmwareInstall(const char* name)
 // A band of a waveform bitmap into the display chip's graphics memory (see Mask.h)
 void FourTrackHal::maskWrite(int slot, uint32_t byteOffset, const uint8_t* data, uint32_t len)
 {
-    if (slot < 0 || slot >= 12) return;
-    const uint32_t addr = ft::kMaskBase + (uint32_t)(slot / 3) * ft::kMaskPerTrack + (uint32_t)ft::kMaskOffset[slot % 3] + byteOffset;
+    if (slot < 0 || slot > ft::kPageMaskSlot) return;
+    const uint32_t addr = ft::maskAddress(slot) + byteOffset;
     display.getDisplayDriver()->writeDataRAMG(data, len, addr);
 }

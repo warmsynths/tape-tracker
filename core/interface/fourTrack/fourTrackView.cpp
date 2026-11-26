@@ -22,11 +22,11 @@ class DisplayGfx : public ft::Gfx
     // A waveform bitmap from the chip's graphics memory (see Mask.h and FourTrackHal::maskWrite)
     void mask(int slot, int x, int y, int w, int h) override
     {
-        const uint32_t addr = ft::kMaskBase + (uint32_t)(slot / 3) * ft::kMaskPerTrack + (uint32_t)ft::kMaskOffset[slot % 3];
+        const uint32_t addr = ft::maskAddress(slot);
         API_SAVE_CONTEXT();
         API_BITMAP_HANDLE(30);
         API_BITMAP_SOURCE(addr);
-        API_BITMAP_LAYOUT(L1, ft::kMaskStride, h);
+        API_BITMAP_LAYOUT(L1, ft::maskStride(slot), h);
         API_BITMAP_SIZE(NEAREST, BORDER, BORDER, w, h);
         API_BITMAP_SIZE_H(w >> 9, h >> 9); // 600 px is wider than the 511 the plain command takes
         API_BEGIN(BITMAPS);

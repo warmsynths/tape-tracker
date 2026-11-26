@@ -149,10 +149,19 @@ void App::drawEditor(Pen& p)
     // waveform, zoomed around the field being edited
     if (editWaveDirty) const_cast<App*>(this)->computeEditWave();
     p.rect(20, 64, 760, 200, pal.waveBg);
-    uint8_t h[150];
-    for (int i = 0; i < 150; i++) h[i] = (uint8_t)(2 + editWave[i] * 170 / 255);
     p.g.color(pal.wave);
-    p.g.bars(25, 164, 5, 4, h, 150);
+    if (set.waveBitmap) p.g.mask(kPageMaskSlot, 20, 64, kPageMaskW, kPageMaskH);
+    else
+    {
+        uint8_t h[150];
+        for (int i = 0; i < 150; i++)
+        {
+            int m = 0;
+            for (int k = 0; k < 5; k++) if (editWave[i * 5 + k] > m) m = editWave[i * 5 + k];
+            h[i] = (uint8_t)(2 + m * 170 / 255);
+        }
+        p.g.bars(25, 164, 5, 4, h, 150);
+    }
     if (loop > 0)
     {
         const uint32_t ws = zoomStart(), span = zoomSpan();
@@ -304,11 +313,26 @@ void App::drawPadSample(Pen& p)
     p.text(712, 43, padsKeysMode ? "KEYS" : "PAD", F12, pal.text);
     // waveform with Start and End
     p.rect(20, 64, 760, 200, pal.waveBg);
-    uint8_t h[150];
-    hal.padSampleWave(slot, h, 150);
-    for (int i = 0; i < 150; i++) h[i] = (uint8_t)(2 + h[i] * 170 / 255);
     p.g.color(pal.wave);
-    p.g.bars(25, 164, 5, 4, h, 150);
+    if (set.waveBitmap)
+    {
+        // drawn once per sample: the picture is only rebuilt when the slot changes
+        if (padWaveFor != slot)
+        {
+            hal.padSampleWave(slot, padWave, 760);
+            uploadPageMask(padWave, 86);
+            padWaveFor = slot;
+            editWaveDirty = true; // the editor shares the picture
+        }
+        p.g.mask(kPageMaskSlot, 20, 64, kPageMaskW, kPageMaskH);
+    }
+    else
+    {
+        uint8_t h[150];
+        hal.padSampleWave(slot, h, 150);
+        for (int i = 0; i < 150; i++) h[i] = (uint8_t)(2 + h[i] * 170 / 255);
+        p.g.bars(25, 164, 5, 4, h, 150);
+    }
     const int xs = 20 + (int)((uint32_t)s.start * 760 / 65535), xe = 20 + (int)((uint32_t)s.end * 760 / 65535);
     p.rect(20, 64, xs - 20, 200, pal.bg);
     p.rect(xe, 64, 780 - xe, 200, pal.bg);

@@ -505,19 +505,44 @@ void App::computeEditWave()
     const int16_t* d = partData[editTrack];
     const uint32_t frames = session.loopFrames();
     const uint32_t ws = zoomStart(), span = zoomSpan();
-    for (int c = 0; c < 150; c++)
+    for (int c = 0; c < 760; c++)
     {
         uint16_t peak = 0;
         if (d != nullptr && frames > 0)
         {
-            const uint32_t from = ws + (uint32_t)(((uint64_t)c * span) / 150);
-            const uint32_t to = ws + (uint32_t)(((uint64_t)(c + 1) * span) / 150);
+            const uint32_t from = ws + (uint32_t)(((uint64_t)c * span) / 760);
+            const uint32_t to = ws + (uint32_t)(((uint64_t)(c + 1) * span) / 760);
             if (to > from) peak = loopPeakBlock(d + from, to - from, 0, (int)(to - from));
         }
         const float norm = __builtin_sqrtf((float)peak / 32767.0f);
         editWave[c] = (uint8_t)(norm * 255.0f);
     }
     editWaveDirty = false;
+    if (set.waveBitmap) { uploadPageMask(editWave, 86); padWaveFor = -1; } // the pad page shares the picture
+}
+
+// The big waveform of a page as a one-bit picture in the display chip (slot 12), a band of rows at a time
+void App::uploadPageMask(const uint8_t* peaks, int maxHalf)
+{
+    constexpr int kBand = 16;
+    uint8_t buf[kBand * kPageMaskStride];
+    const int mid = kPageMaskH / 2;
+    for (int r0 = 0; r0 < kPageMaskH; r0 += kBand)
+    {
+        const int rows = (kPageMaskH - r0) < kBand ? (kPageMaskH - r0) : kBand;
+        for (int i = 0; i < rows * kPageMaskStride; i++) buf[i] = 0;
+        for (int c = 0; c < kPageMaskW; c++)
+        {
+            const int half = 1 + (peaks[c] * (maxHalf - 1)) / 255;
+            for (int r = 0; r < rows; r++)
+            {
+                const int row = r0 + r;
+                const int dist = row < mid ? mid - 1 - row : row - mid;
+                if (dist < half) buf[r * kPageMaskStride + (c >> 3)] |= (uint8_t)(0x80 >> (c & 7));
+            }
+        }
+        hal.maskWrite(kPageMaskSlot, (uint32_t)(r0 * kPageMaskStride), buf, (uint32_t)(rows * kPageMaskStride));
+    }
 }
 
 // Cuts the silence off the start and the end of the Part (the Part itself is not changed)
@@ -1192,6 +1217,7 @@ void App::loadDo(bool advance)
     loadPath(ldSel, path, sizeof path);
     if (!hal.loadSampleFile(path, ldSlot)) { showPopup(Popup::Message, 5); return; }
     hal.setCurrentSample(ldSlot);
+    padWaveFor = -1;
     unsaved = true;
     if (advance)
     {
@@ -1321,6 +1347,7 @@ void App::resampleFinish()
     rsLevelL = rsLevelR = -60;
     if (!hal.loadSampleFile(rsPath, rsSlot)) { rsState = Rs::Ready; showPopup(Popup::Message, 5); return; }
     hal.setCurrentSample(rsSlot);
+    padWaveFor = -1;
     rsBytesSaved = jobTotal * 2;
     rsState = Rs::Saved;
     unsaved = true;
@@ -1452,7 +1479,7 @@ void App::deviceChange(int g, int r, int delta)
         case 3: step(Dev::Volume, 0, 100, shift ? 5 : 1); break;
         case 4:
             if (r == 0) step(Dev::Brightness, 0, 2, 1);
-            else if (r == 2) { set.waveBitmap = !set.waveBitmap; for (int t = 0; t < 4; t++) waveDirty[t] = true; refresh(true); }
+            else if (r == 2) { set.waveBitmap = !set.waveBitmap; for (int t = 0; t < 4; t++) waveDirty[t] = true; padWaveFor = -1; editWaveDirty = true; refresh(true); }
             else set.homeGrid = (uint8_t)clampi(set.homeGrid + d, 0, 3); break;
         case 5:
             if (r == 0) set.windowIdx = (uint8_t)clampi(set.windowIdx + d, 0, 4);

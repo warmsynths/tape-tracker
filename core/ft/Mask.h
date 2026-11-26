@@ -17,6 +17,14 @@ constexpr int kMaskPerTrack = kMaskStride * 84 + 18752 + kMaskStride * 28; // 27
 // 128,800) and below the picture viewer's area (350,000). 4 tracks of 27,152 bytes end at 308,608.
 constexpr unsigned kMaskBase = 200000;
 inline int maskSlot(int track, int size) { return track * kMaskSizes + size; }
+
+// One more picture, shared by the pages that show a big waveform (Part Editor, Pad sample): 760 x 200,
+// slot 12, only one page is open at a time. 19,000 bytes after the four tracks, ending at 327,608.
+constexpr int kPageMaskSlot = 12;
+constexpr int kPageMaskW = 760, kPageMaskH = 200;
+constexpr int kPageMaskStride = kPageMaskW / 8;
+inline unsigned maskAddress(int slot) { return slot < kPageMaskSlot ? kMaskBase + (unsigned)(slot / kMaskSizes) * kMaskPerTrack + (unsigned)kMaskOffset[slot % kMaskSizes] : kMaskBase + 4u * kMaskPerTrack; }
+inline int maskStride(int slot) { return slot < kPageMaskSlot ? kMaskStride : kPageMaskStride; }
 } // namespace ft
 
 #endif /* FT_MASK_H_ */

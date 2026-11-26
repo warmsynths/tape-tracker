@@ -612,6 +612,26 @@ static void pagesAndProjects()
         app.key(kB8);
         CHECK(!app.state().hasPart(0) && app.state().loopFrames() == loop, "Clear all keeps the Loop too");
     }
+    {   // the Part Editor and the Pad sample page draw their big waveform as one shared bitmap
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kSampleEdit);
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        CHECK(hal.masks.count(kPageMaskSlot) && hal.masks[kPageMaskSlot].size() == (size_t)kPageMaskStride * kPageMaskH, "the editor sent its waveform picture");
+        CHECK(!app.pageOverflowed(), "the editor still fits");
+        hal.masks.erase(kPageMaskSlot);
+        app.key(kB8);
+        hal.sampleData[0].volume = 100; hal.sampleData[0].end = 65535;
+        app.key(kSamplePlay);
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        CHECK(hal.masks.count(kPageMaskSlot), "the pad sample page sent its waveform picture");
+        hal.masks.erase(kPageMaskSlot);
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        CHECK(!hal.masks.count(kPageMaskSlot), "and does not send it again while the sample is the same");
+    }
     {   // the Pattern button is home
         FakeHal hal;
         App app(hal, palette());
