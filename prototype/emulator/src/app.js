@@ -218,8 +218,8 @@
   const soundBtn = document.getElementById('sound');
   soundBtn.addEventListener('click', async () => {
     if (!audio) return;
-    if (audio.state === 'running') { await audio.suspend(); soundBtn.textContent = 'Sound off (click to turn on)'; }
-    else { await audio.resume(); soundBtn.textContent = 'Sound on (click to turn off)'; }
+    if (audio.state === 'running') { await audio.suspend(); soundBtn.textContent = 'Sound off'; }
+    else { await audio.resume(); soundBtn.textContent = 'Sound on'; }
   });
   document.getElementById('font').addEventListener('change', (e) => { fontSet = e.target.value; glyphs = {}; if (node) node.port.postMessage({ type: 'init-fonts', advances: advances() }); });
 
@@ -312,6 +312,28 @@
     }
   });
   function sampleDone(m) { document.getElementById('note').textContent = m.ok ? 'Sample loaded.' : 'No room left in sample memory.'; }
+
+  // The device is drawn at its real size and scaled to fit the window
+  function fit() {
+    const st = document.getElementById('scaleStage');
+    st.style.transform = '';
+    const w = 1200, h = st.offsetHeight + 16;
+    const s = Math.min(window.innerWidth / w, window.innerHeight / h, 1.6);
+    st.style.transform = 'scale(' + s + ')';
+    document.getElementById('app').style.minHeight = (h * s) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+  const drawer = document.getElementById('drawer');
+  const gear = document.getElementById('gear');
+  function toggleDrawer(show) { drawer.hidden = !show; gear.setAttribute('aria-expanded', String(show)); }
+  gear.addEventListener('click', () => toggleDrawer(drawer.hidden));
+  document.getElementById('drawerClose').addEventListener('click', () => toggleDrawer(false));
+  // the last button pressed, in the strip under the device
+  document.querySelectorAll('.hw-btn[title], .hw-fn-row .hw-btn').forEach((b) => b.addEventListener('pointerdown', () => {
+    const t = (b.title || '').replace(/ \(.*\)$/, '') || b.textContent;
+    const le = document.getElementById('lastEvent'); if (le) le.innerHTML = '<span>Last:</span>' + (b.classList.contains('dim') ? t : (b.textContent.replace(/\s+/g, ' ')));
+  }));
 
   // Initial picture before audio starts: a blank device screen
   ctx.fillStyle = css(PALETTE[0]); ctx.fillRect(0, 0, 800, 480);
