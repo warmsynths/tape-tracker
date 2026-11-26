@@ -11,8 +11,6 @@ FONTS = '../../core/libs/fonts/'
 SETS = {
     'liberation': ['LiberationSans-Regular_14_L4', 'LiberationSans-Regular_17_L4', 'LiberationSans-Bold_14_L4',
                    'LiberationSans-Bold_17_L4', 'LiberationSans-Regular_12_L4'],
-    'roboto': ['RobotoMono-Light_14_L4', 'RobotoMono-Light_17_L4', 'RobotoMono-Regular_14_L4',
-               'RobotoMono-Bold_17_L4', 'RobotoMono-Regular_12_L4'],
 }
 
 def decode(name):

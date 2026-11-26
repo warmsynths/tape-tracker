@@ -16,7 +16,6 @@
 #include "mtPadBoard.h"
 #include "mtPadsBacklight.h"
 #include "mtSequencer.h"
-#include "mtTest.h"
 #include "patternEditor/patternEditor.h"
 
 cConfigEditor configEditor;
@@ -452,10 +451,6 @@ static void functActionButton(uint8_t button, uint8_t state)
             default: break;
         }
 
-        if (mtTest.runTestByMiniCombinaion(button))
-        {
-            CE->eventFunct(eventActivateTestingProcedure, CE, 0, 0);
-        }
     }
     else if (state == buttonRelease)
     {
@@ -478,10 +473,6 @@ static void functPads(uint8_t pad, uint8_t state, int16_t)
         return;
     }
 
-    if (mtTest.runTestByCombinaion(pad))
-    {
-        CE->eventFunct(eventActivateTestingProcedure, CE, 0, 0);
-    }
 }
 
 static void functEncoder(int16_t value)

@@ -128,7 +128,7 @@ New: after you stop the first take (or it stops by itself at 24 s), the Tracker 
 Please check: does the question appear after the first take, can you choose with the jog wheel and the arrows, do OK and Cancel do what they say, and does the position readout count sensibly against what you play? Try a very short take (about 2 seconds) and a very long one (stop it by letting it fill) and tell me what choices you are offered.
 
 ## Test build FT16: the whole design, one build
-`firmware/PolyendTracker_FT30_full.ptf` (FT16 plus the fixes below; FT30 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
+`firmware/PolyendTracker_FT31_full.ptf` (FT16 plus the fixes below; FT31 is the current one). Built from v1.0.0 with the shared core (`core/ft`), the same code the web emulator runs. Test the emulator first; this build should behave the same, apart from audio hardware timing. It has not been run on a device yet.
 
 What is in it (see `docs/build-plan.md` for the plan and `docs/design/screen-requirements.md` for each screen):
 - **Main screen:** starting tempo and count-in, click, source per track (line, mic low, mic high, pads), alignment of each Part to the loop (first-note detection and snap, window in Settings), offset, mute, Loop Mode, undo of a replaced take, How many bars.
@@ -191,3 +191,10 @@ FT29 (built, being tested in the emulator first):
 FT30 (emulator first): the Play button now stops the loop when it is already playing, on the main screen and on every page (before, on a page it could only start). Button 3 under the screen still only starts.
 
 Emulator only: Params, Config, Sample Load, Sample Play and Sample Rec now show a picture of the stock screen over the emulator's screen (click or press any button to close). Pictures go in `prototype/emulator/stock/` (see the README there); on the Tracker, hold Shift and press Power on a screen to save a picture to `Snapshots/` on the SD card. Until a picture is added a placeholder card is shown.
+
+FT31 (carve step 1, NOT yet sent or tested on a device): frees about 79 KB of flash (883 KB used of 1 MB, was 963 KB). No change to the Four-Track screens.
+- The Roboto Mono font set is removed; the Liberation set is used whatever the Config font setting says (that setting now changes nothing). The emulator's font choice is gone too.
+- The Four-Track screens and pages are compiled for size (-Os); the audio maths stays on speed (-O2). Please watch for any slowdown in screen updates.
+- The hidden factory test combinations (button and pad combinations in Config) and their code are removed.
+- Random names (the Random button on the name keyboard) now come from two short lists instead of two lists of about a thousand words each.
+To check on the device: the Four-Track screens look the same as FT30, text is the same font, and Config, Sample Load, Sample Rec and Sample Play still open and work.

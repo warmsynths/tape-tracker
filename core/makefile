@@ -42,6 +42,11 @@ else
 COMPILER_OPTIONS+=-O2 -DNDEBUG
 endif
 
+# The Four-Track screens and pages are built for size; the audio maths in ft/dsp stays on speed.
+$(OBJ_DIR)/ft/%.o: COMPILER_OPTIONS += -Os
+$(OBJ_DIR)/ft/dsp/%.o: COMPILER_OPTIONS += -O2
+$(OBJ_DIR)/interface/fourTrack/%.o: COMPILER_OPTIONS += -Os
+
 CPP_OPTIONS=-std=gnu++20 -felide-constructors -includecstdint -fno-rtti -fno-exceptions 
 CC_OPTIONS=
 

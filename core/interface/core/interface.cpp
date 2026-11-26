@@ -26,7 +26,6 @@
 #include "mtConfig.h"
 #include "mtPadBoard.h"
 #include "mtStructs.h"
-#include "mtTest.h"
 
 #include "Platform.h"
 #include "config.h"
@@ -114,13 +113,6 @@ void Interface::begin(Platform* platform, Synth* synth)
     ModuleBase::setTitleBar(&titleBar);
     ModuleBase::setSynth(synth);
 
-    mtTest.setCodecAudio(platform->getCodecAudio());
-    mtTest.setRadio(platform->getRadio());
-    mtTest.setButtons(platform->getButtons());
-    mtTest.setEncoder(platform->getEncoder());
-    mtTest.setTimer(platform->getTimer());
-    mtTest.setBattery(platform->getBattery());
-    mtTest.setFileSystem(platform->getFileSystem());
 
     ip->unblockAllInputs();
 }
@@ -137,7 +129,6 @@ void Interface::update()
 
     mtPopups.update();
 
-    mtTest.testLoop();
 
     commonThingsUpdate();
 }
@@ -609,7 +600,6 @@ void interfaceEnvents(uint8_t event, void* param1, void* param2, void* param3)
         case eventActivateTestingProcedure:
         {
             mtInterface.deactivateModule((hModule)param1);
-            mtTest.runTestingProcedure(mtInterface.ip);
             break;
         }
         case eventSetFileTransferMode:

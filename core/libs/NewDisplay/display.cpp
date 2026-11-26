@@ -12,11 +12,6 @@
 #include "polyassert.h"
 
 // FONTS
-#include "RobotoMono-Bold_17_L4.h"
-#include "RobotoMono-Light_14_L4.h"
-#include "RobotoMono-Light_17_L4.h"
-#include "RobotoMono-Regular_12_L4.h"
-#include "RobotoMono-Regular_14_L4.h"
 
 #include "LiberationSans-Bold_14_L4.h"
 #include "LiberationSans-Bold_17_L4.h"
@@ -107,30 +102,6 @@ const CompressedFontData fontsData2[displayFontCount] =
     {
       LiberationSans_Regular_12_L4_compressed,
       sizeof(LiberationSans_Regular_12_L4_compressed) / sizeof(LiberationSans_Regular_12_L4_compressed[0])
-    },
-};
-
-const CompressedFontData fontsData1[displayFontCount] =
-{
-    {
-      Roboto_Mono_Light_14_L4_compressed,
-      sizeof(Roboto_Mono_Light_14_L4_compressed) / sizeof(Roboto_Mono_Light_14_L4_compressed[0])
-    },
-    {
-      Roboto_Mono_Light_17_L4_compressed,
-      sizeof(Roboto_Mono_Light_17_L4_compressed) / sizeof(Roboto_Mono_Light_17_L4_compressed[0])
-    },
-    {
-      Roboto_Mono_Regular_14_L4_compressed,
-      sizeof(Roboto_Mono_Regular_14_L4_compressed) / sizeof(Roboto_Mono_Regular_14_L4_compressed[0])
-    },
-    {
-      Roboto_Mono_Bold_17_L4_compressed,
-      sizeof(Roboto_Mono_Bold_17_L4_compressed) / sizeof(Roboto_Mono_Bold_17_L4_compressed[0])
-    },
-    {
-      Roboto_Mono_Regular_12_L4_compressed,
-      sizeof(Roboto_Mono_Regular_12_L4_compressed) / sizeof(Roboto_Mono_Regular_12_L4_compressed[0])
     },
 };
 
@@ -309,7 +280,7 @@ void cDisplay::begin(DisplayDriver* displayDriver, Timer* timer)
         displayDriver->writeDataRAMG(bitmaps[i].data, bitmaps[i].source, bitmaps[i].address);
     }
 
-    loadFont(fontsData1, displayFontCount);
+    loadFont(fontsData2, displayFontCount);
 
     // ####################################
 
@@ -1364,9 +1335,7 @@ void cDisplay::setFont(uint8_t index)
 {
     switch (index)
     {
-        case 0: loadFont(fontsData1, displayFontCount); break;
-        case 1: loadFont(fontsData2, displayFontCount); break;
-        default: loadFont(fontsData1, displayFontCount); break;
+        default: loadFont(fontsData2, displayFontCount); break; // one font set (Liberation); the Roboto Mono set was removed to save flash
     }
 }
 

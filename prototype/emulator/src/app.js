@@ -221,7 +221,6 @@
     if (audio.state === 'running') { await audio.suspend(); soundBtn.textContent = 'Sound off'; }
     else { await audio.resume(); soundBtn.textContent = 'Sound on'; }
   });
-  document.getElementById('font').addEventListener('change', (e) => { fontSet = e.target.value; glyphs = {}; if (node) node.port.postMessage({ type: 'init-fonts', advances: advances() }); });
 
   document.getElementById('theme').addEventListener('change', (e) => {
     PALETTE = THEMES[e.target.value];
