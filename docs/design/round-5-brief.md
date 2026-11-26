@@ -13,6 +13,15 @@ Round 5. The Four-Track screens are built. Now we want to rebuild the Tracker's 
 - No fades, slides, scrolling or zoom. Playheads, meters, a moving highlight and changing numbers are fine.
 - Use the named colour roles from round 4 so a theme can recolour it.
 
+## A2. The stock screens today
+Pictures of the five stock screens are in `docs/design/stock/` (params.png, config.png, sample-load.png, sample-play.png, sample-rec.png). What they show, so the rebuilt screens can keep what matters:
+- **Params ("Instrument Parameters 1/2"):** eight vertical faders with labels and values underneath: Volume, Panning, Tune, Finetune, Filter Type (Disabled, Low-pass, High-pass, Band-pass), Cutoff, Resonance, and More (page 2).
+- **Config:** a list of groups on the left (Project Settings, General, MIDI, Metronome, Firmware, Info) and the rows of the chosen group on the right (Performance presets, Pattern divider, Notes scale, Root note, Notes layout, Anti-aliasing, Limiter mode, Sends mode, Extra headroom, Snap to zero). The bottom row has up and down arrows for the group and the row, and Enter.
+- **Sample Playback:** a big waveform, Preview, Start, End and Zoom at the bottom, and a list of play modes (1-Shot, Forward Loop, Backward Loop, Pingpong Loop, Slice, Beat Slice, Wavetable, Granular).
+- **Sample Recorder:** a source list (Line in, Radio, Mic LG, Mic HG), two level meters, a Monitor on/off list, and buttons Source, Metronome Config, Level, Gain, Monitor and a red Record.
+- **Sample Loader:** the SD card folders on the left, the 48 instrument slots in the middle, a preview level meter, and buttons Enter, Add next, Preview, Rename, Import, Delete unused, Preview Vol and Memory.
+Wavetable, Granular, Slice and Beat Slice are being dropped. The Radio source is not needed. The stock look is plain black and white; the rebuilt screens should use our palette and shapes.
+
 ## B. Buttons and what they open
 The Tracker has these buttons. Four-Track screens already use the ones marked (done).
 
