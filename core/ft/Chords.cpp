@@ -99,6 +99,7 @@ const char* Chords::perfName(Perf p)
         case Perf::Sus: return "Sus";
         case Perf::Seventh: return "7th";
         case Perf::Hold: return "Hold";
+        case Perf::Style: return "Style";
         default: return "";
     }
 }
@@ -108,7 +109,7 @@ Perf Chords::perfOf(int pad)
 {
     if (!isPerf(pad)) return Perf::None;
     static const Perf map[4][2] = {
-        { Perf::OctUp, Perf::OctDown }, { Perf::Inversion, Perf::Open }, { Perf::Sus, Perf::Seventh }, { Perf::Hold, Perf::Spare }
+        { Perf::OctUp, Perf::OctDown }, { Perf::Inversion, Perf::Open }, { Perf::Sus, Perf::Seventh }, { Perf::Hold, Perf::Style }
     };
     return map[pad / 12][pad % 12 - kPlayColumns];
 }
@@ -125,6 +126,49 @@ uint8_t Chords::modFor(Perf p)
         case Perf::Seventh: return ModSeventh;
         default: return 0;
     }
+}
+
+const char* Chords::playStyleName(int s)
+{
+    static const char* const n[kPlayStyles] = { "Block", "Strum D", "Strum U", "Arp Up", "Arp Dn", "Arp U/D", "Arp Rnd" };
+    return n[s < 0 || s >= kPlayStyles ? 0 : s];
+}
+
+const char* Chords::arpRateName(int r)
+{
+    static const char* const n[kArpRates] = { "1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32" };
+    return n[r < 0 || r >= kArpRates ? 0 : r];
+}
+
+float Chords::arpRateBeats(int r)
+{
+    static const float b[kArpRates] = { 1.0f, 0.5f, 1.0f / 3.0f, 0.25f, 1.0f / 6.0f, 0.125f };
+    return b[r < 0 || r >= kArpRates ? 0 : r];
+}
+
+int Chords::arpSequence(const uint8_t* chord, int count, int style, int range, uint8_t* out, int max)
+{
+    uint8_t up[24];
+    int n = 0;
+    if (range < 1) range = 1;
+    if (range > 3) range = 3;
+    for (int o = 0; o < range; o++)
+        for (int i = 0; i < count && n < 24; i++)
+        {
+            const int note = chord[i] + 12 * o;
+            if (note <= 127) up[n++] = (uint8_t)note;
+        }
+    int m = 0;
+    if (style == StyleArpDown)
+        for (int i = n - 1; i >= 0 && m < max; i--) out[m++] = up[i];
+    else if (style == StyleArpUpDown)
+    {
+        for (int i = 0; i < n && m < max; i++) out[m++] = up[i];
+        for (int i = n - 2; i >= 1 && m < max; i--) out[m++] = up[i]; // the ends are not played twice
+    }
+    else
+        for (int i = 0; i < n && m < max; i++) out[m++] = up[i];
+    return m;
 }
 
 void Chords::init()
@@ -182,6 +226,16 @@ void Chords::rebuild()
     if (cfg.octave < -2) cfg.octave = -2;
     if (cfg.octave > 2) cfg.octave = 2;
     for (int i = 0; i < 4; i++) if (cfg.rowType[i] >= kChordTypes) cfg.rowType[i] = 0;
+    if (cfg.playStyle >= kPlayStyles) cfg.playStyle = 0;
+    if (cfg.humanise > 100) cfg.humanise = 100;
+    if (cfg.strumMs < 10) cfg.strumMs = 10;
+    if (cfg.strumMs > 80) cfg.strumMs = 80;
+    if (cfg.arpRate >= kArpRates) cfg.arpRate = 3;
+    if (cfg.arpRange < 1) cfg.arpRange = 1;
+    if (cfg.arpRange > 3) cfg.arpRange = 3;
+    if (cfg.gate < 10) cfg.gate = 10;
+    if (cfg.gate > 100) cfg.gate = 100;
+    if (cfg.padVelocity > 1) cfg.padVelocity = 0;
     for (int i = 0; i < kColourChords; i++)
     {
         if (cfg.colSemi[i] < 1 || cfg.colSemi[i] > 11) cfg.colSemi[i] = 1;
@@ -361,7 +415,7 @@ void Chords::played(int pad)
 Tier Chords::tier(int pad) const
 {
     if (pad < 0 || pad >= 48) return Tier::Off;
-    if (isPerf(pad)) return perfOf(pad) == Perf::Spare ? Tier::Off : Tier::Control;
+    if (isPerf(pad)) return Tier::Control;
     const int row = pad / 12, col = pad % 12;
     if (row < cfg.chordRows)
     {
@@ -385,7 +439,7 @@ void Chords::label(int pad, char* out, int size) const
 {
     out[0] = 0;
     if (pad < 0 || pad >= 48) return;
-    if (isPerf(pad)) { fmt(out, size, "%s", perfName(perfOf(pad))); return; }
+    if (isPerf(pad)) { fmt(out, size, "%s", perfOf(pad) == Perf::Style ? playStyleName(cfg.playStyle) : perfName(perfOf(pad))); return; }
     const int row = pad / 12, col = pad % 12;
     if (row < cfg.chordRows)
     {

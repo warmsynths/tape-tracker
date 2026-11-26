@@ -292,12 +292,12 @@ void App::jog(int delta)
     moveSelection(delta > 0 ? 1 : -1);
 }
 
-void App::pad(int p, bool down)
+void App::pad(int p, bool down, int velocity)
 {
     if (p < 0 || p >= 48) return;
     if (padsChords && current != Screen::PadSample)
     {
-        chordPad(p, down);
+        chordPad(p, down, velocity);
         if (current == Screen::Chords) refresh(true);
         return;
     }
@@ -306,15 +306,125 @@ void App::pad(int p, bool down)
     else hal.padOff(p);
 }
 
-void App::chordNote(int pad, int index, int note, bool on)
+void App::chordNote(int pad, int index, int note, int velocity, bool on)
 {
-    if (chSound < kSynthPresets) hal.synthNote(note, 100, on);
-    else hal.sampleNote(200 + pad * kMaxChordNotes + index, note, on);
+    if (chSound < kSynthPresets) hal.synthNote(note, velocity, on);
+    else hal.sampleNote(200 + pad * kMaxChordNotes + index, note, velocity, on);
+}
+
+int App::rnd(int n)
+{
+    rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+    return n > 0 ? (int)(rng % (uint32_t)n) : 0;
+}
+
+// Humanise lowers a velocity by up to a third at most, a little differently every time
+int App::humanVelocity(int base)
+{
+    const int h = chords.cfg.humanise;
+    int v = base - rnd(base * h * 35 / 10000 + 1);
+    if (v < 20) v = 20;
+    return v > 127 ? 127 : v;
+}
+
+void App::startNote(int p, int index, int note, int velocity, uint32_t delayMs)
+{
+    if (delayMs == 0)
+    {
+        chordNote(p, index, note, velocity, true);
+        soundMask[p] |= (uint8_t)(1u << index);
+        return;
+    }
+    if (pendCount < 64) pend[pendCount++] = Pending{ hal.millis() + delayMs, (uint8_t)p, (uint8_t)index, (uint8_t)note, (uint8_t)velocity };
+}
+
+double App::currentBpm()
+{
+    if (session.loopFrames() > 0 && session.bars() > 0)
+        return 60.0 * (double)hal.sampleRate() * (double)(session.bars() * 4) / (double)session.loopFrames();
+    return (set.tempoTenths > 0 ? (double)set.tempoTenths : 1200.0) / 10.0;
+}
+
+void App::stopArp()
+{
+    if (arpPad >= 0 && arpNote >= 0) chordNote(arpPad, arpVoice, arpNote, 0, false);
+    arpNote = -1;
+    arpPad = -1;
+}
+
+void App::startArp(int p, const uint8_t* chord, int count, int velocity)
+{
+    stopArp();
+    arpLen = Chords::arpSequence(chord, count, chords.cfg.playStyle, chords.cfg.arpRange, arpSeq, 24);
+    if (arpLen == 0) return;
+    arpPad = p;
+    arpStep = 0;
+    arpVel = velocity;
+    arpPeriod = 60000.0 / currentBpm() * (double)Chords::arpRateBeats(chords.cfg.arpRate);
+    // while a loop plays, the first step waits for the next step of the loop's grid
+    double wait = 0;
+    if (hal.playerPlaying() && session.loopFrames() > 0 && hal.sampleRate() > 0)
+    {
+        const double stepFrames = arpPeriod * (double)hal.sampleRate() / 1000.0;
+        const double into = (double)(hal.playerPosition() % session.loopFrames());
+        double rem = into - (double)((uint64_t)(into / stepFrames)) * stepFrames;
+        if (rem > stepFrames * 0.125) wait = (stepFrames - rem) * 1000.0 / (double)hal.sampleRate(); // just past the step: play now
+    }
+    arpDue = (double)hal.millis() + wait;
+    if (wait == 0) stepArp(hal.millis()); // the first note is not late
+}
+
+void App::stepArp(uint32_t now)
+{
+    if (arpNote >= 0) chordNote(arpPad, arpVoice, arpNote, 0, false);
+    const int idx = chords.cfg.playStyle == StyleArpRandom ? rnd(arpLen) : arpStep % arpLen;
+    arpStep++;
+    arpVoice = (arpVoice + 1) % kMaxChordNotes;
+    arpNote = arpSeq[idx];
+    chordNote(arpPad, arpVoice, arpNote, humanVelocity(arpVel), true);
+    const int h = chords.cfg.humanise;
+    double gate = arpPeriod * (double)chords.cfg.gate / 100.0 * (1.0 + (double)(rnd(21) - 10) * (double)h / 1000.0);
+    if (gate < 20.0) gate = 20.0;
+    arpOffAt = now + (uint32_t)gate;
+    arpDue += arpPeriod;
+    if (arpDue < (double)now - arpPeriod) arpDue = (double)now + arpPeriod; // far behind: do not catch up in a burst
+}
+
+void App::serviceChordNotes()
+{
+    const uint32_t now = hal.millis();
+    for (int i = 0; i < pendCount;)
+    {
+        if ((int32_t)(now - pend[i].at) >= 0)
+        {
+            const Pending e = pend[i];
+            pend[i] = pend[--pendCount];
+            if (heldCount[e.pad] != 0)
+            {
+                chordNote(e.pad, e.index, e.note, e.velocity, true);
+                soundMask[e.pad] |= (uint8_t)(1u << e.index);
+            }
+        }
+        else i++;
+    }
+    if (arpPad >= 0)
+    {
+        if (arpNote >= 0 && (int32_t)(now - arpOffAt) >= 0) { chordNote(arpPad, arpVoice, arpNote, 0, false); arpNote = -1; }
+        if (arpDue <= (double)now) stepArp(now);
+    }
 }
 
 void App::releasePad(int p)
 {
-    for (int i = 0; i < heldCount[p]; i++) chordNote(p, i, heldNote[p][i], false);
+    if (arpPad == p) stopArp();
+    for (int i = 0; i < pendCount;)
+    {
+        if (pend[i].pad == p) pend[i] = pend[--pendCount];
+        else i++;
+    }
+    for (int i = 0; i < heldCount[p]; i++)
+        if ((soundMask[p] >> i) & 1) chordNote(p, i, heldNote[p][i], 0, false);
+    soundMask[p] = 0;
     if (heldCount[p] != 0) hitAt[p] = hal.millis();
     heldCount[p] = 0;
     latched[p] = false;
@@ -325,12 +435,13 @@ void App::releaseLatched()
     for (int p = 0; p < 48; p++) if (latched[p]) releasePad(p);
 }
 
-void App::chordPad(int p, bool down)
+void App::chordPad(int p, bool down, int velocity)
 {
     const Perf perf = Chords::perfOf(p);
+    ChordCfg& c = chords.cfg;
     if (perf != Perf::None)
     {
-        // the performance pads: held modifiers, and Hold which latches
+        // the performance pads: held modifiers, Hold which latches, and Style which steps the play style
         if (down)
         {
             heldCount[p] = 1;
@@ -339,6 +450,11 @@ void App::chordPad(int p, bool down)
             {
                 chHold = !chHold;
                 if (!chHold) releaseLatched();
+            }
+            else if (perf == Perf::Style)
+            {
+                c.playStyle = (uint8_t)((c.playStyle + 1) % kPlayStyles);
+                soundMark();
             }
             else chords.mods |= Chords::modFor(perf);
         }
@@ -356,12 +472,27 @@ void App::chordPad(int p, bool down)
         uint8_t n[kMaxChordNotes];
         const int count = chords.notes(p, n);
         chords.played(p);
+        if (count == 0) return;
+        const bool chord = chords.isChordPad(p);
+        const int base = c.padVelocity && velocity >= 1 ? (velocity > 127 ? 127 : velocity) : 100;
+        for (int i = 0; i < count; i++) heldNote[p][i] = n[i];
+        heldCount[p] = (uint8_t)count;
+        const int style = chord ? c.playStyle : StyleBlock;
+        if (Chords::isArp(style)) { startArp(p, n, count, base); return; }
+        const int h = c.humanise;
         for (int i = 0; i < count; i++)
         {
-            heldNote[p][i] = n[i];
-            chordNote(p, i, n[i], true);
+            // a strum plays the notes in turn, low to high (D) or high to low (U); a block gets a few
+            // milliseconds of looseness when humanise is up
+            const int order = style == StyleStrumUp ? count - 1 - i : i;
+            uint32_t delay = 0;
+            if (style == StyleStrumDown || style == StyleStrumUp) delay = (uint32_t)(order * c.strumMs);
+            else delay = (uint32_t)(i * h * 15 / 100);
+            if (h > 0 && delay > 0) delay += (uint32_t)rnd(h / 10 + 1);
+            int v = humanVelocity(base);
+            if (order == 0 && (style == StyleStrumDown || style == StyleStrumUp) && v < 119) v += 8; // the first note of a strum leans in
+            startNote(p, i, n[i], v, delay);
         }
-        heldCount[p] = (uint8_t)count;
     }
     else
     {
@@ -374,6 +505,8 @@ void App::chordPad(int p, bool down)
 void App::chordsReleaseAll()
 {
     chHold = false;
+    stopArp();
+    pendCount = 0;
     for (int p = 0; p < 48; p++)
     {
         if (Chords::isPerf(p)) heldCount[p] = 0;
@@ -950,7 +1083,7 @@ void App::serviceLights()
             case Tier::ChordTone: base = 10; break;
             case Tier::Other: base = 3; break;
             case Tier::Outside: base = 2; break;
-            case Tier::Control: base = Chords::perfOf(p) == Perf::Hold && chHold ? 24 : 4; break;
+            case Tier::Control: base = (Chords::perfOf(p) == Perf::Hold && chHold) ? 24 : (Chords::perfOf(p) == Perf::Style && chords.cfg.playStyle != StyleBlock) ? 10 : 4; break;
             default: break;
         }
         int level = base;
@@ -1008,6 +1141,7 @@ void App::tick()
     }
     serviceCountIn();
     serviceClick();
+    serviceChordNotes();
     serviceLights();
     if (soundDirty && hal.millis() - soundDirtyAt > 1500) { soundDirty = false; soundSave(); }
     serviceJob();

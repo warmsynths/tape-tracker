@@ -150,7 +150,8 @@ int main()
             CHECK(c.isChordPad(r * 12 + col) == false, "and are not chord pads");
         }
     CHECK(Chords::perfOf(10) == Perf::OctUp && Chords::perfOf(11) == Perf::OctDown && Chords::perfOf(46) == Perf::Hold, "perf pads are where the design says");
-    CHECK(c.tier(10) == Tier::Control && c.tier(47) == Tier::Off, "perf pads light, the spare one does not");
+    CHECK(c.tier(10) == Tier::Control && c.tier(47) == Tier::Control && Chords::perfOf(47) == Perf::Style, "perf pads light, the last one is the play style pad");
+    c.cfg.playStyle = StyleArpUp; label(c, 47, l); CHECK(std::strcmp(l, "Arp Up") == 0, "the style pad shows the style"); c.cfg.playStyle = StyleBlock;
     // chord types on the degrees (C major) and the rules for what fits the scale
     struct T { int type; const char* name[7]; };
     c.cfg.chordRows = 4; c.cfg.scale = 0; c.cfg.key = 0;
@@ -206,6 +207,22 @@ int main()
     c.cfg.colSemi[1] = 6; c.cfg.colKind[1] = 2; c.cfg.rowType[0] = (uint8_t)ChordType::Sus2;
     c.rebuild();
     label(c, 8, l); CHECK(std::strcmp(l, "F#sus2") == 0, "custom colour chord and row type are kept");
+    // arpeggio order
+    {
+        const uint8_t ch[3] = { 48, 52, 55 };
+        uint8_t o[24];
+        int k = Chords::arpSequence(ch, 3, StyleArpUp, 1, o, 24);
+        CHECK(k == 3 && o[0] == 48 && o[2] == 55, "arp up");
+        k = Chords::arpSequence(ch, 3, StyleArpDown, 1, o, 24);
+        CHECK(k == 3 && o[0] == 55 && o[2] == 48, "arp down");
+        k = Chords::arpSequence(ch, 3, StyleArpUpDown, 1, o, 24);
+        CHECK(k == 4 && o[0] == 48 && o[2] == 55 && o[3] == 52, "arp up and down does not play the ends twice");
+        k = Chords::arpSequence(ch, 3, StyleArpUp, 2, o, 24);
+        CHECK(k == 6 && o[3] == 60 && o[5] == 67, "two octaves");
+        k = Chords::arpSequence(ch, 3, StyleArpUp, 3, o, 24);
+        CHECK(k == 9, "three octaves");
+        CHECK(Chords::arpRateBeats(3) == 0.25f && Chords::isArp(StyleArpRandom) && !Chords::isArp(StyleStrumUp), "rates and style kinds");
+    }
     // chordRows 0 has only notes and performance pads
     c.init(); c.cfg.chordRows = 0; c.rebuild();
     CHECK(c.notes(0, n) == 1, "with no chord rows the top rows are notes");

@@ -211,7 +211,7 @@ class EmuHal : public Hal
     void setCurrentSample(int slot) override { currentSampleSlot = slot; }
     void sampleMemory(uint32_t& used, uint32_t& total) override { used = g_samplesUsed * 2; total = kSamplePool * 2; }
 
-    void startVoice(int pad, int smp, float ratio)
+    void startVoice(int pad, int smp, float ratio, float gain = 1.0f)
     {
         int slot = 0;
         for (int i = 0; i < 8; i++) if (!voices[i].on) { slot = i; break; }
@@ -226,7 +226,7 @@ class EmuHal : public Hal
             const float startIdx = (float)((uint64_t)s.pStart * s.length / 65535);
             float endIdx = (float)((uint64_t)s.pEnd * s.length / 65535);
             if (endIdx <= startIdx + 2) endIdx = (float)s.length - 1;
-            voices[slot] = Voice{ true, pad, startIdx, 0.0f, 0.8f * (float)s.volume / 100.0f, true, smp, r, (float)s.pan / 100.0f, endIdx, startIdx, s.loop };
+            voices[slot] = Voice{ true, pad, startIdx, 0.0f, gain * 0.8f * (float)s.volume / 100.0f, true, smp, r, (float)s.pan / 100.0f, endIdx, startIdx, s.loop };
         }
         else
         {
@@ -406,7 +406,7 @@ class EmuHal : public Hal
     void synthSetPatch(const SynthPatch& patch) override { synth.setPatch(patch); }
     void synthNote(int note, int velocity, bool on) override { if (on) synth.noteOn(note, velocity); else synth.noteOff(note); }
     void synthAllOff() override { synth.allNotesOff(); }
-    void sampleNote(int id, int note, bool on) override
+    void sampleNote(int id, int note, int velocity, bool on) override
     {
         if (on)
         {
@@ -414,7 +414,7 @@ class EmuHal : public Hal
             const int semis = note - 60;
             if (semis > 0) for (int i = 0; i < semis; i++) r *= 1.05946309f;
             if (semis < 0) for (int i = 0; i < -semis; i++) r /= 1.05946309f;
-            startVoice(id, currentSampleSlot, r);
+            startVoice(id, currentSampleSlot, r, (float)velocity / 100.0f);
         }
         else for (auto& v : voices) if (v.on && v.pad == id) v.held = false;
     }

@@ -53,10 +53,22 @@ struct ChordCfg
     uint8_t rowType[4] = { 0, 2, 4, 8 };        // the chord type of each row (Triad, 7th, 9th, Sus4)
     uint8_t colSemi[kColourChords] = { 1, 3, 5 }; // colour chords: semitones above the tonic (1 to 11)
     uint8_t colKind[kColourChords] = { 1, 1, 2 }; // and their kind, see kindName
+    // how the chords are played
+    uint8_t playStyle = 0;   // see playStyleName
+    uint8_t humanise = 0;    // 0 to 100: velocity, timing and gate looseness
+    uint8_t strumMs = 28;    // time between the notes of a strum, 10 to 80
+    uint8_t arpRate = 3;     // see arpRateName
+    uint8_t arpRange = 1;    // octaves the arpeggio covers, 1 to 3
+    uint8_t gate = 80;       // how long an arpeggio note lasts, percent of the step, 10 to 100
+    uint8_t padVelocity = 0; // 1: the pad's own velocity is used, 0: a fixed one
 };
 
+constexpr int kPlayStyles = 7;
+constexpr int kArpRates = 6;
+enum PlayStyle : uint8_t { StyleBlock, StyleStrumDown, StyleStrumUp, StyleArpUp, StyleArpDown, StyleArpUpDown, StyleArpRandom };
+
 // The right-hand performance pads
-enum class Perf : uint8_t { None, OctUp, OctDown, Inversion, Open, Sus, Seventh, Hold, Spare };
+enum class Perf : uint8_t { None, OctUp, OctDown, Inversion, Open, Sus, Seventh, Hold, Style };
 // Modifiers that act while their pad is held and a chord is played
 enum Mod : uint8_t { ModOctUp = 1, ModOctDown = 2, ModInversion = 4, ModOpen = 8, ModSus = 16, ModSeventh = 32 };
 
@@ -102,6 +114,13 @@ class Chords
     static const char* typeName(int t);
     static const char* kindName(int k);
     static const char* perfName(Perf p);
+    static const char* playStyleName(int s);
+    static const char* arpRateName(int r);
+    static float arpRateBeats(int r);   // the length of a step in beats
+    static bool isArp(int style) { return style >= StyleArpUp; }
+    // The order an arpeggio plays a chord's notes in, across `range` octaves; returns how many
+    // (random order is picked step by step by the player: this returns them ascending).
+    static int arpSequence(const uint8_t* chord, int count, int style, int range, uint8_t* out, int max);
 
     // The notes of a chord for tests: a degree 0 to 6 or a colour 7 to 9, and a type
     int degreeChord(int col, int type, uint8_t* out) const;

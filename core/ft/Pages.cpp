@@ -1753,11 +1753,11 @@ void App::resetAll()
 void App::chordsKey(int k)
 {
     ChordCfg& c = chords.cfg;
-    const int last = chPage == 0 ? 6 : 9;
+    const int last = chPage == 0 ? 6 : chPage == 1 ? 9 : 6;
     if (k == kLeft) chField = clampi(chField - 1, 0, last);
     else if (k == kRight) chField = clampi(chField + 1, 0, last);
-    else if (k == kUp) chField = clampi(chField - (chPage == 0 ? 4 : 5), 0, last);
-    else if (k == kDown) chField = clampi(chField + (chPage == 0 ? 4 : 5), 0, last);
+    else if (k == kUp) chField = clampi(chField - (chPage == 1 ? 5 : 4), 0, last);
+    else if (k == kDown) chField = clampi(chField + (chPage == 1 ? 5 : 4), 0, last);
     else if (k == kB1)
     {
         if (padsChords) chordsOff();
@@ -1772,7 +1772,7 @@ void App::chordsKey(int k)
         soundMark();
     }
     else if (k == kB4) { if (chSound >= kSynthPresets) chSound = sndPreset; open(Screen::Sound); return; }
-    else if (k == kB7) { chPage = 1 - chPage; chField = 0; }
+    else if (k == kB7) { chPage = (chPage + 1) % 3; chField = 0; }
     else if (k == kB8 || k == kNote) { back(); return; }
 }
 
@@ -1789,6 +1789,22 @@ void App::chordsJog(int delta)
             const int i = (chField - 4) / 2;
             if ((chField - 4) % 2 == 0) c.colSemi[i] = (uint8_t)(c.colSemi[i] + d < 1 ? 11 : c.colSemi[i] + d > 11 ? 1 : c.colSemi[i] + d);
             else c.colKind[i] = (uint8_t)((c.colKind[i] + kColourKinds + d) % kColourKinds);
+        }
+        chords.rebuild();
+        soundMark();
+        return;
+    }
+    if (chPage == 2)
+    {
+        switch (chField)
+        {
+            case 0: c.playStyle = (uint8_t)((c.playStyle + kPlayStyles + d) % kPlayStyles); break;
+            case 1: c.humanise = (uint8_t)clampi(c.humanise + d * 5, 0, 100); break;
+            case 2: c.strumMs = (uint8_t)clampi(c.strumMs + d * 2, 10, 80); break;
+            case 3: c.arpRate = (uint8_t)((c.arpRate + kArpRates + d) % kArpRates); break;
+            case 4: c.arpRange = (uint8_t)clampi(c.arpRange + d, 1, 3); break;
+            case 5: c.gate = (uint8_t)clampi(c.gate + d * 5, 10, 100); break;
+            default: c.padVelocity = (uint8_t)(1 - c.padVelocity); break;
         }
         chords.rebuild();
         soundMark();
@@ -1905,12 +1921,13 @@ void App::soundSave()
     if (!hal.sdPresent()) return;
     uint8_t b[200];
     int n = 0;
-    b[n++] = 'F'; b[n++] = 'S'; b[n++] = '0'; b[n++] = '2';
+    b[n++] = 'F'; b[n++] = 'S'; b[n++] = '0'; b[n++] = '3';
     const ChordCfg& c = chords.cfg;
     b[n++] = c.key; b[n++] = c.scale; b[n++] = c.style; b[n++] = c.chordRows; b[n++] = (uint8_t)c.noteMode; b[n++] = (uint8_t)c.octave;
     b[n++] = (uint8_t)(c.shuffle & 255); b[n++] = (uint8_t)(c.shuffle >> 8);
     for (int i = 0; i < 4; i++) b[n++] = c.rowType[i];
     for (int i = 0; i < kColourChords; i++) { b[n++] = c.colSemi[i]; b[n++] = c.colKind[i]; }
+    b[n++] = c.playStyle; b[n++] = c.humanise; b[n++] = c.strumMs; b[n++] = c.arpRate; b[n++] = c.arpRange; b[n++] = c.gate; b[n++] = c.padVelocity;
     b[n++] = (uint8_t)chSound; b[n++] = (uint8_t)sndPreset;
     for (int i = 0; i < kSynthMacros; i++) b[n++] = (uint8_t)sndMacros.v[i];
     for (int i = 0; i < kSynthParams; i++)
@@ -1925,15 +1942,16 @@ void App::soundSave()
 void App::soundLoad()
 {
     uint8_t b[200];
-    const uint32_t want = 4 + 6 + 2 + 4 + 2 * kColourChords + 2 + kSynthMacros + 4 * kSynthParams;
+    const uint32_t want = 4 + 6 + 2 + 4 + 2 * kColourChords + 7 + 2 + kSynthMacros + 4 * kSynthParams;
     if (hal.fileSize("sound.cfg") != want || hal.fileRead("sound.cfg", 0, b, want) != want) return;
-    if (b[0] != 'F' || b[1] != 'S' || b[2] != '0' || b[3] != '2') return;
+    if (b[0] != 'F' || b[1] != 'S' || b[2] != '0' || b[3] != '3') return;
     int n = 4;
     ChordCfg& c = chords.cfg;
     c.key = b[n++]; c.scale = b[n++]; c.style = b[n++]; c.chordRows = b[n++]; c.noteMode = (NoteMode)(b[n] > 2 ? 0 : b[n]); n++; c.octave = (int8_t)b[n++];
     c.shuffle = (uint16_t)(b[n] | (b[n + 1] << 8)); n += 2;
     for (int i = 0; i < 4; i++) c.rowType[i] = b[n++];
     for (int i = 0; i < kColourChords; i++) { c.colSemi[i] = b[n++]; c.colKind[i] = b[n++]; }
+    c.playStyle = b[n++]; c.humanise = b[n++]; c.strumMs = b[n++]; c.arpRate = b[n++]; c.arpRange = b[n++]; c.gate = b[n++]; c.padVelocity = b[n++];
     chSound = clampi(b[n++], 0, kSynthPresets);
     sndPreset = clampi(b[n++], 0, kSynthPresets - 1);
     sndBase = synthPreset(sndPreset);

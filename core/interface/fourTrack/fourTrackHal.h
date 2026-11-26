@@ -93,7 +93,7 @@ class FourTrackHal : public ft::Hal
     void synthSetPatch(const ft::SynthPatch& patch) override;
     void synthNote(int note, int velocity, bool on) override;
     void synthAllOff() override;
-    void sampleNote(int id, int note, bool on) override;
+    void sampleNote(int id, int note, int velocity, bool on) override;
 
     // Called when the screen is closed: put the codec and monitor back as they were.
     void restoreAudio();

@@ -155,7 +155,7 @@ class Hal
     virtual void synthSetPatch(const SynthPatch& /*patch*/) {}
     virtual void synthNote(int /*note*/, int /*velocity*/, bool /*on*/) {}
     virtual void synthAllOff() {}
-    virtual void sampleNote(int /*id*/, int /*note*/, bool /*on*/) {}
+    virtual void sampleNote(int /*id*/, int /*note*/, int /*velocity*/, bool /*on*/) {}
 };
 } // namespace ft
 

@@ -171,9 +171,10 @@ struct FakeHal : Hal
     int patches = 0;
     float lastCutoff = 0;
     void synthSetPatch(const SynthPatch& p) override { patches++; lastCutoff = p.cutoff; }
-    void synthNote(int note, int, bool on) override { notesOn += on ? 1 : -1; noteEvents++; lastNote = note; }
+    int vmin = 127, vmax = 0;
+    void synthNote(int note, int vel, bool on) override { notesOn += on ? 1 : -1; noteEvents++; if (on) { lastNote = note; if (vel < vmin) vmin = vel; if (vel > vmax) vmax = vel; } }
     void synthAllOff() override { notesOn = 0; }
-    void sampleNote(int, int, bool on) override { sampleNotes += on ? 1 : -1; }
+    void sampleNote(int, int, int, bool on) override { sampleNotes += on ? 1 : -1; }
 
     // Let `frames` of audio go by, in blocks of 128, running the application's main loop as it
     // would run on the device.
@@ -1008,6 +1009,64 @@ int main()
         app.pad(0, false);
         app.key(kB7);
         app.key(kB8);
+    }
+    {   // strum, arpeggio and humanise
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        app.key(kNote);
+        // Strum down: the notes come one after another, 28 ms apart
+        app.pad(47, true); app.pad(47, false); // Style pad: Strum D
+        app.pad(0, true);
+        CHECK(hal.notesOn == 1 && hal.lastNote == 48, "a strum starts with the lowest note");
+        hal.advance(app, 128 * 12); // about 36 ms
+        CHECK(hal.notesOn == 2 && hal.lastNote == 52, "the second note follows");
+        hal.advance(app, 128 * 12);
+        CHECK(hal.notesOn == 3 && hal.lastNote == 55, "and the third");
+        app.pad(0, false);
+        CHECK(hal.notesOn == 0, "releasing ends all of it");
+        // a pad let go before the strum finishes plays only what had started, and nothing is left on
+        app.pad(0, true);
+        app.pad(0, false);
+        hal.advance(app, 128 * 40);
+        CHECK(hal.notesOn == 0, "a short tap leaves no stuck notes");
+        // Strum up goes from the top
+        app.pad(47, true); app.pad(47, false);
+        app.pad(0, true);
+        CHECK(hal.lastNote == 55, "strum up starts with the highest note");
+        app.pad(0, false);
+        // Arp up: one note at a time, at the rate, gated
+        app.pad(47, true); app.pad(47, false);
+        app.pad(0, true);
+        CHECK(hal.notesOn == 1 && hal.lastNote == 48, "an arpeggio starts on the first note");
+        hal.noteEvents = 0;
+        hal.advance(app, 44100 * 3); // 3 s: 1/16 at 120 BPM is 125 ms, about 24 steps
+        CHECK(hal.noteEvents > 40 && hal.noteEvents < 60, "the arpeggio keeps stepping (note-ons and note-offs)");
+        CHECK(hal.notesOn <= 1, "never more than one arpeggio note at a time");
+        app.pad(0, false);
+        CHECK(hal.notesOn == 0, "releasing the pad stops it");
+        // Hold keeps an arpeggio going
+        app.pad(46, true); app.pad(46, false);
+        app.pad(0, true); app.pad(0, false);
+        hal.noteEvents = 0;
+        hal.advance(app, 44100);
+        CHECK(hal.noteEvents > 8, "with Hold the arpeggio goes on after the pad is let go");
+        app.pad(46, true); app.pad(46, false);
+        CHECK(hal.notesOn == 0, "Hold off stops it");
+        hal.noteEvents = 0;
+        hal.advance(app, 44100);
+        CHECK(hal.noteEvents == 0, "and it stays stopped");
+        // the style cycles through all of them and comes back to Block
+        for (int i = 0; i < 4; i++) { app.pad(47, true); app.pad(47, false); }
+        CHECK(app.chordSettings().playStyle == 0, "the Style pad cycles back to Block");
+        // humanise changes velocities within bounds and spreads a block
+        hal.vmin = 127; hal.vmax = 0;
+        app.key(kB7); app.key(kB7); // page 3
+        app.key(kRight); // Humanise
+        for (int i = 0; i < 20; i++) app.jog(1); // 100%
+        CHECK(app.chordSettings().humanise == 100, "humanise goes to 100");
+        for (int k = 0; k < 6; k++) { app.pad(0, true); hal.advance(app, 128 * 20); app.pad(0, false); }
+        CHECK(hal.vmax <= 100 && hal.vmin >= 65 && hal.vmin < hal.vmax, "humanised velocities vary but stay within a third of the base");
     }
     {   // Shift + Play switches the click; Play alone still plays
         FakeHal hal;

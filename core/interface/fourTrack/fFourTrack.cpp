@@ -63,8 +63,7 @@ static void functInstr() { functKey(ft::kInstr); } // the sound of the chord pad
 static void functEncoder(int16_t value) { FT->application().jog(value); }
 static void functPads(uint8_t pad, uint8_t state, int16_t velo)
 {
-    (void)velo;
-    FT->application().pad(pad, state == buttonPress);
+    FT->application().pad(pad, state == buttonPress, velo);
 }
 
 static void functSwitchModule(uint8_t button)

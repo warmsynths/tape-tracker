@@ -87,7 +87,8 @@ class App
     void keyUp(int key); // releases matter for the held effect buttons on the Glitch screen
     void jog(int delta);
     void setShift(bool held) { shift = held; }
-    void pad(int pad, bool down);
+    const ChordCfg& chordSettings() const { return chords.cfg; }
+    void pad(int pad, bool down, int velocity = 0); // velocity 1 to 127 if the pads send one, 0 if not
 
     // One pass of the main loop.
     void tick();
@@ -172,10 +173,10 @@ class App
     void drawChords(class Pen& p);
     void chordsKey(int k);
     void chordsJog(int delta);
-    void chordPad(int p, bool down);
+    void chordPad(int p, bool down, int velocity = 0);
     void chordsOff();
     void chordsReleaseAll();
-    void chordNote(int pad, int index, int note, bool on);
+    void chordNote(int pad, int index, int note, int velocity, bool on);
     Chords chords;
     bool padsChords = false;      // the pads play chords and scale notes
     int chField = 0;              // chords page 1: 0 key, 1 scale, 2 style, 3 chord rows, 4 notes, 5 octave, 6 sound; page 2: 0 to 3 row types, 4 to 9 colour chords
@@ -210,6 +211,25 @@ class App
     uint32_t beatAt = 0;          // when the last beat started, for the pulse
     int lightBeat = -1;
     bool lightsOn = false;
+    // Playing the chords: block, strum and arpeggio, with humanise (see Chords.h)
+    void serviceChordNotes();
+    void startNote(int p, int index, int note, int velocity, uint32_t delayMs);
+    void startArp(int p, const uint8_t* chord, int count, int velocity);
+    void stopArp();
+    void stepArp(uint32_t now);
+    double currentBpm();
+    int humanVelocity(int base);
+    int rnd(int n);
+    struct Pending { uint32_t at; uint8_t pad, index, note, velocity; };
+    Pending pend[64];
+    int pendCount = 0;
+    uint8_t soundMask[48] = {};   // bit i: note i of the pad's chord is sounding
+    uint32_t rng = 2463534242u;
+    int arpPad = -1;              // the pad whose chord is arpeggiating, -1: none
+    uint8_t arpSeq[24] = {};
+    int arpLen = 0, arpStep = 0, arpVoice = 0, arpNote = -1, arpVel = 100;
+    double arpDue = 0, arpPeriod = 0;
+    uint32_t arpOffAt = 0;
     void releasePad(int p);
     void releaseLatched();
     int chPage = 0;               // chords page: 0 harmony, 1 chord types

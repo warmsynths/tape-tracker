@@ -1319,7 +1319,7 @@ void App::drawChords(Pen& p)
     heading(p, model, "Chords");
     const ChordCfg& c = chords.cfg;
     char b[24];
-    p.textRight(786, 44, chPage == 0 ? "Page 1 of 2: harmony" : "Page 2 of 2: chord types", F12, pal.dim);
+    p.textRight(786, 44, chPage == 0 ? "Page 1 of 3: harmony" : chPage == 1 ? "Page 2 of 3: chord types" : "Page 3 of 3: feel", F12, pal.dim);
     int gy = 140, gstep = 64, gh = 62;
     if (chPage == 0)
     {
@@ -1342,6 +1342,26 @@ void App::drawChords(Pen& p)
             p.text(x + 10, 92, v[i], F17B, pal.text);
             x += widths[i] + 4;
         }
+    }
+    else if (chPage == 2)
+    {
+        char v[7][24];
+        fmt(v[0], 24, "%s", Chords::playStyleName(c.playStyle));
+        fmt(v[1], 24, "%d%%", c.humanise);
+        fmt(v[2], 24, "%d ms", c.strumMs);
+        fmt(v[3], 24, "%s", Chords::arpRateName(c.arpRate));
+        fmt(v[4], 24, "%d oct", c.arpRange);
+        fmt(v[5], 24, "%d%%", c.gate);
+        fmt(v[6], 24, "%s", c.padVelocity ? "From the pads" : "Fixed");
+        static const char* const names[7] = { "Play style", "Humanise", "Strum speed", "Arp rate", "Arp range", "Arp gate", "Velocity" };
+        for (int i = 0; i < 7; i++)
+        {
+            const int x = 14 + (i % 4) * 193, y = i < 4 ? 62 : 120;
+            p.cell(x, y, 189, 52, i == chField, pal.panel);
+            p.text(x + 10, y + 6, names[i], F12, pal.dim);
+            p.text(x + 10, y + 24, v[i], F17B, pal.text);
+        }
+        gy = 182; gstep = 52; gh = 50;
     }
     else
     {
@@ -1392,8 +1412,8 @@ void App::drawChords(Pen& p)
     if (chPage == 0)
         p.text(14, 412, c.chordRows == 0 ? "All left pads play scale notes. The right two columns are performance pads." : "Left: chords by type, then scale notes. Right: Oct, Invert, Open, Sus, 7th (hold), Hold (latch).", F14, pal.text);
     else
-        p.text(14, 412, "Dim chords are outside the key. Jog changes the selected setting.", F14, pal.text);
-    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Shuffle", "Reset", "Sound", "", "", chPage == 0 ? "Page 2" : "Page 1", "Back" };
+        p.text(14, 412, chPage == 1 ? "Dim chords are outside the key. Jog changes the selected setting." : "The Style pad (bottom right) steps the play style. Humanise loosens velocity and timing.", F14, pal.text);
+    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Shuffle", "Reset", "Sound", "", "", chPage == 0 ? "Page 2" : chPage == 1 ? "Page 3" : "Page 1", "Back" };
     p.buttons(l, padsChords ? 1 : 0);
 }
 

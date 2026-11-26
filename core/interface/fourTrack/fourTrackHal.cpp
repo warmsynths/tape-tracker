@@ -189,9 +189,9 @@ void FourTrackHal::synthNote(int note, int velocity, bool on)
     else engine.getSynthPlayer()->noteOff(note);
 }
 void FourTrackHal::synthAllOff() { engine.getSynthPlayer()->allNotesOff(); }
-void FourTrackHal::sampleNote(int id, int note, bool on)
+void FourTrackHal::sampleNote(int id, int note, int velocity, bool on)
 {
-    if (on) sequencer.handleNoteOn(Sequencer::GRID_OUTSIDE_PATTERN, (byte)note, 127, (int16_t)id);
+    if (on) sequencer.handleNoteOn(Sequencer::GRID_OUTSIDE_PATTERN, (byte)note, (int8_t)(velocity < 1 ? 1 : velocity > 127 ? 127 : velocity), (int16_t)id);
     else sequencer.handleNoteOff(Sequencer::GRID_OUTSIDE_PATTERN, (byte)note, 0, (int16_t)id);
 }
 
