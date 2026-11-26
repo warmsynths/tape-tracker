@@ -179,6 +179,14 @@ class App
     bool padsChords = false;      // the pads play chords and scale notes
     int chField = 0;              // chords page: 0 key, 1 scale, 2 style, 3 chord rows, 4 notes, 5 octave, 6 sound
     int chSound = 0;              // 0 .. synth presets - 1 the presets, then the sample
+    void serviceLights();
+    int beatIndex();
+    uint8_t lightSent[48];        // what each pad's light was last set to (255: not yet)
+    uint32_t lightTimer = 0;
+    uint32_t hitAt[48] = {};      // when each chord pad was let go, for the fade
+    uint32_t beatAt = 0;          // when the last beat started, for the pulse
+    int lightBeat = -1;
+    bool lightsOn = false;
     uint8_t heldCount[48] = {};
     uint8_t heldNote[48][kMaxChordNotes] = {};
     int psField = 0;              // pad sample page: 0 tune, 1 volume, 2 pan, 3 play mode, 4 start, 5 end

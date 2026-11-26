@@ -116,7 +116,7 @@
   }
 
   function loop() {
-    if (frame) { draw(frame); frame = null; }
+    if (frame) { draw(frame); showLights(frame.lights); frame = null; }
     requestAnimationFrame(loop);
   }
 
@@ -210,6 +210,14 @@
   });
   jog.addEventListener('pointerup', () => { dragAngle = null; });
 
+  let lastLights = '';
+  function showLights(l) {
+    if (!l) return;
+    const key = l.join(',');
+    if (key === lastLights) return;
+    lastLights = key;
+    document.querySelectorAll('.pad').forEach((b, i) => b.style.setProperty('--lit', (l[i] / 31).toFixed(3)));
+  }
   const padGrid = document.getElementById('pads');
   for (let i = 0; i < 48; i++) {
     const b = document.createElement('button');

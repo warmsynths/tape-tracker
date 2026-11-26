@@ -174,6 +174,13 @@ void FourTrackHal::padsReleaseAll()
     padsBacklight.clearGlobalPads(1, 1, 1);
 }
 
+// Lights from the chord pads sit on the back layer: the front layer is the stock hit light
+void FourTrackHal::padLight(int pad, int level)
+{
+    if (pad < 0 || pad >= 48) return;
+    padsBacklight.setBackLayer(level > 0 ? 1 : 0, (uint8_t)(level > 31 ? 31 : level), (uint8_t)pad);
+}
+
 // The chord pads: the synth, or the pad sample pitched (the sample's own pitch is note 60)
 int FourTrackHal::synthPresetCount() { return engine.getSynthPlayer()->presetCount(); }
 const char* FourTrackHal::synthPresetName(int index) { return engine.getSynthPlayer()->presetName(index); }

@@ -35,6 +35,7 @@ App::App(Hal& h, const Palette& palette)
 {
     for (int i = 0; i < 48; i++) padModeKeys[i] = true;
     chords.init();
+    for (int i = 0; i < 48; i++) lightSent[i] = 255;
     set.waveBitmap = hal.maskDefault();
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
@@ -313,6 +314,7 @@ void App::chordPad(int p, bool down)
     else
     {
         for (int i = 0; i < heldCount[p]; i++) chordNote(p, i, heldNote[p][i], false);
+        if (heldCount[p] != 0) hitAt[p] = hal.millis();
         heldCount[p] = 0;
     }
 }
@@ -327,6 +329,7 @@ void App::chordsOff()
 {
     chordsReleaseAll();
     padsChords = false;
+    serviceLights();
 }
 
 void App::togglePadMode()
@@ -842,6 +845,70 @@ void App::serviceClick()
     }
 }
 
+// The beat the recorder is on, or -1 when nothing is running
+int App::beatIndex()
+{
+    if (session.mode() == FourTrackSession::Mode::RecordingFirst && session.loopFrames() == 0)
+    {
+        const uint32_t tenths = set.tempoTenths > 0 ? set.tempoTenths : 1200u;
+        const uint32_t beatFrames = (uint32_t)((uint64_t)hal.sampleRate() * 600 / tenths);
+        return beatFrames > 0 ? (int)(hal.recordLength() / beatFrames) : -1;
+    }
+    if (!hal.playerPlaying() || session.bars() <= 0 || session.loopFrames() == 0) return -1;
+    const uint32_t beat = session.loopFrames() / ((uint32_t)session.bars() * 4);
+    return beat == 0 ? -1 : (int)(hal.playerPosition() / beat);
+}
+
+// The pad lights while the pads play chords: what each pad is (tiers), a flash that fades when it is
+// played, and a small pulse on the tonic at every beat (a stronger one on the bar). The lights only
+// have brightness, no colour, so the tiers are steps of brightness.
+void App::serviceLights()
+{
+    const uint32_t now = hal.millis();
+    if (!padsChords)
+    {
+        if (lightsOn)
+        {
+            for (int p = 0; p < 48; p++) { hal.padLight(p, 0); lightSent[p] = 255; }
+            lightsOn = false;
+        }
+        return;
+    }
+    if (lightsOn && now - lightTimer < 30) return;
+    lightTimer = now;
+    lightsOn = true;
+    const int beat = beatIndex();
+    if (beat >= 0 && beat != lightBeat) beatAt = now | 1u;
+    lightBeat = beat;
+    const uint32_t sinceBeat = beatAt != 0 ? now - beatAt : 100000u;
+    const int pulse = sinceBeat < 110 ? (lightBeat % 4 == 0 ? 10 : 5) * (int)(110 - sinceBeat) / 110 : 0;
+    for (int p = 0; p < 48; p++)
+    {
+        int base = 0;
+        switch (chords.tier(p))
+        {
+            case Tier::Tonic: base = 14 + pulse; break;
+            case Tier::Colour: base = 5; break;
+            case Tier::ChordTone: base = 10; break;
+            case Tier::Other: base = 3; break;
+            default: break;
+        }
+        int level = base;
+        if (heldCount[p] != 0) level = 31;
+        else if (now - hitAt[p] < 260 && hitAt[p] != 0)
+        {
+            const int fade = 31 - (int)(now - hitAt[p]) * (31 - base) / 260;
+            if (fade > level) level = fade;
+        }
+        if (level > 31) level = 31;
+        if (lightSent[p] != (uint8_t)level)
+        {
+            lightSent[p] = (uint8_t)level;
+            hal.padLight(p, level);
+        }
+    }
+}
+
 void App::serviceCountIn()
 {
     if (!countingIn) return;
@@ -881,6 +948,7 @@ void App::tick()
     }
     serviceCountIn();
     serviceClick();
+    serviceLights();
     serviceJob();
     serviceFirmware();
     refresh(false);

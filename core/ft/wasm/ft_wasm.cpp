@@ -30,6 +30,7 @@ float frac(float x) { return x - (float)(int)x; }
 float saw(float ph) { return frac(ph) * 2.0f - 1.0f; }
 float triangle(float ph) { const float f = frac(ph); return f < 0.5f ? f * 4.0f - 1.0f : 3.0f - f * 4.0f; }
 
+uint8_t g_padLights[48];
 float g_inL[kBlock], g_inR[kBlock], g_outL[kBlock], g_outR[kBlock];
 uint32_t g_palette[21];
 uint8_t g_adv[5][128];
@@ -419,6 +420,7 @@ class EmuHal : public Hal
         }
         else for (auto& v : voices) if (v.on && v.pad == id) v.held = false;
     }
+    void padLight(int pad, int level) override { if (pad >= 0 && pad < 48) g_padLights[pad] = (uint8_t)level; }
     void padOff(int pad) override { for (auto& v : voices) if (v.on && v.pad == pad) v.held = false; }
     void padsReleaseAll() override { for (auto& v : voices) v.held = false; }
 
@@ -603,6 +605,7 @@ float* ft_out_l_ptr() { return g_outL; }
 float* ft_out_r_ptr() { return g_outR; }
 int32_t* ft_cmd_ptr() { return g_cmd; }
 uint8_t* ft_pool_ptr() { return g_pool; }
+uint8_t* ft_pad_lights_ptr() { return g_padLights; }
 
 void ft_init(uint32_t rate)
 {

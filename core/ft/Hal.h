@@ -146,6 +146,9 @@ class Hal
     virtual void padOff(int pad) = 0;
     virtual void padsReleaseAll() = 0;
 
+    // The light of a pad, 0 (off) to 31 (full). Only the Tracker has lights; the emulator draws them.
+    virtual void padLight(int /*pad*/, int /*level*/) {}
+
     // Notes from the chord pads and the synth. `note` is a MIDI note. A sample plays pitched from
     // its original pitch at note 60; `id` tells the note's voice apart so it can be released.
     virtual int synthPresetCount() { return 0; }

@@ -1,5 +1,7 @@
 # Plan: a synth and a chord engine on the Original Tracker
 
+**Status (FT46, 2026-11-26):** steps 1, 2 (without Shuffle lock) and 4 to 5 are built in the emulator and firmware: Chords page, 5 styles, Shuffle, pad lights, 6-voice Plaits synth with 8 presets. Not built: CPU readout (step 3), Sound page (Instr), mono glide control, saving the settings, delay and reverb sends. Unverified on the device.
+
 Drafted 2026-11-26 after the stock screens were removed (FT43: flash 529 KB used, about 519 KB free; internal RAM about 105 KB free). Everything here is an estimate until measured on the device.
 
 ## Goal (owner)

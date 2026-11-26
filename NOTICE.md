@@ -48,3 +48,8 @@ Polyend Tracker Community Edition (CE) incorporates or links against the followi
 * **Location**: `synth/lib/`
 * **License**: Polyend Precompiled Synthesizer & DSP Library License (`synth/lib/LICENSE-PROPRIETARY.txt`)
 * **Copyright**: Copyright (c) 2023-2026 Polyend Sp. z o.o. All rights reserved.
+
+## Plaits and stmlib (Mutable Instruments) - the Four-Track synth
+* **Location**: `core/ft/dsp/third_party/plaits/`, `core/ft/dsp/third_party/stmlib/` (a small part of each: the oscillators, the ensemble chorus, the overdrive, the sine table and the helpers they need)
+* **License**: MIT
+* **Copyright**: Copyright 2014-2016 Emilie Gillet. The licence text is at the top of each file. Changes: `resources.h/.cpp` replaced by a sine table only; `stmlib.h` static-assert namespace renamed so it does not clash with the reverb's copy; `dsp.h` falls back to plain C maths off the ARM chip.

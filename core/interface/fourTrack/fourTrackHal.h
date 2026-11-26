@@ -89,6 +89,7 @@ class FourTrackHal : public ft::Hal
     void padOn(int pad, bool keysMode) override;
     void padOff(int pad) override;
     void padsReleaseAll() override;
+    void padLight(int pad, int level) override;
     int synthPresetCount() override;
     const char* synthPresetName(int index) override;
     void synthSetPreset(int index) override;

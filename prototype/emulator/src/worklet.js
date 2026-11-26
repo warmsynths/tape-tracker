@@ -121,6 +121,7 @@ class FourTrackProcessor extends AudioWorkletProcessor {
         this.outR = new Float32Array(mem, this.x.ft_out_r_ptr(), 128);
         this.cmd = new Int32Array(mem, this.x.ft_cmd_ptr(), 4096 * 7);
         this.pool = new Uint8Array(mem, this.x.ft_pool_ptr(), 32768);
+        this.lights = new Uint8Array(mem, this.x.ft_pad_lights_ptr(), 48);
         this.ready = true;
         this.port.postMessage({ type: 'ready', sampleRate });
       });
@@ -216,7 +217,7 @@ class FourTrackProcessor extends AudioWorkletProcessor {
       const n = this.x.ft_frame();
       const used = this.x.ft_pool_used();
       this.port.postMessage(
-        { type: 'frame', cmd: this.cmd.slice(0, n * 7), pool: this.pool.slice(0, used), mode: this.x.ft_state_mode(), screen: this.x.ft_state_screen() }
+        { type: 'frame', cmd: this.cmd.slice(0, n * 7), pool: this.pool.slice(0, used), lights: this.lights.slice(), mode: this.x.ft_state_mode(), screen: this.x.ft_state_screen() }
       );
     }
     return true;
