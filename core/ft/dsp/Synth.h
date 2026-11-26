@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "SynthPatch.h"
 #include "plaits/dsp/fx/ensemble.h"
 #include "plaits/dsp/fx/overdrive.h"
 #include "plaits/dsp/oscillator/super_square_oscillator.h"
@@ -16,43 +17,6 @@ namespace ft
 // low-frequency oscillator, drive and a stereo ensemble chorus. Portable: the web emulator and the
 // Tracker run the same code.
 
-enum class SynthOsc : uint8_t
-{
-    Shape,       // triangle to saw to square with pulse width (Plaits VariableShapeOscillator)
-    Saw,         // saw with a moving notch (VariableSawOscillator)
-    SuperSquare  // thick, detuned pulse (SuperSquareOscillator)
-};
-
-struct SynthPatch
-{
-    const char* name;
-    SynthOsc osc;
-    float shape;       // 0 triangle, 0.5 saw, 1 square (Shape); notch and slope (Saw); spread (SuperSquare)
-    float pulse;       // pulse width / second shape control, 0 to 1
-    float detune;      // oscillator B against A, in cents (0: off)
-    float subLevel;    // square an octave down, 0 to 1
-    float noise;       // 0 to 1
-    float cutoff;      // 0 to 1 (about 60 Hz to 14 kHz, exponential)
-    float resonance;   // 0 to 1
-    float envAmount;   // filter envelope depth in octaves (can be negative)
-    float keyTrack;    // 0 to 1: how much the cutoff follows the note
-    float attack, decay, sustain, release;      // amp envelope, seconds and level
-    float fAttack, fDecay, fSustain, fRelease;  // filter envelope
-    float lfoRate;     // Hz
-    float lfoPitch;    // semitones of vibrato
-    float lfoCutoff;   // octaves
-    float lfoPulse;    // 0 to 1
-    float drive;       // 0 to 1
-    float ensemble;    // chorus amount, 0 to 1
-    float depth;       // chorus depth, 0 to 1
-    float glide;       // seconds, mono mode only
-    bool mono;
-    float level;       // output level, 0 to 1
-};
-
-constexpr int kSynthPresets = 8;
-const SynthPatch& synthPreset(int index);
-
 class Synth
 {
   public:
@@ -61,7 +25,7 @@ class Synth
 
     void init(float sampleRate);
     void setPatch(const SynthPatch& patch);
-    void setPreset(int index) { setPatch(synthPreset(index)); }
+    void setPreset(int index) { preset = index; setPatch(synthPreset(index)); }
     const SynthPatch& patch() const { return p; }
     int presetIndex() const { return preset; }
 

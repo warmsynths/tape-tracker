@@ -2,6 +2,7 @@
 #define FT_HAL_H_
 
 #include "dsp/Dsp.h"
+#include "dsp/SynthPatch.h"
 #include <stdint.h>
 
 namespace ft
@@ -151,9 +152,7 @@ class Hal
 
     // Notes from the chord pads and the synth. `note` is a MIDI note. A sample plays pitched from
     // its original pitch at note 60; `id` tells the note's voice apart so it can be released.
-    virtual int synthPresetCount() { return 0; }
-    virtual const char* synthPresetName(int /*index*/) { return ""; }
-    virtual void synthSetPreset(int /*index*/) {}
+    virtual void synthSetPatch(const SynthPatch& /*patch*/) {}
     virtual void synthNote(int /*note*/, int /*velocity*/, bool /*on*/) {}
     virtual void synthAllOff() {}
     virtual void sampleNote(int /*id*/, int /*note*/, bool /*on*/) {}

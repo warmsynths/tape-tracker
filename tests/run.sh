@@ -18,7 +18,7 @@ $CXX -std=c++17 $INC tests/host/ft_dsp_test.cpp core/ft/dsp/Dsp.cpp -o "$OUT/ft_
 echo "== ft_chords"
 $CXX -std=c++17 $INC tests/host/ft_chords_test.cpp core/ft/Chords.cpp -o "$OUT/ft_chords" && "$OUT/ft_chords"
 echo "== ft_synth"
-$CXX -std=c++17 $INC tests/host/ft_synth_test.cpp core/ft/dsp/Synth.cpp $RES -o "$OUT/ft_synth" && "$OUT/ft_synth"
+$CXX -std=c++17 $INC tests/host/ft_synth_test.cpp core/ft/dsp/Synth.cpp core/ft/dsp/SynthPatch.cpp $RES -o "$OUT/ft_synth" && "$OUT/ft_synth"
 echo "== ft_app"
 $CXX -std=c++17 $INC tests/host/ft_app_test.cpp core/ft/*.cpp core/ft/dsp/*.cpp $RES core/source/FourTrackSession.cpp -o "$OUT/ft_app" && "$OUT/ft_app"
 echo "== build id"

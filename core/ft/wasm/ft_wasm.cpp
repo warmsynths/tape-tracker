@@ -403,9 +403,7 @@ class EmuHal : public Hal
     }
     // the chord pads: the synth, or the current sample pitched
     Synth synth;
-    int synthPresetCount() override { return kSynthPresets; }
-    const char* synthPresetName(int i) override { return ft::synthPreset(i).name; }
-    void synthSetPreset(int i) override { synth.setPreset(i); }
+    void synthSetPatch(const SynthPatch& patch) override { synth.setPatch(patch); }
     void synthNote(int note, int velocity, bool on) override { if (on) synth.noteOn(note, velocity); else synth.noteOff(note); }
     void synthAllOff() override { synth.allNotesOff(); }
     void sampleNote(int id, int note, bool on) override

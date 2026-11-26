@@ -176,6 +176,7 @@ void App::popupKey(int k)
 
 void App::keyUp(int k)
 {
+    if ((current == Screen::Sound || current == Screen::SoundAdv) && k == kB1) soundHear(false);
     if (current == Screen::PadSample && k == kB1 && psAuditioning)
     {
         psAuditioning = false;
@@ -269,6 +270,8 @@ void App::keyScreen(int k)
             for (int i = 0; i < 48; i++) padModeKeys[i] = padsKeysMode;
             break;
         case Screen::Chords: chordsKey(k); break;
+        case Screen::Sound: soundKey(k); break;
+        case Screen::SoundAdv: soundAdvKey(k); break;
         case Screen::Load: loadKey(k); break;
         case Screen::Resample: resampleKey(k); break;
         case Screen::Device: deviceKey(k); break;
@@ -408,6 +411,8 @@ void App::jogScreen(int delta)
         }
         case Screen::PadSample: psChange(delta); break;
         case Screen::Chords: chordsJog(delta); break;
+        case Screen::Sound: soundJog(delta); break;
+        case Screen::SoundAdv: soundAdvJog(delta); break;
         case Screen::Load: loadJog(delta); break;
         case Screen::Resample: resampleJog(delta); break;
         case Screen::Device: deviceJog(delta); break;
@@ -1762,7 +1767,9 @@ void App::chordsKey(int k)
         chordsReleaseAll();
         c.shuffle = k == kB3 ? 0 : (uint16_t)(c.shuffle >= 65000 ? 1 : c.shuffle + 1);
         chords.rebuild();
+        soundMark();
     }
+    else if (k == kB4) { if (chSound >= kSynthPresets) chSound = sndPreset; open(Screen::Sound); return; }
     else if (k == kB8 || k == kNote) { back(); return; }
 }
 
@@ -1781,13 +1788,143 @@ void App::chordsJog(int delta)
         case 5: c.octave = (int8_t)clampi(c.octave + d, -2, 2); break;
         default:
         {
-            const int count = hal.synthPresetCount() + 1; // the presets and the sample
-            chSound = clampi(chSound + d, 0, count - 1);
-            if (chSound < hal.synthPresetCount()) hal.synthSetPreset(chSound);
+            chSound = clampi(chSound + d, 0, kSynthPresets); // the patches, then the pad sample
+            if (chSound < kSynthPresets) soundPick(chSound);
             break;
         }
     }
     chords.rebuild();
+    soundMark();
+}
+
+//--------------------------------------------------------------------------------------------
+// C11 Sound (Instr button): pick a patch, tweak it with eight knobs, or open every raw setting
+
+void App::soundApply() { hal.synthSetPatch(synthApply(sndBase, sndMacros)); }
+
+void App::soundMark()
+{
+    soundDirty = true;
+    soundDirtyAt = hal.millis();
+}
+
+void App::soundPick(int preset)
+{
+    sndPreset = clampi(preset, 0, kSynthPresets - 1);
+    sndBase = synthPreset(sndPreset);
+    sndMacros = SynthMacros();
+    chSound = sndPreset;
+    soundApply();
+    soundMark();
+}
+
+bool App::soundEdited() const
+{
+    const SynthPatch& o = synthPreset(sndPreset);
+    for (int i = 0; i < kSynthParams; i++)
+        if (synthParamGet(o, i) != synthParamGet(sndBase, i)) return true;
+    return false;
+}
+
+void App::soundHear(bool on)
+{
+    if (on)
+    {
+        if (hearPad >= 0) return;
+        hearPad = (sndBase.mono && chords.cfg.chordRows < 4) ? 36 : 0; // a lead plays a note, the rest a chord
+        chordPad(hearPad, true);
+    }
+    else if (hearPad >= 0)
+    {
+        chordPad(hearPad, false);
+        hearPad = -1;
+    }
+}
+
+void App::soundKey(int k)
+{
+    if (k == kLeft) sndField = clampi(sndField - 1, 0, 8);
+    else if (k == kRight) sndField = clampi(sndField + 1, 0, 8);
+    else if (k == kUp) { if (sndField == 0) soundPick(sndPreset - 1); else sndField = sndField <= 4 ? 0 : sndField - 4; }
+    else if (k == kDown) { if (sndField == 0) { if (sndPreset >= kSynthPresets - 1) sndField = 1; else soundPick(sndPreset + 1); } else sndField = clampi(sndField + 4, 1, 8); }
+    else if (k == kB1) soundHear(true);
+    else if (k == kB2) { sndMacros = SynthMacros(); soundApply(); soundMark(); }
+    else if (k == kB3) soundPick(sndPreset);
+    else if (k == kB7) { soundHear(false); open(Screen::SoundAdv); return; }
+    else if (k == kB8 || k == kInstr) { soundHear(false); back(); return; }
+}
+
+void App::soundJog(int delta)
+{
+    const int d = delta > 0 ? 1 : -1;
+    if (sndField == 0) { soundPick(sndPreset + d); return; }
+    int8_t& m = sndMacros.v[sndField - 1];
+    m = (int8_t)clampi(m + d, -kMacroRange, kMacroRange);
+    soundApply();
+    soundMark();
+}
+
+void App::soundAdvKey(int k)
+{
+    if (k == kUp) advField = clampi(advField - 1, 0, kSynthParams - 1);
+    else if (k == kDown) advField = clampi(advField + 1, 0, kSynthParams - 1);
+    else if (k == kLeft) advField = clampi(advField - kSynthParams / 2, 0, kSynthParams - 1);
+    else if (k == kRight) advField = clampi(advField + kSynthParams / 2, 0, kSynthParams - 1);
+    else if (k == kB1) soundHear(true);
+    else if (k == kB2) { synthParamSet(sndBase, advField, synthParamGet(synthPreset(sndPreset), advField)); soundApply(); soundMark(); }
+    else if (k == kB3) { sndBase = synthPreset(sndPreset); soundApply(); soundMark(); }
+    else if (k == kB8 || k == kInstr) { soundHear(false); open(Screen::Sound); return; }
+}
+
+void App::soundAdvJog(int delta)
+{
+    synthParamStep(sndBase, advField, delta > 0 ? 1 : -1, shift);
+    soundApply();
+    soundMark();
+}
+
+// What is kept: the chord pad settings, the patch with its edits and the knobs. One small file.
+void App::soundSave()
+{
+    if (!hal.sdPresent()) return;
+    uint8_t b[160];
+    int n = 0;
+    b[n++] = 'F'; b[n++] = 'S'; b[n++] = '0'; b[n++] = '1';
+    const ChordCfg& c = chords.cfg;
+    b[n++] = c.key; b[n++] = c.scale; b[n++] = c.style; b[n++] = c.chordRows; b[n++] = (uint8_t)c.noteMode; b[n++] = (uint8_t)c.octave;
+    b[n++] = (uint8_t)(c.shuffle & 255); b[n++] = (uint8_t)(c.shuffle >> 8);
+    b[n++] = (uint8_t)chSound; b[n++] = (uint8_t)sndPreset;
+    for (int i = 0; i < kSynthMacros; i++) b[n++] = (uint8_t)sndMacros.v[i];
+    for (int i = 0; i < kSynthParams; i++)
+    {
+        union { float f; uint32_t u; } v;
+        v.f = synthParamGet(sndBase, i);
+        for (int k = 0; k < 4; k++) b[n++] = (uint8_t)(v.u >> (8 * k));
+    }
+    hal.fileWrite("sound.cfg", b, (uint32_t)n, false);
+}
+
+void App::soundLoad()
+{
+    uint8_t b[160];
+    const uint32_t want = 4 + 6 + 2 + 2 + kSynthMacros + 4 * kSynthParams;
+    if (hal.fileSize("sound.cfg") != want || hal.fileRead("sound.cfg", 0, b, want) != want) return;
+    if (b[0] != 'F' || b[1] != 'S' || b[2] != '0' || b[3] != '1') return;
+    int n = 4;
+    ChordCfg& c = chords.cfg;
+    c.key = b[n++]; c.scale = b[n++]; c.style = b[n++]; c.chordRows = b[n++]; c.noteMode = (NoteMode)(b[n] > 2 ? 0 : b[n]); n++; c.octave = (int8_t)b[n++];
+    c.shuffle = (uint16_t)(b[n] | (b[n + 1] << 8)); n += 2;
+    chSound = clampi(b[n++], 0, kSynthPresets);
+    sndPreset = clampi(b[n++], 0, kSynthPresets - 1);
+    sndBase = synthPreset(sndPreset);
+    for (int i = 0; i < kSynthMacros; i++) sndMacros.v[i] = (int8_t)clampi((int8_t)b[n++], -kMacroRange, kMacroRange);
+    for (int i = 0; i < kSynthParams; i++)
+    {
+        union { float f; uint32_t u; } v;
+        v.u = (uint32_t)b[n] | ((uint32_t)b[n + 1] << 8) | ((uint32_t)b[n + 2] << 16) | ((uint32_t)b[n + 3] << 24);
+        n += 4;
+        synthParamSet(sndBase, i, v.f);
+    }
+    chords.rebuild();
 }
 } // namespace ft
-

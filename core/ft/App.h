@@ -36,12 +36,13 @@ enum Key
     kCopy,         // copy a Part to another track
     kDelete,       // clear a Part (Shift: all)
     kNote,         // chords and scale notes on the pads
+    kInstr,        // the sound of the chord pads: patches and tweaks
     kKeyCount
 };
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv
 };
 
 enum class Popup : uint8_t
@@ -178,7 +179,29 @@ class App
     Chords chords;
     bool padsChords = false;      // the pads play chords and scale notes
     int chField = 0;              // chords page: 0 key, 1 scale, 2 style, 3 chord rows, 4 notes, 5 octave, 6 sound
-    int chSound = 0;              // 0 .. synth presets - 1 the presets, then the sample
+    int chSound = 0;              // 0 .. kSynthPresets - 1 the patches, then kSynthPresets: the pad sample
+    // Sound page (Instr): a patch, eight tweak knobs on top, and every raw setting on the Advanced page
+    void drawSound(class Pen& p);
+    void drawSoundAdv(class Pen& p);
+    void soundKey(int k);
+    void soundJog(int delta);
+    void soundAdvKey(int k);
+    void soundAdvJog(int delta);
+    void soundApply();            // sends the patch with the knobs applied to the synth
+    void soundPick(int preset);
+    void soundHear(bool on);
+    bool soundEdited() const;     // the raw settings differ from the patch
+    void soundMark();             // something changed that is worth saving
+    void soundSave();
+    void soundLoad();
+    int sndPreset = 0;
+    SynthPatch sndBase;
+    SynthMacros sndMacros;
+    int sndField = 0;             // 0 the patch list, 1 to 8 the knobs
+    int advField = 0;             // the raw setting in focus
+    int hearPad = -1;
+    bool soundDirty = false;
+    uint32_t soundDirtyAt = 0;
     void serviceLights();
     int beatIndex();
     uint8_t lightSent[48];        // what each pad's light was last set to (255: not yet)

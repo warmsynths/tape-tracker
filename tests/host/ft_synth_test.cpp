@@ -109,6 +109,51 @@ int main()
         auto hf = [](const std::vector<float>& v) { double e = 0; for (size_t i = 1000; i + 1 < v.size(); i++) { const float d = v[i + 1] - v[i]; e += d * d; } return e; };
         CHECK(hf(bright) > hf(dark) * 2.0, "brightness opens the filter");
     }
+    {   // the tweak knobs and the settings list
+        const SynthPatch& base = synthPreset(0);
+        SynthMacros none;
+        const SynthPatch same = synthApply(base, none);
+        CHECK(same.cutoff == base.cutoff && same.attack == base.attack && same.ensemble == base.ensemble, "knobs at zero leave the patch alone");
+        for (int k = 0; k < kSynthMacros; k++)
+        {
+            SynthMacros up, down;
+            up.v[k] = kMacroRange; down.v[k] = -kMacroRange;
+            const SynthPatch a = synthApply(base, up), b = synthApply(base, down);
+            const bool differs = a.cutoff != b.cutoff || a.resonance != b.resonance || a.attack != b.attack || a.release != b.release ||
+                                 a.detune != b.detune || a.ensemble != b.ensemble || a.drive != b.drive || a.lfoCutoff != b.lfoCutoff;
+            char m[64];
+            std::snprintf(m, sizeof m, "knob %d (%s) changes the sound", k, synthMacroName(k));
+            CHECK(differs, m);
+        }
+        SynthMacros extreme;
+        for (int k = 0; k < kSynthMacros; k++) extreme.v[k] = kMacroRange;
+        for (int pr = 0; pr < kSynthPresets; pr++)
+        {
+            const SynthPatch a = synthApply(synthPreset(pr), extreme);
+            CHECK(a.cutoff <= 1.0f && a.resonance <= 0.95f && a.attack <= 6.0f && a.release <= 8.0f && a.ensemble <= 1.0f && a.drive <= 1.0f, "knobs stay in range");
+        }
+        // every setting has a name, steps both ways inside its range and shows a text
+        SynthPatch p = synthPreset(3);
+        for (int i = 0; i < kSynthParams; i++)
+        {
+            char t[32];
+            synthParamText(p, i, t, sizeof t);
+            CHECK(synthParamName(i)[0] != 0 && t[0] != 0, "a setting has a name and a value");
+            for (int n = 0; n < 60; n++) synthParamStep(p, i, 1, n % 2 == 0);
+            const float hi = synthParamFraction(p, i);
+            for (int n = 0; n < 120; n++) synthParamStep(p, i, -1, n % 2 == 0);
+            const float lo = synthParamFraction(p, i);
+            CHECK(hi >= lo && hi <= 1.0f && lo >= 0.0f, "stepping stays in range");
+        }
+        // a patch edited on the Advanced page still plays
+        SynthPatch edit = synthPreset(0);
+        for (int i = 0; i < kSynthParams; i++) synthParamStep(edit, i, i % 2 ? 1 : -1, false);
+        s.init(kRate); s.setPatch(synthApply(edit, extreme)); s.noteOn(60, 100);
+        std::vector<float> a = renderSeconds(s, 0.5f);
+        bool finite = true;
+        for (float v : a) if (!std::isfinite(v)) finite = false;
+        CHECK(finite, "an edited patch with every knob up stays finite");
+    }
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
     return failures ? 1 : 0;
 }

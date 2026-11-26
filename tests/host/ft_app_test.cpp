@@ -167,10 +167,10 @@ struct FakeHal : Hal
     void padOn(int, bool) override { padsOn++; }
     void padOff(int) override { padsOn--; }
     void padsReleaseAll() override { padsOn = 0; }
-    int notesOn = 0, noteEvents = 0, lastNote = 0, synthPreset = 0, sampleNotes = 0;
-    int synthPresetCount() override { return 3; }
-    const char* synthPresetName(int i) override { return i == 0 ? "One" : i == 1 ? "Two" : "Three"; }
-    void synthSetPreset(int i) override { synthPreset = i; }
+    int notesOn = 0, noteEvents = 0, lastNote = 0, sampleNotes = 0;
+    int patches = 0;
+    float lastCutoff = 0;
+    void synthSetPatch(const SynthPatch& p) override { patches++; lastCutoff = p.cutoff; }
     void synthNote(int note, int, bool on) override { notesOn += on ? 1 : -1; noteEvents++; lastNote = note; }
     void synthAllOff() override { notesOn = 0; }
     void sampleNote(int, int, bool on) override { sampleNotes += on ? 1 : -1; }
@@ -961,7 +961,7 @@ int main()
         app.pad(0, false);
         // sound field: the third value is the sample
         app.key(kRight); app.key(kRight); app.key(kRight); app.key(kRight); app.key(kRight); app.key(kRight);
-        app.jog(1); app.jog(1); app.jog(1);
+        for (int i = 0; i < kSynthPresets + 1; i++) app.jog(1); // past the last patch: the pad sample
         app.pad(0, true);
         CHECK(hal.sampleNotes == 3, "with Sound set to Sample the chord plays the sample");
         app.pad(0, false);
@@ -977,6 +977,47 @@ int main()
         app.pad(3, true);
         CHECK(hal.padsOn == 1, "with chord pads off, the pads are the normal pads again");
         app.pad(3, false);
+    }
+    {   // sound: patches, knobs, every setting, and keeping them
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        const int start = hal.patches;
+        app.key(kInstr);
+        CHECK(app.screen() == Screen::Sound, "Instr opens the Sound page");
+        app.jog(1);
+        CHECK(hal.patches == start + 1, "jog on the patch list picks the next patch");
+        const float cut = hal.lastCutoff;
+        app.key(kRight); // the first knob: Bright
+        for (int i = 0; i < 5; i++) app.jog(1);
+        CHECK(hal.lastCutoff > cut, "the Bright knob opens the filter");
+        app.key(kB2); // knobs to zero
+        CHECK(hal.lastCutoff == cut, "Knobs to 0 puts the patch back");
+        app.key(kB1);
+        CHECK(hal.notesOn > 0, "holding B1 plays the patch");
+        app.keyUp(kB1);
+        CHECK(hal.notesOn == 0, "releasing B1 stops it");
+        app.key(kB7);
+        CHECK(app.screen() == Screen::SoundAdv, "B7 opens the settings list");
+        app.key(kDown); app.key(kDown); app.key(kDown); app.key(kDown); app.key(kDown); app.key(kDown); // Cutoff
+        const float before = hal.lastCutoff;
+        app.jog(1);
+        CHECK(hal.lastCutoff > before, "jog changes the setting under the cursor");
+        app.key(kB2);
+        CHECK(hal.lastCutoff == before, "B2 puts the one setting back");
+        app.jog(-1); app.jog(-1);
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Sound, "Back goes to the Sound page");
+        const float edited = hal.lastCutoff;
+        // time passes: the sound is written to the card
+        hal.advance(app, 100000);
+        CHECK(hal.files.count("sound.cfg") == 1, "the sound is saved after a moment");
+        // a new machine starts with it
+        FakeHal hal2;
+        hal2.files = hal.files;
+        App app2(hal2, palette());
+        app2.enter();
+        CHECK(hal2.lastCutoff == edited, "the saved patch comes back");
     }
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
     return failures ? 1 : 0;

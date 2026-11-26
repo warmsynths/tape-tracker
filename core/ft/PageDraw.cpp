@@ -71,6 +71,8 @@ void App::buildPage()
         case Screen::Mixer: drawMixer(p); break;
         case Screen::PadSample: drawPadSample(p); break;
         case Screen::Chords: drawChords(p); break;
+        case Screen::Sound: drawSound(p); break;
+        case Screen::SoundAdv: drawSoundAdv(p); break;
         case Screen::Load: drawLoad(p); break;
         case Screen::Resample: drawResample(p); break;
         case Screen::Device: if (fwUpdating) drawFirmwareUpdate(p); else drawDevice(p); break;
@@ -1325,8 +1327,7 @@ void App::drawChords(Pen& p)
     fmt(v[3], 24, "%d chords, %d notes", c.chordRows, 4 - c.chordRows);
     fmt(v[4], 24, "%s", c.noteMode == NoteMode::Scale ? "Scale" : c.noteMode == NoteMode::Chord ? "Chord" : "Follow");
     fmt(v[5], 24, "%s%d", c.octave > 0 ? "+" : "", c.octave);
-    const int presets = hal.synthPresetCount();
-    fmt(v[6], 24, "%s", chSound < presets ? hal.synthPresetName(chSound) : "Sample");
+    fmt(v[6], 24, "%s%s", chSound < kSynthPresets ? synthPreset(chSound).name : "Sample", chSound < kSynthPresets && (sndMacros.any() || soundEdited()) ? " *" : "");
     static const char* const names[7] = { "Key", "Scale", "Style", "Rows", "Note pads", "Octave", "Sound" };
     static const int widths[7] = { 60, 140, 112, 152, 88, 70, 128 };
     int x = 14;
@@ -1357,8 +1358,76 @@ void App::drawChords(Pen& p)
         p.textMid(px, 62, py + 24, b, b[0] != 0 && p.width(b, F17B) <= 58 ? F17B : F12, ink);
     }
     p.text(14, 412, c.chordRows == 0 ? "All pads play scale notes. Jog changes the selected value." : c.chordRows == 4 ? "All pads play chords. Jog changes the selected value." : "Top rows play chords, the rest scale notes. Jog changes the selected value.", F14, pal.text);
-    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Shuffle", "Reset", "", "", "", "", "Back" };
+    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Shuffle", "Reset", "Sound", "", "", "", "Back" };
     p.buttons(l, padsChords ? 1 : 0);
 }
-} // namespace ft
 
+//--------------------------------------------------------------------------------------------
+// C11 Sound (Instr button)
+void App::drawSound(Pen& p)
+{
+    heading(p, model, "Sound");
+    const SynthPatch& cur = synthPreset(sndPreset);
+    // the patches
+    p.text(14, 66, "Patch", F12, pal.dim);
+    for (int i = 0; i < kSynthPresets; i++)
+    {
+        const int y = 84 + i * 26;
+        const bool on = i == sndPreset;
+        p.rect(14, y, 300, 24, on ? pal.sel : pal.panel);
+        if (on) p.rect(14, y, sndField == 0 ? 300 : 3, sndField == 0 ? 2 : 24, pal.text);
+        p.text(26, y + 4, synthPreset(i).name, on ? F14B : F14, pal.text);
+        p.textRight(304, y + 6, synthPreset(i).kind, F12, pal.dim);
+    }
+    // what the patch is
+    const int nx = p.text(334, 66, cur.name, F17B, pal.text);
+    if (sndMacros.any() || soundEdited()) p.text(nx + 12, 71, soundEdited() ? "edited" : "tweaked", F12, pal.marker);
+    p.text(334, 94, cur.blurb, F14, pal.dim);
+    // the knobs
+    for (int i = 0; i < kSynthMacros; i++)
+    {
+        const int x = 334 + (i % 4) * 115, y = 126 + (i / 4) * 124;
+        const bool focus = sndField == i + 1;
+        p.cell(x, y, 110, 118, focus, pal.panel);
+        p.text(x + 10, y + 10, synthMacroName(i), F12, pal.dim);
+        char v[8];
+        const int m = sndMacros.v[i];
+        if (m == 0) fmt(v, sizeof v, "0"); else fmt(v, sizeof v, "%s%d", m > 0 ? "+" : "-", m > 0 ? m : -m);
+        p.text(x + 10, y + 30, v, F17B, m == 0 ? pal.dim : pal.text);
+        p.rect(x + 10, y + 70, 90, 6, pal.track);
+        p.rect(x + 54, y + 66, 2, 14, pal.dim);
+        const int w = m * 45 / kMacroRange;
+        if (w > 0) p.rect(x + 55, y + 70, w, 6, pal.meter);
+        else if (w < 0) p.rect(x + 55 + w, y + 70, -w, 6, pal.meter);
+        p.text(x + 10, y + 92, synthMacroHint(i), F12, pal.dim);
+    }
+    p.text(14, 412, "Jog changes the selected patch or knob. Hold B1 to hear it. Pads play it too.", F14, pal.text);
+    const char* l[8] = { "Hear", "Knobs to 0", "Reset patch", "", "", "", "Advanced", "Back" };
+    p.buttons(l, hearPad >= 0 ? 1 : 0);
+}
+
+void App::drawSoundAdv(Pen& p)
+{
+    heading(p, model, "Sound: every setting");
+    const int nx = p.text(250, 42, synthPreset(sndPreset).name, F14, pal.dim);
+    if (sndMacros.any()) p.text(nx + 10, 43, "(the knobs sit on top of these)", F12, pal.dim);
+    const SynthPatch& orig = synthPreset(sndPreset);
+    const int rows = kSynthParams / 2;
+    for (int i = 0; i < kSynthParams; i++)
+    {
+        const int x = 14 + (i / rows) * 394, y = 64 + (i % rows) * 24;
+        const bool focus = i == advField;
+        p.cell(x, y, 386, 23, focus, pal.panel);
+        const bool changed = synthParamGet(orig, i) != synthParamGet(sndBase, i);
+        p.text(x + 10, y + 3, synthParamName(i), F14, pal.text);
+        char v[24];
+        synthParamText(sndBase, i, v, sizeof v);
+        p.textRight(x + 376, y + 3, v, F14B, changed ? pal.marker : pal.text);
+        p.rect(x + 160, y + 17, 100, 2, pal.track);
+        p.rect(x + 160, y + 17, (int)(synthParamFraction(sndBase, i) * 100.0f), 2, pal.meter);
+    }
+    p.text(14, 412, "Jog changes the setting (Shift: finer). A changed setting is orange. B2 puts one back.", F14, pal.text);
+    const char* l[8] = { "Hear", "Reset one", "Reset all", "", "", "", "", "Back" };
+    p.buttons(l, hearPad >= 0 ? 1 : 0);
+}
+} // namespace ft

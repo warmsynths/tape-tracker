@@ -35,6 +35,7 @@ App::App(Hal& h, const Palette& palette)
 {
     for (int i = 0; i < 48; i++) padModeKeys[i] = true;
     chords.init();
+    sndBase = synthPreset(0);
     for (int i = 0; i < 48; i++) lightSent[i] = 255;
     set.waveBitmap = hal.maskDefault();
     for (int t = 0; t < FourTrackSession::kTracks; t++)
@@ -81,6 +82,8 @@ void App::enter()
     staticSignature = 0;
     for (int t = 0; t < FourTrackSession::kTracks; t++) waveDirty[t] = true;
     pushBank();
+    soundLoad();
+    soundApply();
     refresh(true);
 }
 
@@ -130,7 +133,7 @@ void App::key(int k)
         // A button that opens a page also works from another page: go home, then open it
         struct Open { int key; Screen page; };
         static const Open pages[] = { { kSampleEdit, Screen::Editor }, { kPerformance, Screen::Glitch }, { kMaster, Screen::Master }, { kFile, Screen::Project },
-                                      { kParams, Screen::Mixer }, { kSamplePlay, Screen::PadSample }, { kSampleLoad, Screen::Load }, { kSampleRec, Screen::Resample }, { kConfig, Screen::Device }, { kNote, Screen::Chords } };
+                                      { kParams, Screen::Mixer }, { kSamplePlay, Screen::PadSample }, { kSampleLoad, Screen::Load }, { kSampleRec, Screen::Resample }, { kConfig, Screen::Device }, { kNote, Screen::Chords }, { kInstr, Screen::Sound } };
         for (const Open& o : pages)
             if (o.key == k && o.page != current)
             {
@@ -144,7 +147,7 @@ void App::key(int k)
         // Play and Stop work on the pages that sit beside the recorder
         const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
                                current == Screen::Input || current == Screen::Pads || current == Screen::Memory || current == Screen::Mixer || current == Screen::PadSample || current == Screen::Load || current == Screen::Resample ||
-                               current == Screen::Settings || current == Screen::Chords;
+                               current == Screen::Settings || current == Screen::Chords || current == Screen::Sound || current == Screen::SoundAdv;
         if (transport && k == kPlay) { togglePlay(); refresh(true); return; }
         if (transport && k == kStop) { pressStop(); refresh(true); return; }
         keyScreen(k);
@@ -248,6 +251,11 @@ void App::key(int k)
         case kSampleRec: resampleOpen(); open(Screen::Resample); break;
         case kConfig: deviceOpen(); open(Screen::Device); break;
         case kNote: if (!padsChords) { hal.padsReleaseAll(); padsChords = true; } open(Screen::Chords); break;
+        case kInstr:
+            if (!padsChords) { hal.padsReleaseAll(); padsChords = true; }
+            if (chSound >= kSynthPresets) chSound = sndPreset; // this page is for the synth
+            open(Screen::Sound);
+            break;
         case kFile: refreshProjectList(); open(Screen::Project); break;
         default: break;
     }
@@ -292,7 +300,7 @@ void App::pad(int p, bool down)
 
 void App::chordNote(int pad, int index, int note, bool on)
 {
-    if (chSound < hal.synthPresetCount()) hal.synthNote(note, 100, on);
+    if (chSound < kSynthPresets) hal.synthNote(note, 100, on);
     else hal.sampleNote(200 + pad * kMaxChordNotes + index, note, on);
 }
 
@@ -949,6 +957,7 @@ void App::tick()
     serviceCountIn();
     serviceClick();
     serviceLights();
+    if (soundDirty && hal.millis() - soundDirtyAt > 1500) { soundDirty = false; soundSave(); }
     serviceJob();
     serviceFirmware();
     refresh(false);

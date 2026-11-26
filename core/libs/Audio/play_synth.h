@@ -16,9 +16,7 @@ class AudioPlaySynth : public AudioStream
     }
 
     void begin(float sampleRate);
-    void setPreset(int index);
-    int presetCount() const { return ft::kSynthPresets; }
-    const char* presetName(int index) const;
+    void setPatch(const ft::SynthPatch& patch);
     void noteOn(int note, int velocity);
     void noteOff(int note);
     void allNotesOff();

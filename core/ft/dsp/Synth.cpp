@@ -18,36 +18,6 @@ float exp2f_(float x)
     return bits.f * p;
 }
 
-const SynthPatch kPresets[kSynthPresets] = {
-    // name, osc, shape, pulse, detune, sub, noise, cutoff, res, envAmt, key,
-    //   attack, decay, sustain, release, fAttack, fDecay, fSustain, fRelease,
-    //   lfoRate, lfoPitch, lfoCutoff, lfoPulse, drive, ensemble, depth, glide, mono, level
-    { "Warm Pad", SynthOsc::Shape, 0.50f, 0.50f, 7.0f, 0.20f, 0.00f, 0.38f, 0.10f, 1.0f, 0.5f,
-      0.35f, 0.80f, 0.80f, 1.20f, 0.50f, 1.20f, 0.50f, 1.00f,
-      0.40f, 0.04f, 0.10f, 0.20f, 0.00f, 0.80f, 0.70f, 0.0f, false, 0.7f },
-    { "Brass", SynthOsc::Saw, 0.60f, 0.50f, 6.0f, 0.30f, 0.00f, 0.30f, 0.15f, 2.5f, 0.6f,
-      0.05f, 0.30f, 0.70f, 0.25f, 0.08f, 0.35f, 0.30f, 0.30f,
-      5.00f, 0.03f, 0.00f, 0.00f, 0.15f, 0.40f, 0.50f, 0.0f, false, 0.7f },
-    { "Strings", SynthOsc::SuperSquare, 0.50f, 0.50f, 12.0f, 0.00f, 0.00f, 0.50f, 0.00f, 0.0f, 0.5f,
-      0.60f, 1.00f, 0.90f, 1.00f, 0.50f, 1.00f, 0.80f, 1.00f,
-      0.30f, 0.03f, 0.05f, 0.00f, 0.00f, 1.00f, 1.00f, 0.0f, false, 0.7f },
-    { "Bass", SynthOsc::Shape, 0.90f, 0.40f, 0.0f, 0.80f, 0.00f, 0.22f, 0.25f, 2.2f, 0.3f,
-      0.005f, 0.25f, 0.50f, 0.15f, 0.00f, 0.20f, 0.10f, 0.15f,
-      0.00f, 0.00f, 0.00f, 0.00f, 0.20f, 0.00f, 0.50f, 0.05f, true, 0.8f },
-    { "Lead", SynthOsc::Shape, 0.55f, 0.50f, 5.0f, 0.15f, 0.00f, 0.55f, 0.30f, 1.2f, 0.5f,
-      0.01f, 0.20f, 0.80f, 0.25f, 0.00f, 0.30f, 0.60f, 0.25f,
-      5.50f, 0.15f, 0.00f, 0.00f, 0.10f, 0.30f, 0.50f, 0.08f, true, 0.7f },
-    { "Pluck", SynthOsc::Saw, 0.50f, 0.50f, 8.0f, 0.00f, 0.00f, 0.35f, 0.20f, 3.0f, 0.5f,
-      0.002f, 0.35f, 0.00f, 0.30f, 0.00f, 0.30f, 0.00f, 0.30f,
-      0.00f, 0.00f, 0.00f, 0.00f, 0.00f, 0.50f, 0.50f, 0.0f, false, 0.7f },
-    { "Organ", SynthOsc::Shape, 1.00f, 0.50f, 0.0f, 0.60f, 0.00f, 0.70f, 0.00f, 0.0f, 0.5f,
-      0.01f, 0.10f, 1.00f, 0.12f, 0.00f, 0.10f, 1.00f, 0.12f,
-      6.00f, 0.02f, 0.00f, 0.00f, 0.00f, 0.60f, 0.50f, 0.0f, false, 0.6f },
-    { "Dream Keys", SynthOsc::Shape, 0.15f, 0.50f, 9.0f, 0.10f, 0.00f, 0.40f, 0.10f, 1.6f, 0.5f,
-      0.01f, 0.90f, 0.35f, 0.80f, 0.02f, 0.60f, 0.20f, 0.60f,
-      0.50f, 0.03f, 0.05f, 0.00f, 0.00f, 0.70f, 0.60f, 0.0f, false, 0.7f },
-};
-
 inline float noteToNorm(float note, float rate)
 {
     float f = 440.0f * exp2f_((note - 69.0f) / 12.0f) / rate;
@@ -55,10 +25,6 @@ inline float noteToNorm(float note, float rate)
 }
 } // namespace
 
-const SynthPatch& synthPreset(int index)
-{
-    return kPresets[index < 0 ? 0 : (index >= kSynthPresets ? kSynthPresets - 1 : index)];
-}
 
 void Synth::init(float sampleRate)
 {
@@ -81,7 +47,6 @@ void Synth::init(float sampleRate)
 void Synth::setPatch(const SynthPatch& patch)
 {
     p = patch;
-    for (int i = 0; i < kSynthPresets; i++) if (&kPresets[i] == &patch) preset = i;
 }
 
 bool Synth::active() const

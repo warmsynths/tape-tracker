@@ -11,14 +11,12 @@ void AudioPlaySynth::begin(float sampleRate)
     AudioInterrupts();
 }
 
-void AudioPlaySynth::setPreset(int index)
+void AudioPlaySynth::setPatch(const ft::SynthPatch& patch)
 {
     AudioNoInterrupts();
-    synth.setPreset(index);
+    synth.setPatch(patch);
     AudioInterrupts();
 }
-
-const char* AudioPlaySynth::presetName(int index) const { return ft::synthPreset(index).name; }
 
 void AudioPlaySynth::noteOn(int note, int velocity)
 {

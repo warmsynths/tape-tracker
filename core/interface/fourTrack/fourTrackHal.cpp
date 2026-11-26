@@ -182,9 +182,7 @@ void FourTrackHal::padLight(int pad, int level)
 }
 
 // The chord pads: the synth, or the pad sample pitched (the sample's own pitch is note 60)
-int FourTrackHal::synthPresetCount() { return engine.getSynthPlayer()->presetCount(); }
-const char* FourTrackHal::synthPresetName(int index) { return engine.getSynthPlayer()->presetName(index); }
-void FourTrackHal::synthSetPreset(int index) { engine.getSynthPlayer()->setPreset(index); }
+void FourTrackHal::synthSetPatch(const ft::SynthPatch& patch) { engine.getSynthPlayer()->setPatch(patch); }
 void FourTrackHal::synthNote(int note, int velocity, bool on)
 {
     if (on) engine.getSynthPlayer()->noteOn(note, velocity);
