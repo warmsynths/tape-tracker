@@ -16,6 +16,8 @@ echo "== ft_dsp"
 $CXX -std=c++17 $INC tests/host/ft_dsp_test.cpp core/ft/dsp/Dsp.cpp -o "$OUT/ft_dsp" && "$OUT/ft_dsp"
 echo "== ft_app"
 $CXX -std=c++17 $INC tests/host/ft_app_test.cpp core/ft/*.cpp core/ft/dsp/*.cpp core/source/FourTrackSession.cpp -o "$OUT/ft_app" && "$OUT/ft_app"
+echo "== build id"
+python3 tests/check_build_id.py
 echo "== button bindings"
 python3 tests/check_button_bindings.py
 echo "all host tests passed"

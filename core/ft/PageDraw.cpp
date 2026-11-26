@@ -3,6 +3,7 @@
 #include "App.h"
 #include "Pen.h"
 #include "loop_fill.h"
+#include "BuildId.h"
 
 namespace ft
 {
@@ -501,6 +502,7 @@ void App::drawSettings(Pen& p)
         "The input gain for that source.",
         "Monitoring on or off when a source is chosen." };
     p.text(14, 412, help[sRow], F14, pal.text);
+    p.textRight(786, 44, FT_BUILD_ID, F12, pal.dim); // the firmware and the emulator are built from the same sources and carry the same id
     const char* l[8] = { "", "", "", "", "", "", "", "Back" };
     p.buttons(l);
 }

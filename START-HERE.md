@@ -14,3 +14,6 @@ This fork is the home of a four-track recorder firmware for the Original Polyend
 - `docs/design/`: the hard screen limits and the first prompt for Claude Design.
 - `core/ft/`: the shared Four-Track application and screen drawing, run by both the firmware and the emulator.
 - `prototype/emulator/`: the web emulator.
+
+
+Building: always use `tools/build-all.sh <number>`. It builds the web emulator and the firmware from the same sources with the same build id, so the emulator is always running the firmware's code.
