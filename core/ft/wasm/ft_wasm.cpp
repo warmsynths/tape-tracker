@@ -234,16 +234,16 @@ class EmuHal : public Hal
     }
     int browse(const char* dir, BrowseEntry* out, int max) override
     {
-        static uint8_t rec[48 * 40];
+        static uint8_t rec[48 * 60]; // per entry: folder flag, name (48 bytes at 4), size at 52, WAV count at 56
         const int n = host_file_browse(dir, rec, max < 48 ? max : 48);
         for (int i = 0; i < n; i++)
         {
-            const uint8_t* r = rec + i * 40;
+            const uint8_t* r = rec + i * 60;
             out[i].dir = r[0] != 0;
-            for (int c = 0; c < 28; c++) out[i].name[c] = (char)r[4 + c];
-            out[i].name[27] = 0;
-            out[i].bytes = r[32] | (r[33] << 8) | (r[34] << 16) | ((uint32_t)r[35] << 24);
-            out[i].count = r[36] | (r[37] << 8) | (r[38] << 16) | ((uint32_t)r[39] << 24);
+            for (int c = 0; c < 48; c++) out[i].name[c] = (char)r[4 + c];
+            out[i].name[47] = 0;
+            out[i].bytes = r[52] | (r[53] << 8) | (r[54] << 16) | ((uint32_t)r[55] << 24);
+            out[i].count = r[56] | (r[57] << 8) | (r[58] << 16) | ((uint32_t)r[59] << 24);
         }
         return n;
     }
@@ -339,10 +339,10 @@ class EmuHal : public Hal
         for (; i < size - 1 && v[i]; i++) out[i] = v[i];
         out[i] = 0;
     }
-    int firmwareFiles(char (*names)[28], int max) override
+    int firmwareFiles(char (*names)[48], int max) override
     {
-        const char* f = "tracker-ft6.ptf";
-        if (max < 1 || host_file_size("/Firmware/tracker-ft6.ptf") == 0) return 0;
+        const char* f = "PolyendTracker_FT41_full.ptf";
+        if (max < 1 || host_file_size("/Firmware/PolyendTracker_FT41_full.ptf") == 0) return 0;
         int i = 0;
         for (; f[i]; i++) names[0][i] = f[i];
         names[0][i] = 0;

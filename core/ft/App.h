@@ -223,7 +223,7 @@ class App
     void serviceFirmware();
     int dvGroup = 0, dvRow = 0;
     bool dvRows = true;           // focus is on the rows (false: on the list of groups)
-    char fwNames[4][28] = {};
+    char fwNames[4][48] = {};
     int fwCount = 0, fwSel = 0;
     bool fwUpdating = false, fwInstalled = false, fwSavedFirst = false;
     uint32_t fwStartMs = 0;

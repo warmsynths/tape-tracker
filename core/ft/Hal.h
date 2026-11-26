@@ -45,7 +45,7 @@ enum class Dev : uint8_t
 // One line of an SD card folder listing (Load samples)
 struct BrowseEntry
 {
-    char name[28];
+    char name[48];
     bool dir;
     uint32_t bytes;   // file size (files)
     uint32_t count;   // WAV files inside (folders)
@@ -137,7 +137,7 @@ class Hal
     virtual int deviceValue(Dev d) = 0;
     virtual void setDeviceValue(Dev d, int value) = 0;
     virtual void firmwareVersion(char* out, int size) = 0;
-    virtual int firmwareFiles(char (*names)[28], int max) = 0;   // update files on the card
+    virtual int firmwareFiles(char (*names)[48], int max) = 0;   // update files on the card
     virtual bool firmwareInstall(const char* name) = 0;           // hands over to the updater; on a Tracker it does not come back
     virtual int firmwareProgress() = 0;                           // 0 to 100, or -1 when the updater shows its own progress
 

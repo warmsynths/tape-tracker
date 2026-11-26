@@ -77,7 +77,7 @@ class FourTrackHal : public ft::Hal
     int deviceValue(ft::Dev d) override;
     void setDeviceValue(ft::Dev d, int value) override;
     void firmwareVersion(char* out, int size) override;
-    int firmwareFiles(char (*names)[28], int max) override;
+    int firmwareFiles(char (*names)[48], int max) override;
     bool firmwareInstall(const char* name) override;
     int firmwareProgress() override { return -1; }
 

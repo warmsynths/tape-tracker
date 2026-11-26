@@ -407,9 +407,9 @@ void App::drawLoad(Pen& p)
             const bool sel = i == ldSel;
             if (sel) { p.rect(0, y - 8, 480, 32, pal.sel); p.rect(0, y - 8, 4, 32, pal.text); }
             // names that are too long lose their end
-            char nm[32];
+            char nm[52];
             int len = 0;
-            for (; len < 27 && ldEntry[i].name[len] != 0; len++) nm[len] = ldEntry[i].name[len];
+            for (; len < 47 && ldEntry[i].name[len] != 0; len++) nm[len] = ldEntry[i].name[len];
             nm[len] = 0;
             while (len > 3 && p.width(nm, sel ? F14B : F14) > 236) { nm[--len] = 0; nm[len - 1] = '.'; }
             p.text(44, y, nm, sel ? F14B : F14, pal.text);
@@ -440,9 +440,9 @@ void App::drawLoad(Pen& p)
     else if (ldCount == 0) p.textMid(494, 292, 116, "Nothing to preview", F14, pal.dim);
     else
     {
-        char nm[32];
+        char nm[52];
         int len = 0;
-        for (; len < 27 && ldEntry[ldSel].name[len] != 0; len++) nm[len] = ldEntry[ldSel].name[len];
+        for (; len < 47 && ldEntry[ldSel].name[len] != 0; len++) nm[len] = ldEntry[ldSel].name[len];
         nm[len] = 0;
         while (len > 3 && p.width(nm, F14B) > 290) { nm[--len] = 0; nm[len - 1] = '.'; }
         p.text(494, 57, nm, F14B, pal.text);

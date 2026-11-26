@@ -311,7 +311,7 @@
       ['Drums/Acoustic/Kick wood.wav', [kick(0.4, 60, 70)]], ['Drums/Acoustic/Snare rim.wav', [snare(0.28)]], ['Drums/Acoustic/Tom hi.wav', [tom(0.5, 180)]],
       ['Keys/Sine A3.wav', [tone(1.5, 220)]], ['Keys/Sine C4 stereo.wav', [tone(1.2, 261.63), tone(1.2, 262.5)]],
     ];
-    return files.map(([p, ch]) => ({ path: '/Samples/' + p, data: wavBytes(ch, R) })).concat([{ path: '/Firmware/tracker-ft6.ptf', data: new Uint8Array(1024) }]);
+    return files.map(([p, ch]) => ({ path: '/Samples/' + p, data: wavBytes(ch, R) })).concat([{ path: '/Firmware/PolyendTracker_FT41_full.ptf', data: new Uint8Array(1024) }]);
   }
   const addToCard = async (e) => {
     await start();

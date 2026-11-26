@@ -56,8 +56,8 @@ class FourTrackProcessor extends AudioWorkletProcessor {
       },
       file_size(pathPtr) { const f = self.files.get(self.str(pathPtr)); return f ? f.len : 0; },
       file_remove(pathPtr) { const p = self.str(pathPtr); self.changed.add(p); return self.files.delete(p) ? 1 : 0; },
-      // The card's samples: folders first, then .wav files. Each entry is 40 bytes: a folder flag,
-      // the name (28 bytes at 4), the size at 32 and the number of WAV files inside at 36.
+      // The card's samples: folders first, then .wav files. Each entry is 60 bytes: a folder flag,
+      // the name (48 bytes at 4), the size at 52 and the number of WAV files inside at 56.
       // A band of a waveform bitmap: sent to the page, which keeps the pictures
       mask_write(slot, offset, ptr, len) {
         const data = new Uint8Array(self.x.memory.buffer, ptr, len).slice();
@@ -77,14 +77,14 @@ class FourTrackProcessor extends AudioWorkletProcessor {
         }
         const by = (a, b) => a[0].toLowerCase().localeCompare(b[0].toLowerCase());
         const list = [...[...folders].sort(by).map(([n, c]) => [n, 0, c, 1]), ...files.sort(by).map(([n, l]) => [n, l, 0, 0])].slice(0, max);
-        const out = new Uint8Array(self.x.memory.buffer, outPtr, max * 40);
+        const out = new Uint8Array(self.x.memory.buffer, outPtr, max * 60);
         out.fill(0);
-        const dv = new DataView(self.x.memory.buffer, outPtr, max * 40);
+        const dv = new DataView(self.x.memory.buffer, outPtr, max * 60);
         list.forEach(([n, size, count, dir], i) => {
-          out[i * 40] = dir;
-          out.set(ascii(n).slice(0, 27), i * 40 + 4);
-          dv.setUint32(i * 40 + 32, size, true);
-          dv.setUint32(i * 40 + 36, count, true);
+          out[i * 60] = dir;
+          out.set(ascii(n).slice(0, 47), i * 60 + 4);
+          dv.setUint32(i * 60 + 52, size, true);
+          dv.setUint32(i * 60 + 56, count, true);
         });
         return list.length;
       },

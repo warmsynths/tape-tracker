@@ -161,7 +161,7 @@ struct FakeHal : Hal
     int deviceValue(Dev d) override { return devVal[(int)d]; }
     void setDeviceValue(Dev d, int v) override { devVal[(int)d] = v; }
     void firmwareVersion(char* out, int size) override { std::snprintf(out, size, "1.0.0 test"); }
-    int firmwareFiles(char (*names)[28], int max) override { if (max < 1 || !files.count("/Firmware/tracker-ft6.ptf")) return 0; std::snprintf(names[0], 28, "tracker-ft6.ptf"); return 1; }
+    int firmwareFiles(char (*names)[48], int max) override { if (max < 1 || !files.count("/Firmware/PolyendTracker_FT41_full.ptf")) return 0; std::snprintf(names[0], 48, "PolyendTracker_FT41_full.ptf"); return 1; }
     bool firmwareInstall(const char*) override { fwInstalled = true; fwAt = nowMs; return true; }
     int firmwareProgress() override { return fwInstalled ? (nowMs - fwAt >= 3000 ? 100 : 50) : 0; }
     void padOn(int, bool) override { padsOn++; }
@@ -474,7 +474,7 @@ static void pagesAndProjects()
     {   // Device settings: groups, values, firmware update
         FakeHal hal;
         std::vector<uint8_t> f(100, 1);
-        hal.files["/Firmware/tracker-ft6.ptf"] = f;
+        hal.files["/Firmware/PolyendTracker_FT41_full.ptf"] = f;
         App app(hal, palette());
         app.setMeasure(&gfx);
         app.enter();

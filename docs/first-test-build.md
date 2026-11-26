@@ -238,3 +238,6 @@ Waveform bitmaps (plan D) behind a switch: Config, Display, Waveforms: Bitmaps o
 
 ## FT40 (not sent)
 The Part Editor and the Pad sample page draw their big waveform as a bitmap too (Config, Display, Waveforms: Bitmaps, the default). One shared picture, 760 x 200 at one pixel per column (it was 150 columns), 19,000 bytes in the display chip's graphics memory at 308,608 to 327,608 (the picture viewer starts at 350,000). Only one of those pages is open at a time, so they share it. The editor redraws it when the zoom, trims or offset change; the pad page only when the sample changes. Each page's waveform goes from about 1.2 KB of display commands to about 50 bytes. Load samples keeps its 58 column preview (a finer one would need many slow reads from the card).
+
+## FT41 (not sent)
+Fix: Device settings, Firmware found no update files. The stock list call skips names that fill its length limit, and `PolyendTracker_FT38_full.ptf` is 28 characters, exactly the limit I passed. Now 48. The list also follows the stock updater's rule: the name starts with `PolyendTrac`, ends `.ptf` and is at least 15 characters long. The same limit hid sample files with long names in Load samples; names up to 47 characters now list.

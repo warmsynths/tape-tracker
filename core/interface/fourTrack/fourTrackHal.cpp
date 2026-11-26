@@ -341,7 +341,7 @@ int FourTrackHal::fileList(const char* dir, char (*names)[24], int maxNames)
     static char buffer[16 * 28];
     char* list[16];
     int count = maxNames < 16 ? maxNames : 16;
-    fs->listDirContents(full, FileSystem::kFiles, [](const char*) { return true; }, buffer, sizeof buffer, 28, count, list);
+    fs->listDirContents(full, FileSystem::kFiles, [](const char*) { return true; }, buffer, sizeof buffer, 48, count, list);
     int n = 0;
     for (int i = 0; i < count && n < maxNames; i++)
     {
@@ -465,12 +465,12 @@ int FourTrackHal::browse(const char* dir, ft::BrowseEntry* out, int max)
     char full[96];
     fullPath(dir, full, sizeof full);
     if (full[0] == 0) snprintf(full, sizeof full, "/");
-    static char buffer[48 * 28];
+    static char buffer[48 * 48];
     char* list[48];
     int n = 0;
     // folders first
     int count = max < 48 ? max : 48;
-    fs->listDirContents(full, FileSystem::kFolders, [](const char* name) { return name[0] != '.'; }, buffer, sizeof buffer, 28, count, list);
+    fs->listDirContents(full, FileSystem::kFolders, [](const char* name) { return name[0] != '.'; }, buffer, sizeof buffer, 48, count, list);
     for (int i = 0; i < count && n < max; i++)
     {
         if (list[i] == nullptr || list[i][0] == 0) continue;
@@ -484,7 +484,7 @@ int FourTrackHal::browse(const char* dir, ft::BrowseEntry* out, int max)
     count = (max - n) < 48 ? (max - n) : 48;
     if (count > 0)
     {
-        fs->listDirContents(full, FileSystem::kFiles, isWavName, buffer, sizeof buffer, 28, count, list);
+        fs->listDirContents(full, FileSystem::kFiles, isWavName, buffer, sizeof buffer, 48, count, list);
         for (int i = 0; i < count && n < max; i++)
         {
             if (list[i] == nullptr || list[i][0] == 0) continue;
@@ -503,7 +503,7 @@ int FourTrackHal::browse(const char* dir, ft::BrowseEntry* out, int max)
         char sub[128];
         snprintf(sub, sizeof sub, "%s/%s", full, out[i].name);
         int c = 48;
-        fs->listDirContents(sub, FileSystem::kFiles, isWavName, buffer, sizeof buffer, 28, c, list);
+        fs->listDirContents(sub, FileSystem::kFiles, isWavName, buffer, sizeof buffer, 48, c, list);
         out[i].count = c > 0 ? (uint32_t)c : 0;
     }
     // sorted by name inside each group
@@ -594,20 +594,20 @@ void FourTrackHal::setDeviceValue(ft::Dev d, int v)
 
 void FourTrackHal::firmwareVersion(char* out, int size) { snprintf(out, size, "%s", interfaceGlobals.currentFirmwareVersion); }
 
-int FourTrackHal::firmwareFiles(char (*names)[28], int max)
+int FourTrackHal::firmwareFiles(char (*names)[48], int max)
 {
     FileSystem* fs = platform->getFileSystem();
     closeFiles();
     if (!fs->isSdCardInserted()) return 0;
-    static char buffer[8 * 28];
+    static char buffer[8 * 48];
     char* list[8];
     int count = max < 8 ? max : 8;
-    fs->listDirContents("Firmware", FileSystem::kFiles, [](const char* n) { const size_t l = strlen(n); return l > 4 && n[0] != '.' && strcasecmp(n + l - 4, ".ptf") == 0; }, buffer, sizeof buffer, 28, count, list);
+    fs->listDirContents("Firmware", FileSystem::kFiles, [](const char* n) { const size_t l = strlen(n); return l >= 15 && strncmp(n, "PolyendTrac", 11) == 0 && strcasecmp(n + l - 4, ".ptf") == 0; }, buffer, sizeof buffer, 48, count, list);
     int n = 0;
     for (int i = 0; i < count && n < max; i++)
     {
         if (list[i] == nullptr || list[i][0] == 0) continue;
-        snprintf(names[n++], 28, "%s", list[i]);
+        snprintf(names[n++], 48, "%s", list[i]);
     }
     return n;
 }
