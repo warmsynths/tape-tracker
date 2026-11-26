@@ -252,3 +252,8 @@ The take being recorded is a bitmap too (it was 120 red columns). It grows at on
 - **MIDI:** incoming notes (on the channel set in Device settings) now play the pads: C2 (note 36) is pad 1, up to 48 pads. MIDI CC input does nothing for now. This is new and untested.
 - **Not touched:** the bootloader area and the flash start address (the linker script and platform files are unchanged).
 - **Test first:** it boots to Four-Track; every button still does its job; project save and load; Load samples and Resample; Device settings and the firmware update (the update still goes through the stock bootloader, which is untouched, so a bad build can be fixed by installing another file).
+
+## FT44 (not sent): quieter defaults
+- Every track starts at -6 dB (it was 0 dB), so four Parts have headroom; the mixer's Reset (B3) goes back to -6 dB. Saved projects keep their own levels.
+- The default output volume is 60 (the stock default was 81). A config still on 81 is set to 60 once when the Four-Track screen starts; Device settings, Volume changes it and the change is kept.
+- Shift + Left or Right on the home screen changes the output volume by 2; the hint line shows the value.

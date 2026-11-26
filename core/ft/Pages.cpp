@@ -250,7 +250,7 @@ void App::keyScreen(int k)
             else if (k == kDown) mxField = clampi(mxField + 1, 0, 2);
             else if (k == kB1) c.mute = !c.mute;
             else if (k == kB2) c.solo = !c.solo;
-            else if (k == kB3) { c.levelDb10 = 0; c.pan = 0; c.tone = 0; }
+            else if (k == kB3) { c.levelDb10 = kDefaultLevelDb10; c.pan = 0; c.tone = 0; }
             else if (k == kB8 || k == kParams) { back(); return; }
             if (k >= kB1 && k <= kB3) unsaved = true;
             break;

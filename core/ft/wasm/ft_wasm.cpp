@@ -327,7 +327,7 @@ class EmuHal : public Hal
     void maskWrite(int slot, uint32_t offset, const uint8_t* data, uint32_t len) override { host_mask_write(slot, offset, data, len); }
 
     // device settings and the firmware update (a pretend update: it counts up and then restarts)
-    int devVal[7] = { 3, 0, 2, 3, 0, 80, 2 };
+    int devVal[7] = { 3, 0, 2, 3, 0, 60, 2 };
     uint32_t fwStartMs = 0;
     bool fwRunning = false;
     int deviceValue(Dev d) override { return devVal[(int)d]; }

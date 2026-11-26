@@ -187,6 +187,17 @@ void App::key(int k)
             case kB8: muteTrack(3); return;
             case kUp: undoTake(); return;
             case kDown: open(Screen::Settings); return;
+            case kLeft:
+            case kRight:
+            {
+                // Shift + Left or Right: the output volume, from any home screen state
+                int v = hal.deviceValue(Dev::Volume) + (k == kRight ? 2 : -2);
+                v = v < 0 ? 0 : (v > 100 ? 100 : v);
+                hal.setDeviceValue(Dev::Volume, v);
+                fmt(noteHint, sizeof noteHint, "Volume %d. Shift + Left or Right changes it.", v);
+                refresh(true);
+                return;
+            }
             default: break;
         }
     }

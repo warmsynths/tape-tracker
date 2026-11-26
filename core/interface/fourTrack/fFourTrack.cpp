@@ -123,6 +123,13 @@ void cFourTrack::start(uint32_t options)
 
     showScreen();
     setDefaultScreenFunct();
+    // The stock default output volume (81) was loud for four Parts: a config still on it starts lower
+    if (mtConfig.audioCodecConfig.volume == 81)
+    {
+        mtConfig.audioCodecConfig.volume = MASTER_VOLUME_DEFAULT;
+        engine.setHeadphonesVolume(mtConfig.audioCodecConfig.volume);
+        saveConfigAsap();
+    }
     midiSetNoteHook(ftMidiNote);
     application().enter();
 }

@@ -359,7 +359,7 @@ static void pagesAndProjects()
         app.key(kParams);
         CHECK(app.screen() == Screen::Mixer, "Params opens the mixer");
         app.jog(1);
-        CHECK(hal.trackBank.cfg[0].levelDb10 == 5, "the jog changes the level by half a dB");
+        CHECK(hal.trackBank.cfg[0].levelDb10 == kDefaultLevelDb10 + 5, "the jog changes the level by half a dB");
         app.key(kDown); app.jog(1);
         CHECK(hal.trackBank.cfg[0].pan == 5, "Down moves to pan");
         app.key(kDown); app.setShift(true); app.jog(-1); app.setShift(false);
@@ -367,7 +367,7 @@ static void pagesAndProjects()
         app.key(kB2);
         CHECK(hal.trackBank.cfg[0].solo, "B2 solos the track");
         app.key(kB3);
-        CHECK(hal.trackBank.cfg[0].levelDb10 == 0 && hal.trackBank.cfg[0].pan == 0 && !hal.trackBank.cfg[0].mute, "Reset puts level, pan and tone back");
+        CHECK(hal.trackBank.cfg[0].levelDb10 == kDefaultLevelDb10 && hal.trackBank.cfg[0].pan == 0 && !hal.trackBank.cfg[0].mute, "Reset puts level, pan and tone back");
         CHECK(!app.pageOverflowed() && app.stagesOf(4) <= 5, "the mixer fits the drawing budget");
         for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
         app.key(kB8);
@@ -649,6 +649,19 @@ static void pagesAndProjects()
         for (uint8_t b : hal.masks[1]) for (int k = 0; k < 8; k++) bits2 += (b >> k) & 1;
         CHECK(bits2 > bits, "and it grows as the take goes on");
         for (int l = 0; l < 2; l++) for (int st = 0; st < app.stagesOf(l); st++) app.draw(l, st, gfx);
+    }
+    {   // tracks start at -6 dB, and Shift + Left or Right sets the output volume from home
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        CHECK(hal.trackBank.cfg[0].levelDb10 == -60, "tracks start at -6 dB");
+        const int before = hal.devVal[(int)Dev::Volume];
+        app.setShift(true); app.key(kLeft); app.setShift(false);
+        CHECK(hal.devVal[(int)Dev::Volume] == before - 2, "Shift + Left lowers the volume");
+        app.setShift(true); app.key(kRight); app.key(kRight); app.setShift(false);
+        CHECK(hal.devVal[(int)Dev::Volume] == before + 2, "Shift + Right raises it");
+        CHECK(std::strncmp(app.view().hint, "Volume", 6) == 0, "the hint line says what it is now");
     }
     {   // the Pattern button is home
         FakeHal hal;

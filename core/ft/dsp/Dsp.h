@@ -56,6 +56,8 @@ struct FxSlot
     uint8_t chance = 100; // percent of slices it happens on while latched on; 100 is always. Held: always
 };
 
+constexpr int16_t kDefaultLevelDb10 = -60;
+
 struct TrackCfg
 {
     bool mute = false;
@@ -66,7 +68,7 @@ struct TrackCfg
     float gain = 1.0f;              // normalize
     FxSlot slot[4];
     // The track mixer (see C1 in the design)
-    int16_t levelDb10 = 0;          // level in tenths of a dB, -600 (off) to +60
+    int16_t levelDb10 = -60;        // level in tenths of a dB, -600 (off) to +60; tracks start at -6 dB so four Parts have headroom
     int8_t pan = 0;                 // -100 left to +100 right
     int8_t tone = 0;                // -100 low-pass (darker) to +100 high-pass (thinner), 0 flat
     bool solo = false;

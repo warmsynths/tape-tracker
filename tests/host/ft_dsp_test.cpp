@@ -44,7 +44,7 @@ int main()
     }
     {   // offsets: repeat wraps, play once cuts
         auto d = ramp(1000);
-        TrackBank b;
+        TrackBank b; for (auto& c : b.cfg) c.levelDb10 = 0; // these tests measure the effects at unity level
         b.data[0] = d.data(); b.loop = 1000;
         b.cfg[0].offset = 100;
         float L[8], R[8];
@@ -64,7 +64,7 @@ int main()
     }
     {   // mute and trim
         auto d = ramp(1000);
-        TrackBank b;
+        TrackBank b; for (auto& c : b.cfg) c.levelDb10 = 0; // these tests measure the effects at unity level
         b.data[0] = d.data(); b.loop = 1000;
         float L[4], R[4];
         b.cfg[0].mute = true; b.render(10, 4, L, R);
@@ -78,7 +78,7 @@ int main()
     }
     {   // glitch effects work in slices
         auto d = ramp(1600);
-        TrackBank b;
+        TrackBank b; for (auto& c : b.cfg) c.levelDb10 = 0; // these tests measure the effects at unity level
         b.data[0] = d.data(); b.loop = 1600; b.slice = 400;
         float L[1], R[1];
         b.cfg[0].slot[0].type = FxType::JumpBack; b.cfg[0].slot[0].on = true;
@@ -99,7 +99,7 @@ int main()
     }
     {   // pitch: an octave up reads twice as fast within a slice
         auto d = ramp(1600);
-        TrackBank b;
+        TrackBank b; for (auto& c : b.cfg) c.levelDb10 = 0; // these tests measure the effects at unity level
         b.data[0] = d.data(); b.loop = 1600; b.slice = 400;
         b.cfg[0].slot[0].type = FxType::Pitch; b.cfg[0].slot[0].on = true; b.cfg[0].slot[0].semis = 12;
         float L[1], R[1];
@@ -132,7 +132,7 @@ int main()
         CHECK(peak > 0.3f && peak < 0.7f, "wow and flutter keeps the signal at about the same level");
     }
     {   // random jumps and pitch steps: stay in time, differ from pass to pass, change the sound
-        TrackBank b;
+        TrackBank b; for (auto& c : b.cfg) c.levelDb10 = 0; // these tests measure the effects at unity level
         const int L = 44100 * 2;
         std::vector<int16_t> d(L);
         for (int i = 0; i < L; i++) d[i] = (int16_t)(std::sin(i * 0.03f) * 8000 + (i / 4000 % 2) * 6000);
@@ -146,7 +146,7 @@ int main()
         int diffPass = 0;
         for (int i = 0; i < L; i++) if (std::fabs(l1[i] - l2[i]) > 0.001f) diffPass++;
         CHECK(diffPass > L / 10, "random jumps are different on the next pass");
-        TrackBank plain;
+        TrackBank plain; for (auto& c : plain.cfg) c.levelDb10 = 0;
         plain.data[0] = d.data(); plain.loop = L; plain.slice = 11025;
         std::vector<float> lp(L), rp(L);
         for (int p = 0; p < L; p += 1000) plain.render(p, 1000 < L - p ? 1000 : L - p, lp.data() + p, rp.data() + p);
@@ -181,7 +181,7 @@ int main()
         CHECK(some > L / 20 && some < L * 9 / 10, "a chance of 50 percent triggers on some slices only");
     }
     {   // the mixer: level, pan, tone and solo
-        TrackBank b;
+        TrackBank b; for (auto& c : b.cfg) c.levelDb10 = 0; // these tests measure the effects at unity level
         const int L = 4410;
         std::vector<int16_t> d(L);
         for (int i = 0; i < L; i++) d[i] = (int16_t)(std::sin(i * 0.2f) * 10000);

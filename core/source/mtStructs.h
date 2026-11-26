@@ -269,7 +269,7 @@ const uint8_t MAX_NOTE_OFFSET = 13;
 
 const uint8_t MASTER_VOLUME_MIN = 0;
 const uint8_t MASTER_VOLUME_MAX = 100;
-const uint8_t MASTER_VOLUME_DEFAULT = 81;
+const uint8_t MASTER_VOLUME_DEFAULT = 60; // the stock default was 81; the Four-Track screen lowers a saved 81 once at start
 constexpr float MIN_ANALOG_VOLUME_IN_DB = -51.5f;
 constexpr float MAX_ANALOG_VOLUME_IN_DB = 12.0f;
 
