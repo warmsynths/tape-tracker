@@ -1028,7 +1028,7 @@ void App::drawSettings(Pen& p)
     }
     static const char* const help[13] = {
         "Repeat wraps a shifted Part round the Loop; Play once cuts what passes the end.",
-        "A click plays with the loop (the Song button switches it too).",
+        "A click plays with the loop (Shift + Play switches it too).",
         "How many clicks play before the first take. Free tempo counts at 120 BPM.",
         "The first take waits: Rec arms it and recording begins when the input is loud enough.",
         "The steps for moving a Part and cutting in the Part Editor.",
