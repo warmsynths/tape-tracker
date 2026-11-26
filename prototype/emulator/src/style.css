@@ -56,3 +56,4 @@ label { display:block; margin:4px 0; } select, input[type=number] { background:#
 #stockCard small { color:#91876f; }
 #stockTag { position:absolute; top:6px; right:6px; padding:3px 8px; border-radius:3px; background:rgba(0,0,0,.8); color:#d2a94f; font:10px var(--ui); }
 .hw-btn[data-stock] { color:#a89f88; cursor:pointer; }
+#drawer details { margin:4px 0; } #drawer summary { cursor:pointer; color:var(--text); font-size:12px; padding:3px 0; }
