@@ -88,7 +88,7 @@ const uint32_t EDIT_BUFF_OFFSET = SAMPLE_MEMORY_SIZE - (2 * SAMPLE_CHANNELS * ED
 // Four-Track recorder: the four track regions sit at the very top of the sample memory. Loaded
 // samples must stay below them, so the project's memory limit is lowered by this amount.
 constexpr uint32_t kFourTrackSampleRate = 44118;
-constexpr uint32_t kFourTrackRegionFrames = kFourTrackSampleRate * 26;
+constexpr uint32_t kFourTrackRegionFrames = kFourTrackSampleRate * 18; // 16 s takes and 2 s to spare
 constexpr uint32_t kFourTrackRegionBytes = kFourTrackRegionFrames * 2; // 16-bit mono
 constexpr uint32_t kFourTrackTracks = 4;
 // The Four-Track application itself (screens, project jobs) also lives in the sample memory,

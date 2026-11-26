@@ -15,6 +15,21 @@ enum class Source : uint8_t
     Pads
 };
 
+// How one pad sample plays (the fields of a stock instrument that a pad needs)
+struct PadSample
+{
+    char name[24];
+    uint32_t frames;     // length in sample frames
+    uint32_t bytes;      // size in memory
+    int8_t tuneSt;       // semitones, -24 to +24
+    int8_t tuneCt;       // cents, -100 to +100
+    uint8_t volume;      // 0 to 100
+    int8_t pan;          // -100 (left) to +100 (right)
+    bool loop;           // false: one-shot
+    uint16_t start;      // 0 to 65535 along the sample
+    uint16_t end;
+};
+
 // Everything the application needs from the machine. The Tracker firmware implements it with the
 // audio engine and the recorder; the web emulator with the browser's audio.
 class Hal
@@ -78,6 +93,12 @@ class Hal
     virtual int currentSample() = 0;                     // the sample Keys mode plays, -1 if none
     virtual void setCurrentSample(int slot) = 0;
     virtual void sampleMemory(uint32_t& usedBytes, uint32_t& totalBytes) = 0;
+
+    // One pad sample's settings, its picture, and playing it for a moment
+    virtual bool padSample(int slot, PadSample& out) = 0;      // false if the slot is empty
+    virtual void setPadSample(int slot, const PadSample& in) = 0;
+    virtual int padSampleWave(int slot, uint8_t* out, int columns) = 0; // peaks 0..255, returns columns (0 if empty)
+    virtual void padAudition(int slot, bool on) = 0;
 
     // Pads
     virtual void padOn(int pad, bool keysMode) = 0;

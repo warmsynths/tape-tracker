@@ -200,3 +200,6 @@ FT31 (carve step 1, NOT yet sent or tested on a device): frees about 79 KB of fl
 To check on the device: the Four-Track screens look the same as FT30, text is the same font, and Config, Sample Load, Sample Rec and Sample Play still open and work.
 
 Emulator: the five stock-screen buttons now show the real pictures (Params, Config, Sample Load, Sample Play, Sample Rec) supplied by the owner. The same pictures are in docs/design/stock/ for the design tool.
+
+## FT32 (not sent)
+Round 5 so far: 16 s tracks, track mixer on Params (level, pan, tone, mute, solo, reset), pad sample settings on Sample Play (tune, volume, pan, play mode, start, end, audition, Keys or Pad). Emulator only for now; firmware built but not sent.

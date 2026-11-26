@@ -10,6 +10,8 @@
 
 namespace ft
 {
+// The longest first take (and so the longest loop) in seconds. The memory behind each track is 2 s more.
+constexpr uint32_t kMaxTakeSeconds = 16;
 // Buttons and keys of the Tracker that the application reacts to. The eight buttons under the
 // screen are B1 to B8. Shift is held, not pressed: see App::setShift.
 enum Key
@@ -24,12 +26,14 @@ enum Key
     kFile,         // opens Project
     kSong,         // switches the click (metronome) on or off
     kPattern,      // back to the main screen from any page
+    kParams,       // the track mixer
+    kSamplePlay,   // settings of the pad sample
     kKeyCount
 };
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample
 };
 
 enum class Popup : uint8_t
@@ -151,6 +155,12 @@ class App
     void drawExport(class Pen& p);
     void drawPads(class Pen& p);
     void drawMemory(class Pen& p);
+    void drawMixer(class Pen& p);
+    void drawPadSample(class Pen& p);
+    int psField = 0;              // pad sample page: 0 tune, 1 volume, 2 pan, 3 play mode, 4 start, 5 end
+    bool psAuditioning = false;
+    void psChange(int delta);
+    int mxTrack = 0, mxField = 0; // mixer: the column and the control in focus (0 level, 1 pan, 2 tone)
     void drawPopup(class Pen& p);
     void showPopup(Popup kind, int arg = 0);
     void popupKey(int k);

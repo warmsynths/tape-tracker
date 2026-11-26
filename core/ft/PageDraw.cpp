@@ -68,6 +68,8 @@ void App::buildPage()
         case Screen::Export: drawExport(p); break;
         case Screen::Pads: drawPads(p); break;
         case Screen::Memory: drawMemory(p); break;
+        case Screen::Mixer: drawMixer(p); break;
+        case Screen::PadSample: drawPadSample(p); break;
         default: break;
     }
     if (popupKind != Popup::None)
@@ -270,6 +272,144 @@ void App::drawGlitch(Pen& p)
     uint8_t on = (uint8_t)(1u << (4 + gTrack));
     for (int s = 0; s < 4; s++) if (hal.bank().cfg[gTrack].held[s]) on |= (uint8_t)(1u << s);
     p.buttons(l, on);
+}
+
+//--------------------------------------------------------------------------------------------
+// C3 Pad sample settings (Sample Play button)
+void App::drawPadSample(Pen& p)
+{
+    heading(p, model, "Pad sample");
+    const int slot = hal.currentSample();
+    PadSample s;
+    const bool has = hal.padSample(slot, s);
+    char b[64];
+    if (!has)
+    {
+        p.text(116, 42, "No sample on this pad", F14, pal.dim);
+        p.text(14, 100, "Load a sample with Sample Load, or press another pad to look at its sample.", F14, pal.text);
+        const char* l[8] = { "", "Keys", "Pad", "", "", "", "", "Back" };
+        p.buttons(l, padsKeysMode ? 2 : 4);
+        return;
+    }
+    fmt(b, sizeof b, "Slot %d - %s", slot + 1, s.name);
+    const int ex = p.text(116, 42, b, F14, pal.text);
+    const uint32_t hund = (uint32_t)((uint64_t)s.frames * 100 / (hal.sampleRate() ? hal.sampleRate() : 1));
+    fmt(b, sizeof b, "%u.%02u s - %u KB", hund / 100, hund % 100, s.bytes / 1000);
+    p.text(ex + 12, 43, b, F12, pal.dim);
+    p.text(676, 43, "Pads", F12, pal.dim);
+    p.frame(708, 41, p.width(padsKeysMode ? "KEYS" : "PAD", F12) + 8, 18, pal.dim);
+    p.text(712, 43, padsKeysMode ? "KEYS" : "PAD", F12, pal.text);
+    // waveform with Start and End
+    p.rect(20, 64, 760, 200, pal.waveBg);
+    uint8_t h[150];
+    hal.padSampleWave(slot, h, 150);
+    for (int i = 0; i < 150; i++) h[i] = (uint8_t)(2 + h[i] * 170 / 255);
+    p.g.color(pal.wave);
+    p.g.bars(25, 164, 5, 4, h, 150);
+    const int xs = 20 + (int)((uint32_t)s.start * 760 / 65535), xe = 20 + (int)((uint32_t)s.end * 760 / 65535);
+    p.rect(20, 64, xs - 20, 200, pal.bg);
+    p.rect(xe, 64, 780 - xe, 200, pal.bg);
+    p.rect(xs, 64, 1, 200, pal.marker);
+    p.rect(xe, 64, 1, 200, pal.marker);
+    if (s.loop) p.rect(xs, 64, xe - xs, 3, pal.marker);
+    p.text(xs + 6, 247, "Start", F12, pal.dim);
+    p.textRight(xe - 6, 247, "End", F12, pal.dim);
+    p.text(14, 272, s.loop ? "Loop: plays Start to End and repeats while the pad is held." : "One-shot: plays Start to End once.", F14, pal.text);
+    p.textRight(786, 274, padsKeysMode ? "Keys: one sample across the 48 pads" : "Pad: each pad plays its own sample", F12, pal.dim);
+    // the six controls
+    const char* names[6] = { "Tune", "Volume", "Pan", "Play mode", "Start", "End" };
+    char v[6][24];
+    fmt(v[0], 24, "%s%d st", s.tuneSt < 0 ? "-" : "+", s.tuneSt < 0 ? -s.tuneSt : s.tuneSt);
+    { const int db10 = s.volume == 0 ? -600 : ampToDb((float)s.volume / 100.0f) * 10; const int a = db10 < 0 ? -db10 : db10; if (s.volume == 0) fmt(v[1], 24, "-inf dB"); else fmt(v[1], 24, "%s%d.%d dB", db10 < 0 ? "-" : "", a / 10, a % 10); }
+    if (s.pan == 0) fmt(v[2], 24, "Centre"); else fmt(v[2], 24, "%s %d", s.pan < 0 ? "L" : "R", s.pan < 0 ? -s.pan : s.pan);
+    fmt(v[3], 24, "%s", s.loop ? "Loop" : "One-shot");
+    { const uint32_t t1 = (uint32_t)((uint64_t)s.start * s.frames / 65535 * 1000 / hal.sampleRate()); fmt(v[4], 24, "%u.%03u s", t1 / 1000, t1 % 1000); }
+    { const uint32_t t2 = (uint32_t)((uint64_t)s.end * s.frames / 65535 * 1000 / hal.sampleRate()); fmt(v[5], 24, "%u.%03u s", t2 / 1000, t2 % 1000); }
+    for (int i = 0; i < 6; i++)
+    {
+        const int x = 14 + (i % 3) * 258, y = 296 + (i / 3) * 72;
+        p.cell(x, y, 254, 68, i == psField, pal.panel);
+        p.text(x + 12, y + 10, names[i], F12, pal.dim);
+        p.text(x + 12, y + 28, v[i], F17B, pal.text);
+    }
+    fmt(b, sizeof b, "%s%d ct", s.tuneCt < 0 ? "-" : "+", s.tuneCt < 0 ? -s.tuneCt : s.tuneCt);
+    p.text(14 + 98 + 12, 324, b, F17, pal.text);
+    const char* l[8] = { "Audition", "Keys", "Pad", "", "", "", "", "Back" };
+    p.buttons(l, (uint8_t)((psAuditioning ? 1 : 0) | (padsKeysMode ? 2 : 4)));
+}
+
+//--------------------------------------------------------------------------------------------
+// C1 Track mixer (Params button)
+void App::drawMixer(Pen& p)
+{
+    p.topBar(model);
+    bool anySolo = false;
+    for (int t = 0; t < 4; t++) if (hal.bank().cfg[t].solo && session.hasPart(t)) anySolo = true;
+    for (int t = 0; t < 4; t++)
+    {
+        const int x = t * 200;
+        const TrackCfg& c = hal.bank().cfg[t];
+        const bool has = session.hasPart(t);
+        const bool off = !has || c.mute || (anySolo && !c.solo);
+        const bool sel = t == mxTrack;
+        const uint32_t tc = off ? pal.dim : pal.text;
+        const uint32_t fill = off ? pal.waveOff : pal.text;
+        if (t > 0) p.rect(x, 32, 1, 368, pal.frame);
+        p.rect(x + 1, 32, 199, 48, sel ? pal.sel : pal.panel);
+        if (sel) p.rect(x + 1, 32, 4, 48, pal.text);
+        char b[40];
+        fmt(b, sizeof b, "%d Track %d", t + 1, t + 1);
+        p.text(x + 14, 46, b, F17B, tc);
+        if (c.mute) { p.rect(x + 142, 46, 20, 20, pal.marker); p.text(x + 146, 48, "M", F14, pal.bg); }
+        else { p.frame(x + 142, 46, 20, 20, pal.dim); p.text(x + 146, 48, "M", F14, pal.dim); }
+        if (c.solo) { p.rect(x + 168, 46, 20, 20, pal.text); p.text(x + 173, 48, "S", F14, pal.bg); }
+        else { p.frame(x + 168, 46, 20, 20, pal.dim); p.text(x + 173, 48, "S", F14, pal.dim); }
+        // focus cells
+        if (sel && mxField == 0) { p.rect(x + 1, 84, 199, 178, pal.sel); p.rect(x + 1, 84, 199, 2, pal.text); }
+        if (sel && mxField == 1) { p.rect(x + 1, 266, 199, 64, pal.sel); p.rect(x + 1, 266, 199, 2, pal.text); }
+        if (sel && mxField == 2) { p.rect(x + 1, 334, 199, 64, pal.sel); p.rect(x + 1, 334, 199, 2, pal.text); }
+        // level fader, zero mark and live meter
+        p.rect(x + 20, 100, 16, 146, pal.track);
+        int h = 117 + (int)c.levelDb10 * 3 / 10;
+        h = h < 0 ? 0 : (h > 146 ? 146 : h);
+        p.rect(x + 20, 100 + 146 - h, 16, h, fill);
+        p.rect(x + 14, 129, 40, 1, pal.dim);
+        p.rect(x + 42, 100, 6, 146, pal.track);
+        const int mh = has ? model.lane[t].meter * 146 / 100 : 0;
+        p.rect(x + 42, 100 + 146 - mh, 6, mh, pal.meter);
+        const int db = (int)c.levelDb10;
+        const int adb = db < 0 ? -db : db;
+        if (db <= -600) fmt(b, sizeof b, "-inf dB"); else fmt(b, sizeof b, "%s%d.%d dB", db < 0 ? "-" : "", adb / 10, adb % 10);
+        p.text(x + 64, 100, b, F17B, tc);
+        if (c.mute) p.text(x + 64, 124, "Muted", F12, pal.dim);
+        else if (!has) p.text(x + 64, 124, "No Part", F12, pal.dim);
+        else if (anySolo && !c.solo) p.text(x + 64, 124, "Off by solo", F12, pal.dim);
+        // pan
+        if (c.pan == 0) fmt(b, sizeof b, "Centre"); else fmt(b, sizeof b, "%s %d", c.pan < 0 ? "L" : "R", c.pan < 0 ? -c.pan : c.pan);
+        p.text(x + 14, 276, b, F17B, tc);
+        p.textRight(x + 188, 279, "Pan", F12, pal.dim);
+        p.rect(x + 14, 310, 174, 4, pal.track);
+        p.rect(x + 100, 304, 1, 16, pal.dim);
+        p.rect(x + 99 + (int)c.pan * 9 / 10, 304, 3, 16, fill);
+        // tone
+        const int hz = toneCutoffHz(c.tone);
+        if (c.tone == 0) fmt(b, sizeof b, "Flat");
+        else if (hz >= 1000) fmt(b, sizeof b, "%s %d.%d kHz", c.tone < 0 ? "LP" : "HP", hz / 1000, (hz % 1000) / 100);
+        else fmt(b, sizeof b, "%s %d Hz", c.tone < 0 ? "LP" : "HP", hz);
+        p.text(x + 14, 344, b, F17B, tc);
+        p.textRight(x + 188, 347, "Tone", F12, pal.dim);
+        p.rect(x + 14, 378, 174, 4, pal.track);
+        p.rect(x + 100, 372, 1, 16, pal.dim);
+        p.rect(x + 99 + (int)c.tone * 9 / 10, 372, 3, 16, fill);
+    }
+    char hint[96];
+    static const char* const fieldName[3] = { "Level", "Pan", "Tone" };
+    static const char* const fieldHelp[3] = { "Jog: 0.5 dB steps. Shift + jog: 0.1 dB.", "Jog: steps of 5. Shift + jog: 1.", "Left of centre darkens, right of centre thins the sound." };
+    fmt(hint, sizeof hint, "Track %d - %s. %s", mxTrack + 1, fieldName[mxField], fieldHelp[mxField]);
+    p.hint(hint);
+    const TrackCfg& sc = hal.bank().cfg[mxTrack];
+    const char* l[8] = { sc.mute ? "Unmute" : "Mute", sc.solo ? "Unsolo" : "Solo", "Reset", "", "", "", "", "Back" };
+    p.buttons(l, (uint8_t)((sc.mute ? 1 : 0) | (sc.solo ? 2 : 0)));
 }
 
 //--------------------------------------------------------------------------------------------
@@ -635,7 +775,7 @@ void App::drawMemory(Pen& p)
     char b[64];
     p.text(14, 76, "Recording time left for the next Part", F12, pal.dim);
     const uint32_t secs = hal.regionFrames() / hal.sampleRate();
-    fmt(b, sizeof b, "%u.0 s", (unsigned)(secs > 24 ? 24 : secs));
+    fmt(b, sizeof b, "%u.0 s", (unsigned)(secs > kMaxTakeSeconds ? kMaxTakeSeconds : secs));
     p.text(14, 94, b, F17B, pal.text);
     p.text(14, 120, "The limit for one Part.", F12, pal.dim);
     p.text(420, 76, "Samples loaded", F12, pal.dim);

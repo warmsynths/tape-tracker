@@ -66,6 +66,11 @@ class FourTrackHal : public ft::Hal
     void setCurrentSample(int slot) override;
     void sampleMemory(uint32_t& usedBytes, uint32_t& totalBytes) override;
 
+    bool padSample(int slot, ft::PadSample& out) override;
+    void setPadSample(int slot, const ft::PadSample& in) override;
+    int padSampleWave(int slot, uint8_t* out, int columns) override;
+    void padAudition(int slot, bool on) override;
+
     void padOn(int pad, bool keysMode) override;
     void padOff(int pad) override;
     void padsReleaseAll() override;

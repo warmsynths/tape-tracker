@@ -43,6 +43,8 @@ static void functPerformance() { functKey(ft::kPerformance); }
 static void functMaster() { functKey(ft::kMaster); }
 static void functFile() { functKey(ft::kFile); }
 static void functPattern() { functKey(ft::kPattern); } // home
+static void functParams() { functKey(ft::kParams); } // the track mixer
+static void functSamplePlay() { functKey(ft::kSamplePlay); } // pad sample settings
 static void functSong() { functKey(ft::kSong); } // the Song button switches the click on or off
 static void functEncoder(int16_t value) { FT->application().jog(value); }
 static void functPads(uint8_t pad, uint8_t state, int16_t velo)
@@ -87,9 +89,9 @@ void cFourTrack::start(uint32_t options)
 
     songTimer.hide();
 
-    ip->setButtonObj(interfaceButtonParams, buttonPress, functSwitchModule);
+    ip->setButtonObj(interfaceButtonParams, buttonPress, functParams);
     ip->setButtonObj(interfaceButtonConfig, buttonPress, functSwitchModule);
-    ip->setButtonObj(interfaceButtonSamplePlay, buttonPress, functSwitchModule);
+    ip->setButtonObj(interfaceButtonSamplePlay, buttonPress, functSamplePlay);
     // These four open pages of this screen: Part Editor, Glitch, Lo-fi master, Project
     ip->setButtonObj(interfaceButtonSampleEdit, buttonPress, functSampleEdit);
     ip->setButtonObj(interfaceButtonPerformance, buttonPress, functPerformance);

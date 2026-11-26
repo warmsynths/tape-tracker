@@ -147,6 +147,11 @@ void App::popupKey(int k)
 
 void App::keyUp(int k)
 {
+    if (current == Screen::PadSample && k == kB1 && psAuditioning)
+    {
+        psAuditioning = false;
+        hal.padAudition(hal.currentSample(), false);
+    }
     if (current == Screen::Glitch && k >= kB1 && k <= kB4)
     {
         hal.bank().cfg[gTrack].held[k - kB1] = false;
@@ -209,6 +214,31 @@ void App::keyScreen(int k)
             else if (k == kB8) { unsaved = true; waveDirty[editTrack] = true; back(); }
             break;
         }
+        case Screen::Mixer:
+        {
+            TrackCfg& c = hal.bank().cfg[mxTrack];
+            if (k == kLeft) mxTrack = clampi(mxTrack - 1, 0, 3);
+            else if (k == kRight) mxTrack = clampi(mxTrack + 1, 0, 3);
+            else if (k == kUp) mxField = clampi(mxField - 1, 0, 2);
+            else if (k == kDown) mxField = clampi(mxField + 1, 0, 2);
+            else if (k == kB1) c.mute = !c.mute;
+            else if (k == kB2) c.solo = !c.solo;
+            else if (k == kB3) { c.levelDb10 = 0; c.pan = 0; c.tone = 0; }
+            else if (k == kB8 || k == kParams) { back(); return; }
+            if (k >= kB1 && k <= kB3) unsaved = true;
+            break;
+        }
+        case Screen::PadSample:
+            if (k == kLeft) psField = clampi(psField - 1, 0, 5);
+            else if (k == kRight) psField = clampi(psField + 1, 0, 5);
+            else if (k == kUp) psField = clampi(psField - 3, 0, 5);
+            else if (k == kDown) psField = clampi(psField + 3, 0, 5);
+            else if (k == kB1) { psAuditioning = true; hal.padAudition(hal.currentSample(), true); }
+            else if (k == kB2) padsKeysMode = true;
+            else if (k == kB3) padsKeysMode = false;
+            else if (k == kB8 || k == kSamplePlay) { if (psAuditioning) { psAuditioning = false; hal.padAudition(hal.currentSample(), false); } back(); return; }
+            for (int i = 0; i < 48; i++) padModeKeys[i] = padsKeysMode;
+            break;
         case Screen::Glitch: glitchKey(k); break;
         case Screen::Master: masterKey(k); break;
         case Screen::Input:
@@ -333,6 +363,17 @@ void App::jogScreen(int delta)
             else s.chance = (uint8_t)clampi((int)s.chance + delta * 5, 0, 100);
             break;
         }
+        case Screen::Mixer:
+        {
+            TrackCfg& c = hal.bank().cfg[mxTrack];
+            const int d = delta > 0 ? 1 : -1;
+            if (mxField == 0) c.levelDb10 = (int16_t)clampi(c.levelDb10 + d * (shift ? 1 : 5), -600, 60);
+            else if (mxField == 1) c.pan = (int8_t)clampi(c.pan + d * (shift ? 1 : 5), -100, 100);
+            else c.tone = (int8_t)clampi(c.tone + d * (shift ? 1 : 5), -100, 100);
+            unsaved = true;
+            break;
+        }
+        case Screen::PadSample: psChange(delta); break;
         case Screen::Master: masterJog(delta); break;
         case Screen::Input:
         {
@@ -765,6 +806,7 @@ void App::startSave()
     w.u8(l.bypass); w.u8(l.glueOn); w.u8(l.satOn); w.u8(l.wowOn); w.u8(l.crushOn);
     w.u8(l.glue); w.u8(l.sat); w.u8(l.wowDepth); w.u8(l.wowSpeed); w.u8(l.crushBits); w.u8(l.volume);
     for (int i = 0; i < 48; i++) w.u8(padModeKeys[i] ? 1 : 0);
+    for (int t = 0; t < 4; t++) { const TrackCfg& c = hal.bank().cfg[t]; w.u16((uint16_t)c.levelDb10); w.u8((uint8_t)c.pan); w.u8((uint8_t)c.tone); w.u8(c.solo ? 1 : 0); }
     if (!hal.fileWrite(jobPath, h, kHeader, false)) { showPopup(Popup::SdMissing); return; }
     job = Job::Save;
     jobTrack = 0;
@@ -813,6 +855,7 @@ void App::startLoad(const char* name)
     l.bypass = r.u8() != 0; l.glueOn = r.u8() != 0; l.satOn = r.u8() != 0; l.wowOn = r.u8() != 0; l.crushOn = r.u8() != 0;
     l.glue = (uint8_t)r.u8(); l.sat = (uint8_t)r.u8(); l.wowDepth = (uint8_t)r.u8(); l.wowSpeed = (uint8_t)r.u8(); l.crushBits = (uint8_t)r.u8(); l.volume = (uint8_t)r.u8();
     for (int i = 0; i < 48; i++) padModeKeys[i] = r.u8() != 0;
+    for (int t = 0; t < 4; t++) { TrackCfg& c = hal.bank().cfg[t]; c.levelDb10 = (int16_t)r.u16(); c.pan = (int8_t)r.u8(); c.tone = (int8_t)r.u8(); c.solo = r.u8() != 0; }
     session.restore(loop, bars, mask);
     fmt(projectName, sizeof(projectName), "%s", name);
     for (int t = 0; t < 4; t++) hasUndoTake[t] = false;
@@ -930,5 +973,36 @@ void App::serviceJob()
     }
     exportPercent = (int)((uint64_t)jobDone * 100 / (jobTotal ? jobTotal : 1));
     redraw[4] = true;
+}
+} // namespace ft
+
+namespace ft
+{
+// The jog changes the control in focus on the pad sample page
+void App::psChange(int delta)
+{
+    const int slot = hal.currentSample();
+    PadSample s;
+    if (!hal.padSample(slot, s)) return;
+    const int d = delta > 0 ? 1 : -1;
+    const uint32_t frames = s.frames > 0 ? s.frames : 1;
+    int step = (int)((uint64_t)65535 * hal.sampleRate() / 200 / frames); // 5 ms
+    if (step < 1) step = 1;
+    if (shift) step = step / 10 < 1 ? 1 : step / 10;
+    switch (psField)
+    {
+        case 0:
+            if (shift) { int c = s.tuneCt + d; if (c > 100) { c = 0; s.tuneSt = (int8_t)clampi(s.tuneSt + 1, -24, 24); } if (c < -100) { c = 0; s.tuneSt = (int8_t)clampi(s.tuneSt - 1, -24, 24); } s.tuneCt = (int8_t)c; }
+            else s.tuneSt = (int8_t)clampi(s.tuneSt + d, -24, 24);
+            break;
+        case 1: s.volume = (uint8_t)clampi((int)s.volume + d * (shift ? 1 : 2), 0, 100); break;
+        case 2: s.pan = (int8_t)clampi(s.pan + d * (shift ? 1 : 5), -100, 100); break;
+        case 3: s.loop = !s.loop; break;
+        case 4: s.start = (uint16_t)clampi((int)s.start + d * step, 0, (int)s.end - 64 > 0 ? (int)s.end - 64 : 0); break;
+        case 5: s.end = (uint16_t)clampi((int)s.end + d * step, (int)s.start + 64, 65535); break;
+        default: break;
+    }
+    hal.setPadSample(slot, s);
+    unsaved = true;
 }
 } // namespace ft

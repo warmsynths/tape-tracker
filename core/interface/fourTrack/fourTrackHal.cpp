@@ -361,3 +361,68 @@ void FourTrackHal::sampleMemory(uint32_t& usedBytes, uint32_t& totalBytes)
     usedBytes = mtProject.used_memory;
     totalBytes = kSampleMemoryLimit;
 }
+
+//--------------------------------------------------------------------------------------------
+// One pad sample's settings: the fields of the stock instrument that a pad needs
+
+bool FourTrackHal::padSample(int slot, ft::PadSample& out)
+{
+    if (slot < 0 || slot >= kSampleInstrumentsCount || !mtProject.instrument[slot].isActive) return false;
+    const strInstrument& in = mtProject.instrument[slot];
+    snprintf(out.name, sizeof out.name, "%s", in.sample.file_name);
+    out.frames = in.sample.length;
+    out.bytes = in.sample.length * 2;
+    out.tuneSt = in.tune;
+    out.tuneCt = in.fineTune;
+    out.volume = in.volume;
+    out.pan = (int8_t)((in.panning - 50) * 2);
+    out.loop = in.playMode == playModeLoopForward || in.playMode == playModeLoopBackward || in.playMode == playModePingpong;
+    out.start = in.startPoint;
+    out.end = in.endPoint;
+    return true;
+}
+
+void FourTrackHal::setPadSample(int slot, const ft::PadSample& s)
+{
+    if (slot < 0 || slot >= kSampleInstrumentsCount || !mtProject.instrument[slot].isActive) return;
+    strInstrument& in = mtProject.instrument[slot];
+    in.tune = s.tuneSt;
+    in.fineTune = s.tuneCt;
+    in.volume = s.volume;
+    in.panning = (int16_t)(s.pan / 2 + 50);
+    in.startPoint = s.start;
+    in.endPoint = s.end;
+    in.loopPoint1 = s.start;
+    in.loopPoint2 = s.end;
+    in.playMode = s.loop ? playModeLoopForward : playModeSingleShot;
+}
+
+int FourTrackHal::padSampleWave(int slot, uint8_t* out, int columns)
+{
+    if (slot < 0 || slot >= kSampleInstrumentsCount || !mtProject.instrument[slot].isActive) return 0;
+    const strInstrument& in = mtProject.instrument[slot];
+    const int16_t* data = in.sample.address;
+    const uint32_t length = in.sample.length;
+    if (data == nullptr || length == 0) return 0;
+    for (int c = 0; c < columns; c++)
+    {
+        const uint32_t from = (uint32_t)(((uint64_t)c * length) / columns);
+        const uint32_t to = (uint32_t)(((uint64_t)(c + 1) * length) / columns);
+        const uint32_t step = (to - from) > 256 ? (to - from) / 256 : 1;
+        int32_t peak = 0;
+        for (uint32_t i = from; i < to; i += step)
+        {
+            const int32_t v = data[i] < 0 ? -(int32_t)data[i] : data[i];
+            if (v > peak) peak = v;
+        }
+        out[c] = (uint8_t)(__builtin_sqrtf((float)peak / 32768.0f) * 255.0f);
+    }
+    return columns;
+}
+
+void FourTrackHal::padAudition(int slot, bool on)
+{
+    if (slot < 0 || slot >= 48) return;
+    if (on) padOn(slot, false);
+    else padOff(slot);
+}

@@ -20,7 +20,7 @@ void operator delete(void*, size_t) noexcept {}
 namespace
 {
 constexpr uint32_t kMaxRate = 48000;
-constexpr uint32_t kRegionSeconds = 26;
+constexpr uint32_t kRegionSeconds = 18;
 constexpr int kBlock = 128;
 
 int16_t g_mem[4][kMaxRate * kRegionSeconds];
@@ -100,7 +100,7 @@ __attribute__((import_module("host"), import_name("file_list"))) int host_file_l
 constexpr int kSampleSlots = 48;
 constexpr uint32_t kSamplePool = 1300000; // frames: about 2.6 MB, like the Tracker's sample memory
 int16_t g_samples[kSamplePool];
-struct SampleSlot { uint32_t start, length; char name[24]; };
+struct SampleSlot { uint32_t start, length; char name[24]; int8_t tuneSt = 0, tuneCt = 0; uint8_t volume = 100; int8_t pan = 0; bool loop = false; uint16_t pStart = 0, pEnd = 65535; };
 SampleSlot g_slot[kSampleSlots];
 uint32_t g_samplesUsed = 0;
 
@@ -131,7 +131,7 @@ class EmuHal : public Hal
     // click
     float clickPhase = 0, clickEnv = 0, clickInc = 0;
     // pad voices: a sample, or a plucked tone when the slot is empty
-    struct Voice { bool on; int pad; float phase; float inc; float amp; bool held; int slot; float rate; };
+    struct Voice { bool on; int pad; float phase; float inc; float amp; bool held; int slot; float rate; float pan; float endIdx; float startIdx; bool loop; };
     Voice voices[8] = {};
 
     uint32_t sampleRate() const override { return rate; }
@@ -189,24 +189,72 @@ class EmuHal : public Hal
     void setCurrentSample(int slot) override { currentSampleSlot = slot; }
     void sampleMemory(uint32_t& used, uint32_t& total) override { used = g_samplesUsed * 2; total = kSamplePool * 2; }
 
-    void padOn(int pad, bool keysMode) override
+    void startVoice(int pad, int smp, float ratio)
     {
         int slot = 0;
         for (int i = 0; i < 8; i++) if (!voices[i].on) { slot = i; break; }
+        if (smp >= 0 && smp < kSampleSlots && g_slot[smp].length > 0)
+        {
+            const SampleSlot& s = g_slot[smp];
+            float r = ratio;
+            const int total = s.tuneSt * 100 + s.tuneCt;
+            for (int i = 0; i < (total < 0 ? -total : total) / 100; i++) r *= total < 0 ? 0.94387431f : 1.05946309f;
+            const float frac = (float)((total < 0 ? -total : total) % 100) / 100.0f * 0.0594631f * (total < 0 ? -0.94f : 1.0f);
+            r *= 1.0f + frac;
+            const float startIdx = (float)((uint64_t)s.pStart * s.length / 65535);
+            float endIdx = (float)((uint64_t)s.pEnd * s.length / 65535);
+            if (endIdx <= startIdx + 2) endIdx = (float)s.length - 1;
+            voices[slot] = Voice{ true, pad, startIdx, 0.0f, 0.8f * (float)s.volume / 100.0f, true, smp, r, (float)s.pan / 100.0f, endIdx, startIdx, s.loop };
+        }
+        else
+        {
+            float f = 110.0f * ratio * 2.0f;
+            voices[slot] = Voice{ true, pad, 0.0f, f / (float)rate, 0.3f, true, -1, 1.0f, 0.0f, 0.0f, 0.0f, false };
+        }
+    }
+    void padOn(int pad, bool keysMode) override
+    {
         const int semis = keysMode ? (pad % 12) + 12 * ((pad / 12) % 4) - 12 : 0;
         float r = 1.0f;
         if (semis > 0) for (int i = 0; i < semis; i++) r *= 1.05946309f;
         if (semis < 0) for (int i = 0; i < -semis; i++) r /= 1.05946309f;
-        const int smp = keysMode ? currentSampleSlot : pad;
-        if (smp >= 0 && smp < kSampleSlots && g_slot[smp].length > 0)
+        startVoice(pad, keysMode ? currentSampleSlot : pad, r);
+    }
+    bool padSample(int slot, PadSample& out) override
+    {
+        if (slot < 0 || slot >= kSampleSlots || g_slot[slot].length == 0) return false;
+        const SampleSlot& s = g_slot[slot];
+        int i = 0;
+        for (; i < 23 && s.name[i]; i++) out.name[i] = s.name[i];
+        out.name[i] = 0;
+        out.frames = s.length; out.bytes = s.length * 2;
+        out.tuneSt = s.tuneSt; out.tuneCt = s.tuneCt; out.volume = s.volume; out.pan = s.pan; out.loop = s.loop; out.start = s.pStart; out.end = s.pEnd;
+        return true;
+    }
+    void setPadSample(int slot, const PadSample& in) override
+    {
+        if (slot < 0 || slot >= kSampleSlots || g_slot[slot].length == 0) return;
+        SampleSlot& s = g_slot[slot];
+        s.tuneSt = in.tuneSt; s.tuneCt = in.tuneCt; s.volume = in.volume; s.pan = in.pan; s.loop = in.loop; s.pStart = in.start; s.pEnd = in.end;
+    }
+    int padSampleWave(int slot, uint8_t* out, int columns) override
+    {
+        if (slot < 0 || slot >= kSampleSlots || g_slot[slot].length == 0) return 0;
+        const SampleSlot& s = g_slot[slot];
+        for (int c = 0; c < columns; c++)
         {
-            voices[slot] = Voice{ true, pad, 0.0f, 0.0f, 0.8f, true, smp, r };
+            const uint32_t from = (uint32_t)((uint64_t)c * s.length / columns), to = (uint32_t)((uint64_t)(c + 1) * s.length / columns);
+            int peak = 0;
+            for (uint32_t i = from; i < to; i++) { int v = g_samples[s.start + i]; if (v < 0) v = -v; if (v > peak) peak = v; }
+            const float n = __builtin_sqrtf((float)peak / 32768.0f);
+            out[c] = (uint8_t)(n * 255.0f);
         }
-        else
-        {
-            float f = 110.0f * r * 2.0f;
-            voices[slot] = Voice{ true, pad, 0.0f, f / (float)rate, 0.3f, true, -1, 1.0f };
-        }
+        return columns;
+    }
+    void padAudition(int slot, bool on) override
+    {
+        if (on) { startVoice(900 + slot, slot, 1.0f); voices[0].held = true; for (auto& v : voices) if (v.pad == 900 + slot) v.held = true; }
+        else for (auto& v : voices) if (v.on && v.pad == 900 + slot) v.held = false;
     }
     void padOff(int pad) override { for (auto& v : voices) if (v.on && v.pad == pad) v.held = false; }
     void padsReleaseAll() override { for (auto& v : voices) v.held = false; }
@@ -231,8 +279,8 @@ class EmuHal : public Hal
         levelR = levelR * 0.9f + sr * 0.1f;
 
         // pads
-        float pad[kBlock];
-        for (int i = 0; i < n; i++) pad[i] = 0;
+        float pad[kBlock], padL[kBlock], padR[kBlock];
+        for (int i = 0; i < n; i++) pad[i] = padL[i] = padR[i] = 0;
         for (auto& v : voices)
         {
             if (!v.on) continue;
@@ -245,15 +293,20 @@ class EmuHal : public Hal
                     if (idx + 1 >= s.length) { v.on = false; break; }
                     const float fr = v.phase - (float)idx;
                     const float a = g_samples[s.start + idx], b = g_samples[s.start + idx + 1];
-                    pad[i] += (a + (b - a) * fr) / 32768.0f * v.amp;
+                    const float o = (a + (b - a) * fr) / 32768.0f * v.amp;
+                    pad[i] += o;
+                    padL[i] += o * (v.pan > 0 ? 1.0f - v.pan : 1.0f);
+                    padR[i] += o * (v.pan < 0 ? 1.0f + v.pan : 1.0f);
                     v.phase += v.rate;
+                    if (v.loop && v.held && v.phase >= v.endIdx) v.phase = v.startIdx;
+                    else if (v.phase >= v.endIdx) { v.on = false; break; }
                     if (!v.held && v.amp > 0.0f) v.amp *= 0.9995f;
                 }
                 else
                 {
                     v.phase += v.inc;
                     if (v.phase >= 1.0f) v.phase -= 1.0f;
-                    pad[i] += (v.phase * 2.0f - 1.0f) * v.amp;
+                    { const float o = (v.phase * 2.0f - 1.0f) * v.amp; pad[i] += o; padL[i] += o; padR[i] += o; }
                     v.amp *= v.held ? 0.99985f : 0.9985f;
                 }
             }
@@ -311,8 +364,8 @@ class EmuHal : public Hal
                 clickEnv *= 0.9985f;
             }
             float ml = mon ? g_inL[i] : 0.0f, mr = mon ? g_inR[i] : 0.0f;
-            g_outL[i] = pl[i] + pad[i] + cl + ml;
-            g_outR[i] = pr[i] + pad[i] + cl + mr;
+            g_outL[i] = pl[i] + padL[i] + cl + ml;
+            g_outR[i] = pr[i] + padR[i] + cl + mr;
         }
     }
 };
@@ -342,6 +395,7 @@ void makeKit(uint32_t rate)
         SampleSlot& s = g_slot[k];
         s.start = g_samplesUsed;
         s.length = len;
+        s.tuneSt = 0; s.tuneCt = 0; s.volume = 100; s.pan = 0; s.loop = false; s.pStart = 0; s.pEnd = 65535; // global constructors are not run
         for (int i = 0; i < 23 && names[k][i]; i++) { s.name[i] = names[k][i]; s.name[i + 1] = 0; }
         float ph = 0, lp = 0;
         for (uint32_t i = 0; i < len; i++)
@@ -408,6 +462,7 @@ int16_t* ft_sample_prepare(int slot, uint32_t frames)
     g_slot[slot].start = g_samplesUsed;
     g_slot[slot].length = frames;
     g_slot[slot].name[0] = 0;
+    g_slot[slot].tuneSt = 0; g_slot[slot].tuneCt = 0; g_slot[slot].volume = 100; g_slot[slot].pan = 0; g_slot[slot].loop = false; g_slot[slot].pStart = 0; g_slot[slot].pEnd = 65535;
     g_samplesUsed += frames;
     return g_samples + g_slot[slot].start;
 }

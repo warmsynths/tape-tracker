@@ -65,9 +65,17 @@ struct TrackCfg
     uint32_t fadeIn = 0, fadeOut = 0;
     float gain = 1.0f;              // normalize
     FxSlot slot[4];
+    // The track mixer (see C1 in the design)
+    int16_t levelDb10 = 0;          // level in tenths of a dB, -600 (off) to +60
+    int8_t pan = 0;                 // -100 left to +100 right
+    int8_t tone = 0;                // -100 low-pass (darker) to +100 high-pass (thinner), 0 flat
+    bool solo = false;
     bool granular = false;          // pitch style: granular (same length) or tape (speed follows)
     bool held[4] = { false, false, false, false }; // slots held down right now (momentary)
 };
+
+// The cutoff of the tone control in Hz: below zero a low-pass, above zero a high-pass; 0 is flat
+int toneCutoffHz(int tone);
 
 class TrackBank
 {
@@ -90,6 +98,7 @@ class TrackBank
   private:
     float readAt(int t, float srcIndex) const;
     float lp[4] = {}, hp[4] = {}, hpPrev[4] = {};
+    float toneLp[4] = {}, toneHp[4] = {};
     float crushHold[4] = {};
     uint8_t crushCount[4] = {};
 };

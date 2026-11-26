@@ -180,6 +180,34 @@ int main()
         for (int i = 0; i < L; i++) if (std::fabs(l1[i] - lp[i]) > 0.001f) some++;
         CHECK(some > L / 20 && some < L * 9 / 10, "a chance of 50 percent triggers on some slices only");
     }
+    {   // the mixer: level, pan, tone and solo
+        TrackBank b;
+        const int L = 4410;
+        std::vector<int16_t> d(L);
+        for (int i = 0; i < L; i++) d[i] = (int16_t)(std::sin(i * 0.2f) * 10000);
+        b.data[0] = d.data(); b.data[1] = d.data(); b.loop = L;
+        auto rms = [&](bool left) { std::vector<float> l(L), r(L); b.pass = 0; b.lastPos = 0; b.render(0, L, l.data(), r.data()); double s = 0; for (int i = 0; i < L; i++) s += (left ? l[i] : r[i]) * (left ? l[i] : r[i]); return std::sqrt(s / L); };
+        b.cfg[1].mute = true; // only track 0 plays, so the maths is about one track
+        const double base = rms(true);
+        b.cfg[0].levelDb10 = -60;
+        CHECK(std::fabs(rms(true) / base - 0.5012) < 0.02, "-6 dB is about half the level");
+        b.cfg[0].levelDb10 = 0; b.cfg[0].pan = 100;
+        CHECK(rms(true) < 0.01 * base && rms(false) > 0.9 * base, "pan right silences the left");
+        b.cfg[0].pan = 0; b.cfg[0].tone = -100;
+        CHECK(rms(true) < 0.5 * base, "a dark tone takes the top off");
+        b.cfg[0].tone = 100;
+        CHECK(rms(true) < base, "a thin tone takes the bottom off");
+        b.cfg[0].tone = 0; b.cfg[1].mute = false; b.cfg[1].solo = true;
+        std::vector<float> l1(L), r1(L);
+        b.render(0, L, l1.data(), r1.data());
+        double e0 = 0; for (int i = 0; i < L; i++) e0 += l1[i] * l1[i];
+        b.cfg[1].solo = false; b.cfg[0].solo = true; b.cfg[1].mute = true;
+        std::vector<float> l2(L), r2(L);
+        b.render(0, L, l2.data(), r2.data());
+        double e1 = 0; for (int i = 0; i < L; i++) e1 += l2[i] * l2[i];
+        CHECK(e0 > 0 && e1 > 0, "a soloed track plays");
+        CHECK(toneCutoffHz(0) == 0 && toneCutoffHz(-100) < 400 && toneCutoffHz(100) > 1000, "the tone control spans about 200 Hz to 1.3 kHz");
+    }
     {   // zero crossings and the end of the sound
         std::vector<int16_t> x(44100);
         for (int i = 0; i < 44100; i++) x[i] = (int16_t)(std::sin(i * 0.05f) * 10000);

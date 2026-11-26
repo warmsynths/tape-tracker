@@ -39,17 +39,17 @@ struct FakeHal : Hal
     int gains[4] = { 50, 50, 50, 50 };
     std::map<std::string, std::vector<uint8_t>> files;
     int clicks = 0;
-    int curSample = 0;
+    int curSample = 0; // the sample the pads play
     uint32_t quiet = 0; // frames of silence at the start of a take
 
     FakeHal()
     {
-        for (auto& m : mem) m.assign(kRate * 26, 0);
+        for (auto& m : mem) m.assign(kRate * 18, 0);
     }
     uint32_t sampleRate() const override { return kRate; }
     uint32_t millis() override { return nowMs; }
     int16_t* region(int t) override { return mem[t].data(); }
-    uint32_t regionFrames() const override { return kRate * 26; }
+    uint32_t regionFrames() const override { return kRate * 18; }
     void applySource(Source s) override { applied = s; }
     void inputLevels(float& l, float& r) override { l = 0.1f; r = 0.1f; }
     void recordStart(int t, Source) override { recActive = true; recTrack = t; recLen = 0; full = false; captured = false; }
@@ -105,6 +105,11 @@ struct FakeHal : Hal
     int currentSample() override { return curSample; }
     void setCurrentSample(int s) override { curSample = s; }
     void sampleMemory(uint32_t& u, uint32_t& t) override { u = 0; t = 2600000; }
+    PadSample sampleData[48];
+    bool padSample(int slot, PadSample& out) override { if (slot < 0 || slot > 11) return false; out = sampleData[slot]; std::snprintf(out.name, sizeof out.name, "Sample %d", slot + 1); out.frames = 44100; out.bytes = 88200; return true; }
+    void setPadSample(int slot, const PadSample& in) override { if (slot >= 0 && slot < 48) sampleData[slot] = in; }
+    int padSampleWave(int, uint8_t* out, int columns) override { for (int i = 0; i < columns; i++) out[i] = (uint8_t)(i % 200); return columns; }
+    void padAudition(int, bool) override {}
     void padOn(int, bool) override { padsOn++; }
     void padOff(int) override { padsOn--; }
     void padsReleaseAll() override { padsOn = 0; }
@@ -290,6 +295,52 @@ static void pagesAndProjects()
         CHECK(!hal.playing, "Play stops it on a page");
         app.key(kPlay);
         CHECK(hal.playing, "and starts it again");
+    }
+    {   // the track mixer opens with Params and changes the track
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kParams);
+        CHECK(app.screen() == Screen::Mixer, "Params opens the mixer");
+        app.jog(1);
+        CHECK(hal.trackBank.cfg[0].levelDb10 == 5, "the jog changes the level by half a dB");
+        app.key(kDown); app.jog(1);
+        CHECK(hal.trackBank.cfg[0].pan == 5, "Down moves to pan");
+        app.key(kDown); app.setShift(true); app.jog(-1); app.setShift(false);
+        CHECK(hal.trackBank.cfg[0].tone == -1, "Shift makes tone steps of 1");
+        app.key(kB2);
+        CHECK(hal.trackBank.cfg[0].solo, "B2 solos the track");
+        app.key(kB3);
+        CHECK(hal.trackBank.cfg[0].levelDb10 == 0 && hal.trackBank.cfg[0].pan == 0 && !hal.trackBank.cfg[0].mute, "Reset puts level, pan and tone back");
+        CHECK(!app.pageOverflowed() && app.stagesOf(4) <= 5, "the mixer fits the drawing budget");
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Main, "Back goes home");
+    }
+    {   // pad sample settings
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        hal.sampleData[0].volume = 100; hal.sampleData[0].end = 65535;
+        app.key(kSamplePlay);
+        CHECK(app.screen() == Screen::PadSample, "Sample Play opens the pad sample page");
+        app.jog(1);
+        CHECK(hal.sampleData[0].tuneSt == 1, "the jog changes the tune");
+        app.key(kRight); app.jog(-1);
+        CHECK(hal.sampleData[0].volume == 98, "the next control is the volume");
+        app.key(kRight); app.key(kRight); app.jog(1);
+        CHECK(hal.sampleData[0].loop, "the play mode switches to loop");
+        app.key(kRight); app.jog(1);
+        CHECK(hal.sampleData[0].start > 0, "the jog moves Start");
+        CHECK(!app.pageOverflowed() && app.stagesOf(4) <= 5, "the page fits the drawing budget");
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        app.pad(3, true); app.pad(3, false);
+        CHECK(hal.curSample == 3, "a pad chooses its sample on this page");
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Main, "Back goes home");
     }
     {   // the Pattern button is home
         FakeHal hal;
@@ -507,7 +558,7 @@ int main()
         hal.advance(app, FakeHal::kRate * 30);
         CHECK(app.state().mode() == Mode::ChoosingBars, "memory full ends the first take and asks for the bars");
         CHECK(app.view().prompt.memoryFull, "the question says memory is full");
-        CHECK(app.state().pendingFrames() == FakeHal::kRate * 24, "the take is limited to 24 seconds");
+        CHECK(app.state().pendingFrames() == FakeHal::kRate * 16, "the take is limited to 16 seconds");
     }
     {   // stop during a later Part keeps what was played and silences the rest
         FakeHal hal;

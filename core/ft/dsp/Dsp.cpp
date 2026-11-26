@@ -184,6 +184,7 @@ void TrackBank::resetState()
     for (int t = 0; t < 4; t++)
     {
         lp[t] = hp[t] = hpPrev[t] = crushHold[t] = 0.0f;
+        toneLp[t] = toneHp[t] = 0.0f;
         crushCount[t] = 0;
     }
     pass = 0;
@@ -212,6 +213,13 @@ static uint32_t sliceHash(int track, uint32_t pass, uint32_t slice, uint32_t sal
     return x;
 }
 
+int toneCutoffHz(int tone)
+{
+    if (tone == 0) return 0;
+    if (tone < 0) return (int)(18000.0f * exp2Approx((float)tone * 6.5f / 100.0f));   // -100: about 200 Hz
+    return (int)(20.0f * exp2Approx((float)tone * 6.0f / 100.0f));                      // +100: about 1.3 kHz
+}
+
 void TrackBank::render(uint32_t pos, int n, float* left, float* right)
 {
     for (int i = 0; i < n; i++) left[i] = right[i] = 0.0f;
@@ -221,10 +229,18 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
     const uint32_t sl = slice ? slice : (loop / 16 > 0 ? loop / 16 : 1);
     const float grainLen = (float)(sl / 2 < kRate * 40 / 1000 ? (sl / 2 > 0 ? sl / 2 : 1) : kRate * 40 / 1000);
 
+    bool anySolo = false;
+    for (int t = 0; t < 4; t++) if (cfg[t].solo && data[t] != nullptr) anySolo = true;
+
     for (int t = 0; t < 4; t++)
     {
         if (data[t] == nullptr || cfg[t].mute) continue;
+        if (anySolo && !cfg[t].solo) continue;
         TrackCfg& c = cfg[t];
+        const float levelAmp = c.levelDb10 <= -600 ? 0.0f : exp2Approx((float)c.levelDb10 / 10.0f / 6.0206f);
+        const float mixPan = (float)c.pan / 100.0f;
+        const int toneHz = toneCutoffHz(c.tone);
+        const float toneA = toneHz > 0 ? clampf(6.2832f * (float)toneHz / (float)kRate, 0.0f, 1.0f) : 0.0f;
         bool act[4];
         bool any = false;
         for (int s = 0; s < 4; s++)
@@ -402,13 +418,18 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
                 hp[t] += a * (sample - hp[t]);
                 sample = sample - hp[t];
             }
-            sample *= volume;
+            sample *= volume * levelAmp;
+            if (c.tone < 0) { toneLp[t] += toneA * (sample - toneLp[t]); sample = toneLp[t]; }
+            else if (c.tone > 0) { toneHp[t] += toneA * (sample - toneHp[t]); sample = sample - toneHp[t]; }
 
             const float aa = absf(sample);
             const uint16_t p16 = (uint16_t)(aa >= 1.0f ? 32767 : (int)(aa * 32767.0f));
             if (p16 > pk) pk = p16;
-            const float gl = pan > 0 ? 1.0f - pan : 1.0f;
-            const float gr = pan < 0 ? 1.0f + pan : 1.0f;
+            float pn = pan + mixPan;
+            if (pn > 1.0f) pn = 1.0f;
+            if (pn < -1.0f) pn = -1.0f;
+            const float gl = pn > 0 ? 1.0f - pn : 1.0f;
+            const float gr = pn < 0 ? 1.0f + pn : 1.0f;
             left[i] += sample * gl;
             right[i] += sample * gr;
         }

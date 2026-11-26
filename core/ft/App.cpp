@@ -31,7 +31,7 @@ float squareRoot(float x) { return __builtin_sqrtf(x); }
 App::App(Hal& h, const Palette& palette)
   : hal(h)
   , pal(palette)
-  , session(h.sampleRate() * 24)
+  , session(h.sampleRate() * kMaxTakeSeconds)
 {
     for (int i = 0; i < 48; i++) padModeKeys[i] = true;
     for (int t = 0; t < FourTrackSession::kTracks; t++)
@@ -119,7 +119,7 @@ void App::key(int k)
     {
         // Play and Stop work on the pages that sit beside the recorder
         const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
-                               current == Screen::Input || current == Screen::Pads || current == Screen::Memory ||
+                               current == Screen::Input || current == Screen::Pads || current == Screen::Memory || current == Screen::Mixer || current == Screen::PadSample ||
                                current == Screen::Settings;
         if (transport && k == kPlay) { togglePlay(); refresh(true); return; }
         if (transport && k == kStop) { pressStop(); refresh(true); return; }
@@ -205,6 +205,8 @@ void App::key(int k)
             }
             break;
         case kMaster: open(Screen::Master); break;
+        case kParams: mxTrack = session.selected(); open(Screen::Mixer); break;
+        case kSamplePlay: psField = 0; open(Screen::PadSample); break;
         case kFile: refreshProjectList(); open(Screen::Project); break;
         default: break;
     }
@@ -235,6 +237,7 @@ void App::jog(int delta)
 void App::pad(int p, bool down)
 {
     if (p < 0 || p >= 48) return;
+    if (current == Screen::PadSample && down) { hal.setCurrentSample(p); refresh(true); } // a pad chooses its sample here
     if (down) hal.padOn(p, padModeKeys[hal.currentSample() >= 0 ? hal.currentSample() : 0] ? padsKeysMode : false);
     else hal.padOff(p);
 }
@@ -1005,12 +1008,12 @@ void App::fillView()
             fmt(L.msg1, sizeof(L.msg1), "First take - elapsed");
             const uint32_t took = hal.recordLength() > takeOffset ? hal.recordLength() - takeOffset : 0;
             formatTime(L.msg2, sizeof(L.msg2), took, rate);
-            const uint32_t maxFrames = rate * 24;
+            const uint32_t maxFrames = rate * kMaxTakeSeconds;
             const uint32_t got = took < maxFrames ? took : maxFrames;
             const uint32_t leftTenths = (maxFrames - got) * 10 / rate;
             L.progress = (uint8_t)(got * 100 / maxFrames);
             L.warn = leftTenths <= 30;
-            fmt(L.side1, sizeof(L.side1), "%s", L.warn ? "Memory nearly full" : "Up to 24 s per Part");
+            fmt(L.side1, sizeof(L.side1), "%s", L.warn ? "Memory nearly full" : "Up to 16 s per Part");
             fmt(L.side2, sizeof(L.side2), "%u.%u s left", (unsigned)(leftTenths / 10), (unsigned)(leftTenths % 10));
         }
         else if (L.active && mode == FourTrackSession::Mode::Armed)
@@ -1085,7 +1088,7 @@ void App::fillView()
     else if (mode == FourTrackSession::Mode::RecordingFirst)
     {
         if (waitingSound) fmt(v.hint, sizeof(v.hint), "Recording starts when the input reaches %d dB. Stop cancels.", (int)set.waitDb);
-        else if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 24 s the take stops by itself and keeps everything.");
+        else if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 16 s the take stops by itself and keeps everything.");
         else fmt(v.hint, sizeof(v.hint), "B2 or Stop ends the take. Then: How many bars?");
     }
     else if (mode == FourTrackSession::Mode::Armed) fmt(v.hint, sizeof(v.hint), "Records one Loop from the loop start, then stops. B1 again disarms.");
