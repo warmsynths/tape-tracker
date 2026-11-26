@@ -20,7 +20,8 @@ Mixer 119 and 120 elements, load samples 89, pad sample 64 to 67, resample 61 to
 - **C4 Resample:** record the finished mix (after the lo-fi master) into a pad slot. Needs a tap on the master output; the existing pad-bus tap does not include the loop player.
 - **C5 Device settings:** MIDI, USB audio, line input, volume, display, firmware, about, plus a Four-Track group. A rebuild of the stock Config; large, and the riskiest to remove stock code for.
 
-## Questions
-1. Memory: with the tracks at 26 s the pads get about 2.4 MB. Do you want shorter tracks (for example 12 s each, giving about 6 MB for samples) or keep 26 s?
-2. Resample length: whole loops only (1 to 4) as designed, or free length?
-3. Config: rebuild all of it, or keep the stock Config and only add a Four-Track group?
+## Decisions (owner, 2026-11-26)
+1. Track length: 16 s per track (was 26 s), so the pads get about 6 MB (about sixteen samples). Change `kFourTrackRegionFrames` to go back.
+2. Resample length: whole loops, 1 to 4, as designed.
+3. Config: rebuild all of it per C5. Only the firmware-update code underneath is kept.
+4. Memory figures in the design are to be corrected to the real numbers.
