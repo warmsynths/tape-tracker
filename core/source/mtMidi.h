@@ -60,6 +60,8 @@ class UsbMidi;
 void midiInit(UartMidi* uartMidi, UsbMidi* usbMidi);
 void midiUpdate();
 void handleJackNoteOn(byte channel, byte pitch, byte velocity);
+// Where incoming MIDI notes go (the Four-Track pads); null: nowhere
+void midiSetNoteHook(void (*hook)(uint8_t pitch, uint8_t velocity, bool on));
 void handleJackNoteOff(byte channel, byte pitch, byte velocity);
 
 void handleUsbNoteOn(byte channel, byte pitch, byte velocity);

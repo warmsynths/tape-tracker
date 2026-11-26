@@ -1,4 +1,5 @@
 #include "mtAudioEngine.h"
+#include "mtSequencer.h"
 #include "Platform.h"
 #include "VoiceStreamManager.h"
 #ifdef FEATURE_SYNTH
@@ -11,7 +12,6 @@
 #include "mtMidi.h"
 #include "mtMasterEnhancer.h"
 #include "mtStructs.h"
-#include "sampleRecorder/sampleRecorder.h"
 #include "tempoSyncRateValues.h"
 #include "util.h"
 #include <Recorder.h>

@@ -7,12 +7,11 @@
 #include "fileManager.h"
 #include "mtAudioEngine.h"
 #include "mtSequencer.h"
+#include "removedScreens.h"
 #include "mtStructs.h"
-#include "sampleRecorder/sampleRecorder.h"
 
 #include "core/songTimer.h"
 
-#include "patternEditor/patternEditor.h"
 
 #include "core/interfacePopups.h"
 
@@ -33,14 +32,8 @@ Sequencer::strPattern seq[2];
 #include "playModeDefs.h"
 
 extern audioEngine engine;
-extern cPatternEditor patternEditor;
 
-extern cSampleRecorder sampleRecorder;
-cSampleRecorder* SR = &sampleRecorder;
 
-#include "performanceMode/performanceMode.h"
-extern cPerformanceMode performanceMode;
-static cPerformanceMode* PM = &performanceMode;
 
 extern void cbkSetCurrentExporterOnLastStep();
 
@@ -161,15 +154,7 @@ bool Sequencer::isLastPatternStep(void)
 
 AUDIO_CORE_RAM bool Sequencer::isMetronomeApplicableForActualRecordingSource(void)
 {
-    return SR->recorderConfig.source == SR->sourceTypeMicLG ||
-           SR->recorderConfig.source == SR->sourceTypeMicHG ||
-           SR->recorderConfig.source == SR->sourceTypeLineIn
-
-#ifdef PLATFORM_IMX
-           || SR->recorderConfig.source == SR->sourceTypeUsb
-#endif
-
-      ;
+    return false; // the stock sample recorder is gone
 }
 
 AUDIO_CORE_RAM void Sequencer::tick_uStep(void)
@@ -179,14 +164,14 @@ AUDIO_CORE_RAM void Sequencer::tick_uStep(void)
      6912 nanoStep = 12 stepów
      */
 
-    if (SR->recordInProgressFlag == 1 || player.preRecMetronomeActive)
+    if (player.preRecMetronomeActive)
     {
         if (isMetronomeApplicableForActualRecordingSource() || (player.preRecMetronomeActive))
         {
             if (timerTicks % kTicksInStep == 0)
             {
                 bool isActiveRecordingMetronome =
-                  isMetronomeActive() || (SR->waitForPreRollEnd && !isMetronomeActive());
+                  isMetronomeActive();
 
                 if ((player.preRecMetronomeActive || isActiveRecordingMetronome) &&
                     player.extRecMetronomeStep %
@@ -213,13 +198,7 @@ AUDIO_CORE_RAM void Sequencer::tick_uStep(void)
                         playPattern(false); // audio was cleared when metronome preroll started
                     }
 
-                    if (SR->recordInProgressFlag)
-                    {
-                        if (player.preRollMetronomeEndCalback != nullptr)
-                        {
-                            player.preRollMetronomeEndCalback();
-                        }
-                    }
+
                 }
             }
 
@@ -1593,8 +1572,6 @@ void Sequencer::stop(void)
 
     sendMidiStop();
 
-    patternEditor.refreshEditStateFromOutsideModule();
-
     for (int trackIdx = 0; trackIdx < kAllTracks; trackIdx++)
     {
         player.track[trackIdx].stepSent.note = STEP_NOTE_EMPTY;
@@ -1919,7 +1896,6 @@ void Sequencer::switchRowStep(uint8_t row) // przełączamy stepy w zależności
             {
                 mtProject.perfTracksPatterns[a] = mtProject.values.actualPattern;
             }
-            PM->refreshTrackPattern = 1;
         }
     }
 }

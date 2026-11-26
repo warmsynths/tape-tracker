@@ -11,7 +11,6 @@
 #include "fileManager.h"
 #include "fileTransfer.h"
 
-#include "projectEditor/projectEditor.h"
 
 __NOINIT(EXTERNAL_RAM) uint8_t externalRamFileManagerSrcBuff[READ_WRITE_BUFOR_SIZE]; // 32768
 __NOINIT(EXTERNAL_RAM) uint8_t externalRamFileManagerBuffL[READ_WRITE_BUFOR_SIZE];   // 32768
@@ -593,7 +592,6 @@ bool cFileManager::projectExist(char* path, char* name)
 
 void cFileManager::loadProjectValues()
 {
-    projectEditor.loadProjectValues();
 }
 
 bool cFileManager::isInstrumentStereo(int idx)

@@ -2,12 +2,25 @@
 #include "Platform.h"
 #include "TrackerImpl.h"
 #include "mtAudioEngine.h"
-#include "sampleEditor/sampleEditor.h"
 
 #include <cr_section_macros.h>
 #include <cstdio>
 #include <cstring>
 #include <strings.h>
+#include "mtSampleEditorEngine.h"
+
+// names of the built-in effects (they used to sit in the stock sample editor's header)
+static char* const effectNamesLabels[editorEffectMax] = {
+    (char*)"Normalizer",       (char*)"Crop",
+    (char*)"Reverse",          (char*)"Amplifier",
+    (char*)"Overdrive",        (char*)"Delay",
+    (char*)"Bitcrusher",       (char*)"Chorus",
+    (char*)"Flanger",          (char*)"Equalizer",
+    (char*)"Limiter",          (char*)"Compressor",
+    (char*)"WT Smoother",      (char*)"Timestretch Beat",
+    (char*)"Timestretch Note", (char*)"Fade In",
+    (char*)"Fade Out",         (char*)"Modular"
+};
 
 extern uint8_t externalRamScratchBuff[];
 

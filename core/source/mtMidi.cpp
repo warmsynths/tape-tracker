@@ -1,10 +1,5 @@
 #include "mtSequencer.h"
 
-#include "instrumentEditor/instrumentEditor.h"
-#include "patternEditor/patternEditor.h"
-#include "sampleEditor/sampleEditor.h"
-#include "samplePlayback/samplePlayback.h"
-#include "sampleRecorder/sampleRecorder.h"
 
 #include "Platform.h"
 #include "TrackerImpl.h"
@@ -12,21 +7,13 @@
 #include "util_math.h"
 #include <cmath>
 
-extern cPatternEditor patternEditor;
 
-static cSamplePlayback* SP = &samplePlayback;
-static cSampleRecorder* SR = &sampleRecorder;
-static cSampleEditor* SE = &sampleEditor;
-static cPatternEditor* PTE = &patternEditor;
-static cInstrumentEditor* IE = &instrumentEditor;
 static UartMidi* uartMidi = nullptr;
 static UsbMidi* usbMidi = nullptr;
 
 extern void playSongFromSelectedPattern();
 extern void playSongFromSelectedPattern_stop();
 
-void peformanceModeOnMidiCC(uint8_t cc_idx, uint8_t cc_value);
-void changeMixerOnMidiCC(uint8_t cc_idx, uint8_t cc_value);
 
 elapsedMillis timerMidiDelay = 0;
 
@@ -85,217 +72,38 @@ uint8_t isIncomingChannelDesired(uint8_t chan)
     return (mtConfig.midi.notesInChannel == chan || mtConfig.midi.notesInChannel == 0);
 }
 
+// Incoming notes play the Four-Track pads: the Four-Track screen registers where they go
+static void (*s_noteHook)(uint8_t pitch, uint8_t velocity, bool on) = nullptr;
+void midiSetNoteHook(void (*hook)(uint8_t pitch, uint8_t velocity, bool on)) { s_noteHook = hook; }
+
+static void incomingNote(byte channel, byte pitch, byte velocity, bool on, uint8_t via)
+{
+    if (!(mtConfig.midi.notesInMode == via || mtConfig.midi.notesInMode == notesIn_usb_and_jack)) return;
+    if (!isIncomingChannelDesired(channel)) return;
+    const int8_t transp = 12 * (mtConfig.midi.middleC - 2);
+    pitch = clamp(pitch + transp, 0, 127);
+    if (s_noteHook != nullptr) s_noteHook(pitch, velocity, on);
+}
+
 void handleJackNoteOn(byte channel, byte pitch, byte velocity)
 {
-    //	Serial.printf("ON\tch: %d, pitch: %d, velo: %d \r\n", channel, pitch,
-    //					velocity);
-    //	MIDI.sendNoteOn(pitch, velocity, channel);
-
-    if (velocity == 0)
-    {
-        handleJackNoteOff(channel, pitch, 0);
-        return;
-    }
-
-    if (mtConfig.midi.notesInMode == notesIn_jack ||
-        mtConfig.midi.notesInMode == notesIn_usb_and_jack)
-    {
-
-        if (isIncomingChannelDesired(channel))
-        {
-
-            int8_t transp = 12 * (mtConfig.midi.middleC - 2);
-            pitch = clamp(pitch + transp, 0, 127);
-
-            if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_sequencer)
-            {
-                sendSelection();
-
-                sequencer.handleNoteOn(
-                  Sequencer::GRID_OUTSIDE_PATTERN, pitch, velocity, pitch + 100);
-
-                patternEditor.refreshPatternFromOutsideModule();
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SamplePlayback)
-            {
-                SP->noteOnHandle(channel, pitch, velocity, pitch + 100);
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SampleEditor)
-            {
-                SE->noteOnHandle(channel, pitch, velocity, pitch + 100);
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SampleRecorder)
-            {
-                SR->noteOnHandle(channel, pitch, velocity, pitch + 100);
-            }
-        }
-    }
+    if (velocity == 0) { handleJackNoteOff(channel, pitch, 0); return; }
+    incomingNote(channel, pitch, velocity, true, notesIn_jack);
 }
+
 void handleUsbNoteOn(byte channel, byte pitch, byte velocity)
 {
-    //	Serial.printf("ON\tch: %d, pitch: %d, velo: %d \r\n", channel, pitch,
-    //					velocity);
-    //	MIDI.sendNoteOn(pitch, velocity, channel);
-
-    if (velocity == 0)
-    {
-        handleUsbNoteOff(channel, pitch, 0);
-        return;
-    }
-
-    if (mtConfig.midi.notesInMode == notesIn_usb ||
-        mtConfig.midi.notesInMode == notesIn_usb_and_jack)
-    {
-        if (isIncomingChannelDesired(channel))
-        {
-            int8_t transp = 12 * (mtConfig.midi.middleC - 2);
-            pitch = clamp(pitch + transp, 0, 127);
-
-            if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_sequencer)
-            {
-                sendSelection();
-
-                sequencer.handleNoteOn(
-                  Sequencer::GRID_OUTSIDE_PATTERN, pitch, velocity, pitch + 100);
-
-                patternEditor.refreshPatternFromOutsideModule();
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SamplePlayback)
-            {
-                SP->noteOnHandle(channel, pitch, velocity, pitch + 100);
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SampleEditor)
-            {
-                SE->noteOnHandle(channel, pitch, velocity, pitch + 100);
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SampleRecorder)
-            {
-                SR->noteOnHandle(channel, pitch, velocity, pitch + 100);
-            }
-        }
-    }
+    if (velocity == 0) { handleUsbNoteOff(channel, pitch, 0); return; }
+    incomingNote(channel, pitch, velocity, true, notesIn_usb);
 }
 
-void handleJackNoteOff(byte channel, byte pitch, [[maybe_unused]] byte velocity)
-{
+void handleJackNoteOff(byte channel, byte pitch, [[maybe_unused]] byte velocity) { incomingNote(channel, pitch, 0, false, notesIn_jack); }
 
-    //	Serial.printf("OFF\tch: %d, pitch: %d, velo: %d\r\n", channel, pitch,
-    //					velocity);
+void handleUsbNoteOff(byte channel, byte pitch, [[maybe_unused]] byte velocity) { incomingNote(channel, pitch, 0, false, notesIn_usb); }
 
-    if (mtConfig.midi.notesInMode == notesIn_jack ||
-        mtConfig.midi.notesInMode == notesIn_usb_and_jack)
-    {
-        if (isIncomingChannelDesired(channel))
-        {
-            int8_t transp = 12 * (mtConfig.midi.middleC - 2);
-            pitch = clamp(pitch + transp, 0, 127);
+void handleJackControlChange(byte, byte, byte) {} // no stock screen is left to take MIDI CCs
 
-            if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_sequencer)
-            {
-                sendSelection();
-                sequencer.handleNoteOff(Sequencer::GRID_OUTSIDE_PATTERN, pitch, 0, pitch + 100);
-
-                if (isEditMode())
-                {
-                    //					if (isMultiSelectionOnOneLine() &&
-                    // sequencer.noMoreRecOpen())
-                    if (sequencer.noMoreRecOpen())
-                    {
-                        PTE->moveCursorByStepParallel();
-                    }
-                }
-                patternEditor.refreshPatternFromOutsideModule();
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SamplePlayback)
-            {
-                SP->noteOffHandle(channel, pitch, 0, pitch + 100);
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SampleEditor)
-            {
-                SE->noteOffHandle(channel, pitch, 0, pitch + 100);
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SampleRecorder)
-            {
-                SR->noteOffHandle(channel, pitch, 0, pitch + 100);
-            }
-        }
-    }
-}
-
-void handleUsbNoteOff(byte channel, byte pitch, [[maybe_unused]] byte velocity)
-{
-
-    //	Serial.printf("OFF\tch: %d, pitch: %d, velo: %d\r\n", channel, pitch,
-    //					velocity);
-
-    if (mtConfig.midi.notesInMode == notesIn_usb ||
-        mtConfig.midi.notesInMode == notesIn_usb_and_jack)
-    {
-        if (isIncomingChannelDesired(channel))
-        {
-            int8_t transp = 12 * (mtConfig.midi.middleC - 2);
-            pitch = clamp(pitch + transp, 0, 127);
-
-            if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_sequencer)
-            {
-                sendSelection();
-                sequencer.handleNoteOff(Sequencer::GRID_OUTSIDE_PATTERN, pitch, 0, pitch + 100);
-
-                if (isEditMode())
-                {
-                    if (sequencer.noMoreRecOpen())
-                    {
-                        PTE->moveCursorByStepParallel();
-                    }
-                }
-                patternEditor.refreshPatternFromOutsideModule();
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SamplePlayback)
-            {
-                SP->noteOffHandle(channel, pitch, 0, pitch + 100);
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SampleEditor)
-            {
-                SE->noteOffHandle(channel, pitch, 0, pitch + 100);
-            }
-            else if (sequencer.getMidiInVoiceMode() == sequencer.midiInVoiceMode_SampleRecorder)
-            {
-                SR->noteOffHandle(channel, pitch, 0, pitch + 100);
-            }
-        }
-    }
-}
-
-void handleJackControlChange(byte channel, byte number, byte value)
-{
-
-    if ((mtConfig.midi.ccInMode == ccIn_None) || (mtConfig.midi.ccInMode == ccIn_usb))
-        return;
-
-    if ((channel == mtConfig.midi.ccInChannel) || (mtConfig.midi.ccInChannel == ALL_CC_CHANNELS))
-    {
-        if (mtInterface.isPerformanceModeScreenActive())
-            peformanceModeOnMidiCC(number, value);
-
-        IE->onControlChangeReceive(number, value);
-        SP->onControlChangeReceive(number, value);
-    }
-}
-
-void handleUSBControlChange(byte channel, byte number, byte value)
-{
-    if ((mtConfig.midi.ccInMode == ccIn_None) || (mtConfig.midi.ccInMode == ccIn_jack))
-        return;
-
-    if ((channel == mtConfig.midi.ccInChannel) || (mtConfig.midi.ccInChannel == ALL_CC_CHANNELS))
-    {
-        if (mtInterface.isPerformanceModeScreenActive())
-            peformanceModeOnMidiCC(number, value);
-
-        IE->onControlChangeReceive(number, value);
-        SP->onControlChangeReceive(number, value);
-    }
-}
+void handleUSBControlChange(byte, byte, byte) {}
 
 static uint32_t s_audioBlockStartUs = 0;
 static uint32_t s_clockSubBlockOffsetUs = 0;

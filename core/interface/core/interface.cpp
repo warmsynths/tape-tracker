@@ -9,15 +9,9 @@
 #include "core/titleBar.h"
 
 #include "fourTrack/fourTrack.h"
-#include "instrumentEditor/instrumentEditor.h"
-#include "patternEditor/patternEditor.h"
-#include "performanceMode/performanceMode.h"
-#include "projectEditor/projectEditor.h"
-#include "sampleEditor/sampleEditor.h"
-#include "samplePlayback/samplePlayback.h"
-#include "sampleRecorder/sampleRecorder.h"
 
 #include "fileManager.h"
+#include "mtAudioEngine.h"
 #include "mtConfig.h"
 #include "mtPadBoard.h"
 #include "mtStructs.h"
@@ -48,16 +42,16 @@ extern uint8_t isAudioOutMuted();
 
 const uint8_t Interface::modulesCount = 14;
 const hModule Interface::modules[modulesCount] = {
-    &projectEditor,    // 0
+    nullptr,           // 0 (projectEditor removed)
     nullptr,           // 1 (Sample loader removed)
-    &patternEditor,    // 2
-    &samplePlayback,   // 3
+    nullptr,           // 2 (patternEditor removed)
+    nullptr,           // 3 (samplePlayback removed)
     nullptr,           // 4 (Song editor removed)
-    &instrumentEditor, // 5
-    &sampleEditor,     // 6
+    nullptr,           // 5 (instrumentEditor removed)
+    nullptr,           // 6 (sampleEditor removed)
     nullptr,           // 7 (Config editor removed)
-    &sampleRecorder,   // 8
-    &performanceMode,  // 9
+    nullptr,           // 8 (sampleRecorder removed)
+    nullptr,           // 9 (performanceMode removed)
     nullptr,           // 10 (Image viewer removed)
     nullptr,           // 11
     nullptr,           // 12 (Master screen removed)
@@ -68,7 +62,7 @@ const uint8_t Interface::modulesButtonsCount = 11;
 const uint32_t Interface::modulesButtons[modulesButtonsCount][3] = {
     { interfaceButtonPerformance, 9, 0 },
     { interfaceButtonMaster, 12, 0 },
-    { interfaceButtonParams, 5, mtInstEditModeParams },
+    { interfaceButtonParams, 5, 0 },
     { interfaceButtonFile, 0, 0 },
     { interfaceButtonPattern, 2, 0 },
     { interfaceButtonSamplePlay, 3, 0 },
@@ -94,7 +88,6 @@ void Interface::begin(Platform* platform, Synth* synth)
     Interface::platform = platform;
     Interface::fileSystem = platform->getFileSystem();
     Interface::ip = &::ip;
-    patternEditor.initExternalRamState();
     Interface::synth = synth;
     operatingMode = mtOperatingModeStartup;
 
@@ -395,15 +388,13 @@ void Interface::refreshInterfaceControlsColors()
 //=======================================================================
 void Interface::activateModule(hModule module, uint32_t options)
 {
+    if (module == nullptr) return; // the stock screens are removed; only the Four-Track screen is left
     ip->clearAllButtons();
     ip->clearAllPots();
     ip->clearGlobalPads();
 
     onScreenModule = module;
-    if (module != &patternEditor)
-    {
-        songTimer.show();
-    }
+    songTimer.show();
     module->initDisplayControls();
 
     module->start(options);
@@ -449,16 +440,8 @@ void Interface::switchModuleByButton(hModule module, uint8_t button, uint32_t op
     if (modules[modulesButtons[index][1]] == module)
         return;
 
-#ifndef PLATFORM_IMX
-    // The Sample Editor's work buffers sit on top of the Four-Track regions. Opening it while
-    // tracks hold recordings would overwrite them.
-    if (modules[modulesButtons[index][1]] == &sampleEditor && fourTrack.hasParts())
-    {
-        mtPopups.show(0, "Tracks hold recordings", "Sample Editor would erase them");
-        return;
-    }
-#endif
 
+    if (modules[modulesButtons[index][1]] == nullptr) return;
     uint32_t localOptions = options > 0 ? options : modulesButtons[index][2];
 
     deactivateModule(module);
@@ -467,7 +450,7 @@ void Interface::switchModuleByButton(hModule module, uint8_t button, uint32_t op
 
 void Interface::switchModuleToPrevious(hModule module, uint8_t options)
 {
-    if (previousModule == module)
+    if (previousModule == module || previousModule == nullptr)
         return;
 
     hModule prevModule = previousModule;
@@ -526,12 +509,12 @@ bool Interface::isSongScreenActive()
 
 bool Interface::isPatternScreenActive()
 {
-    return isOnScreenModule(&patternEditor);
+    return false;
 }
 
 bool Interface::isPerformanceModeScreenActive()
 {
-    return isOnScreenModule(&performanceMode);
+    return false;
 }
 
 bool Interface::isMasterScreenActive()
@@ -541,12 +524,12 @@ bool Interface::isMasterScreenActive()
 
 bool Interface::isInstrumentParamsScreenActive()
 {
-    return isOnScreenModule(&instrumentEditor);
+    return false;
 }
 
 bool Interface::isSamplePlayerScreenActive()
 {
-    return isOnScreenModule(&samplePlayback);
+    return false;
 }
 
 bool Interface::isOnScreenModule(ModuleBase* module)

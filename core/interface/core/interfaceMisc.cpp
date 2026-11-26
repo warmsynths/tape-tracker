@@ -1,6 +1,5 @@
 #include "core/interface.h"
 
-#include "projectEditor/projectEditor.h"
 
 #include "fileManager.h"
 #include "songTimer.h"

@@ -244,3 +244,11 @@ Fix: Device settings, Firmware found no update files. The stock list call skips 
 
 ## FT42 (not sent)
 The take being recorded is a bitmap too (it was 120 red columns). It grows at one pixel per column in the lane's own 250 px picture; only the newest columns are written to the display chip each update (about 250 short writes of 1 to 2 bytes, an estimated 1.5 ms every 100 ms). The picture is cleared once when a take starts and replaced by the finished waveform when it ends. With Waveforms on Columns the old red columns are used.
+
+## FT43 (not sent): the stock screens are gone
+- **Boot:** the Four-Track screen opens straight away on load. (Before, the stock Pattern screen opened and you had to press Song.)
+- **Removed from the firmware:** the stock Pattern editor, Song editor, Performance mode, Instrument editor, Sample editor, Sample recorder, Sample playback, Sample loader, Master screen, Project editor, Config editor (its hardware actions for USB audio, line input and brightness stay) and Image viewer. Their MIDI, sequencer and file-manager hooks were stubbed.
+- **Flash:** 910,136 bytes before, 529,292 after (50.5% of 1 MB, about 519 KB free). Step by step with a fresh library each time: Song editor, Config editor, Image viewer and Master screen together -70.6 KB; Sample loader -36.4 KB; everything else together -273.8 KB (they depend on each other, so they went in one step). Internal RAM 172,656 to 157,152 bytes; the external RAM the stock screens used went from 15.59 MB to 15.01 MB.
+- **MIDI:** incoming notes (on the channel set in Device settings) now play the pads: C2 (note 36) is pad 1, up to 48 pads. MIDI CC input does nothing for now. This is new and untested.
+- **Not touched:** the bootloader area and the flash start address (the linker script and platform files are unchanged).
+- **Test first:** it boots to Four-Track; every button still does its job; project save and load; Load samples and Resample; Device settings and the firmware update (the update still goes through the stock bootloader, which is untouched, so a bad build can be fixed by installing another file).

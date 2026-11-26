@@ -1,4 +1,5 @@
 #include "fourTrack.h"
+#include "mtMidi.h"
 
 #include "Platform.h"
 #include "core/interface.h"
@@ -48,6 +49,13 @@ static void functSamplePlay() { functKey(ft::kSamplePlay); } // pad sample setti
 static void functConfig() { functKey(ft::kConfig); } // device settings
 static void functCopy() { functKey(ft::kCopy); }     // copy a Part (Shift: undo)
 static void functDelete() { functKey(ft::kDelete); } // clear a Part (Shift: all)
+// Incoming MIDI notes play the pads: C2 (36) is the first of the 48
+static void ftMidiNote(uint8_t pitch, uint8_t velocity, bool on)
+{
+    (void)velocity;
+    if (pitch < 36 || pitch >= 36 + 48) return;
+    FT->application().pad(pitch - 36, on);
+}
 static void functSampleRec() { functKey(ft::kSampleRec); } // resample the mix
 static void functSampleLoad() { functKey(ft::kSampleLoad); } // load samples from the card
 static void functSong() { functKey(ft::kSong); } // the Song button switches the click on or off
@@ -115,11 +123,13 @@ void cFourTrack::start(uint32_t options)
 
     showScreen();
     setDefaultScreenFunct();
+    midiSetNoteHook(ftMidiNote);
     application().enter();
 }
 
 void cFourTrack::stop()
 {
+    midiSetNoteHook(nullptr);
     application().setShift(false);
     application().leave();
     moduleRefresh = 0;

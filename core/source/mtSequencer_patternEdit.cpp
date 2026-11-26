@@ -2,14 +2,18 @@
 #include "fileManager.h"
 #include "mtAudioEngine.h"
 #include "mtSequencer.h"
+#include "removedScreens.h"
 #include "mtStructs.h"
-#include "patternEditor/patternEditor.h"
 
 #include "ctype.h"
 #include "util_math.h"
 #include <cr_section_macros.h>
 
 extern Sequencer sequencer;
+
+// the effect last typed in a step (the pattern editor used to keep these)
+static uint8_t s_prevFx = 0;
+static uint8_t s_prevFxValue = 0;
 
 __NOINIT(EXTERNAL_RAM) Sequencer::strPattern copyPastePattern;
 
@@ -767,12 +771,12 @@ void Sequencer::changeSelectionFxValue(uint8_t fxIndex, int16_t value)
 
             if (!isMultiSelection() && _fx->type == 0)
             {
-                _fx->type = interfaceGlobals.fxNameToId(patternEditor.getPreviousUsedFx());
-                _fx->value = patternEditor.getPreviousUsedFxValue();
+                _fx->type = interfaceGlobals.fxNameToId(s_prevFx);
+                _fx->value = s_prevFxValue;
             }
 
-            patternEditor.setPreviousUsedFxValue(_fx->value);
-            patternEditor.setPreviousUsedFx(interfaceGlobals.fxIdToName(_fx->type));
+            s_prevFxValue = (_fx->value);
+            s_prevFx = (interfaceGlobals.fxIdToName(_fx->type));
         }
     }
 
@@ -807,13 +811,13 @@ void Sequencer::setSelectionFxValueByPad(uint8_t fxIndex, int16_t pad)
 
             if (!isMultiSelection() && _fx->type == 0)
             {
-                _fx->type = interfaceGlobals.fxNameToId(patternEditor.getPreviousUsedFx());
+                _fx->type = interfaceGlobals.fxNameToId(s_prevFx);
             }
 
             int lastHandledPad = std::min(47, getFxMax(_fx->type) - getFxMin(_fx->type));
             _fx->value = roundf(
               mapClamped<float>(pad, 0, lastHandledPad, getFxMin(_fx->type), getFxMax(_fx->type)));
-            patternEditor.setPreviousUsedFxValue(_fx->value);
+            s_prevFxValue = (_fx->value);
 
             sometinghWasChanged = true;
         }
@@ -1004,8 +1008,8 @@ void Sequencer::changeSelectionFxType(uint8_t index, int16_t value)
                     _fx->value = clamp<int>(_fx->value, getFxMin(_fx->type), getFxMax(_fx->type));
                 }
 
-                patternEditor.setPreviousUsedFxValue(_fx->value);
-                patternEditor.setPreviousUsedFx(interfaceGlobals.fxIdToName(_fx->type));
+                s_prevFxValue = (_fx->value);
+                s_prevFx = (interfaceGlobals.fxIdToName(_fx->type));
 
                 somethingWasChanged = true;
             }
@@ -1036,7 +1040,7 @@ void Sequencer::setSelectionFxType(uint8_t fxSlot, int16_t value)
 
             step->fx[fxSlot].type = value;
 
-            if (step->fx[fxSlot].type != patternEditor.getPreviousUsedFx() && !isMultiSelection())
+            if (step->fx[fxSlot].type != s_prevFx && !isMultiSelection())
             {
                 step->fx[fxSlot].value = getFxDefault(step->fx[fxSlot].type);
             }
@@ -1047,8 +1051,8 @@ void Sequencer::setSelectionFxType(uint8_t fxSlot, int16_t value)
                                                     getFxMax(step->fx[fxSlot].type));
             }
 
-            patternEditor.setPreviousUsedFxValue(step->fx[fxSlot].value);
-            patternEditor.setPreviousUsedFx(interfaceGlobals.fxIdToName(step->fx[fxSlot].type));
+            s_prevFxValue = (step->fx[fxSlot].value);
+            s_prevFx = (interfaceGlobals.fxIdToName(step->fx[fxSlot].type));
         }
     }
 
