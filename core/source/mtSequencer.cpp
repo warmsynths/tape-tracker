@@ -10,7 +10,6 @@
 #include "mtStructs.h"
 #include "sampleRecorder/sampleRecorder.h"
 
-#include "configEditor/configEditor.h"
 #include "core/songTimer.h"
 
 #include "patternEditor/patternEditor.h"

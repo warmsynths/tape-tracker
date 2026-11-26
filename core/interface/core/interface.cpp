@@ -2,14 +2,12 @@
 
 #include "core/interface.h"
 #include "ThemeManager.h"
-#include "configEditor/configEditor.h"
 #include "configEditor/configMenuActions.h"
 #include "core/interfaceMenuPopup.h"
 #include "core/interfacePopups.h"
 #include "core/songTimer.h"
 #include "core/titleBar.h"
 
-#include "imageViewer/imageViewer.h"
 #include "fourTrack/fourTrack.h"
 #include "instrumentEditor/instrumentEditor.h"
 #include "masterParams/masterParams.h"
@@ -59,10 +57,10 @@ const hModule Interface::modules[modulesCount] = {
     nullptr,           // 4 (Song editor removed)
     &instrumentEditor, // 5
     &sampleEditor,     // 6
-    &configEditor,     // 7
+    nullptr,           // 7 (Config editor removed)
     &sampleRecorder,   // 8
     &performanceMode,  // 9
-    &imageViewer,      // 10
+    nullptr,           // 10 (Image viewer removed)
     nullptr,           // 11
     &masterParams,     // 12
     &fourTrack,        // 13 (test build: opened with the Song button)
@@ -212,7 +210,6 @@ void Interface::doStartTasks()
     interfaceGlobals.currentFirmwareBuild = platform->getSystemInfo()->buildId;
 
     ThemeManager::init(platform);
-    refreshThemeAndFontMenuOptions();
 
     songTimer.initControls();
     mtPopups.initPopupsDisplayControls();
@@ -587,9 +584,7 @@ void interfaceEnvents(uint8_t event, void* param1, void* param2, void* param3)
         }
         case eventActivateImageViewer:
         {
-            mtInterface.deactivateModule((hModule)param1);
-            mtInterface.activateModule(&imageViewer, param2 == nullptr ? 0 : *((uint8_t*)param2));
-            break;
+            break; // the image viewer was removed
         }
         case eventToggleActiveModule:
         {

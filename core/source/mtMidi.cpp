@@ -1,6 +1,5 @@
 #include "mtSequencer.h"
 
-#include "configEditor/configEditor.h"
 #include "instrumentEditor/instrumentEditor.h"
 #include "patternEditor/patternEditor.h"
 #include "sampleEditor/sampleEditor.h"
