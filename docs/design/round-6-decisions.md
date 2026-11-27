@@ -53,3 +53,8 @@ Q10 (later-Part recording model) is being reshaped: the owner asked for a looper
 18. **Adopt the design's home controls** (jog scrubs, Left and Right step a beat, Up and Down choose the track) with my level mapping: Shift + Up and Down is the selected track's level, Shift + Left and Right the synth level; output volume moves to Config and Params; Undo take moves to Shift + Delete; Settings joins Project.
 19. **Live filter: whole mix** (two stock filters on the final mix).
 Also: the owner asked for a firmware with the latency calibration test now (FT47).
+
+## Build progress (2026-11-27)
+- Done: input latency calibration (FT47, sent). Round 7 brief written (`round-7-brief.md`).
+- Restyle (A), step 1 done: a `roundRect` command in the drawing layer (firmware via the chip's line-width corner setting, emulator on the canvas, cost 28 bytes in the model: it sets and puts back the corner setting); the shared widgets (cells, tags, the eight button cells, chord pads) are now rounded with an inset focus line. **Not yet checked on the chip:** the corner points are placed so a rounded rectangle covers the same area as a plain one; verify on the device.
+- Next, in order: (a) the home screen and lanes in the round-6 look (lane cards, focus line, darkening rectangle, M boxes); (b) the chord screens rebuilt to the design (fixed layout, modifiers, play styles, Sets screen, Voicing and the feel Style); (c) the Sound screen (patch tiles, dials); (d) Play view; (e) first-take flow (bars up front, auto-stop), Layer and Fade; (f) FX sends, live filter, boot logo; (g) track roles (Plaits drums).

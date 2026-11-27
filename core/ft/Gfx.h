@@ -13,6 +13,8 @@ class Gfx
     virtual ~Gfx() {}
     virtual void color(uint32_t rgb) = 0;
     virtual void rect(int x, int y, int w, int h) = 0;           // filled, in the current colour
+    // A filled rectangle with rounded corners of radius r (r >= 1) covering the same area as rect(x, y, w, h).
+    virtual void roundRect(int x, int y, int w, int h, int /*r*/) { rect(x, y, w, h); }
     virtual void line(int x0, int y0, int x1, int y1) = 0;       // one pixel wide
     virtual void dot(int x, int y, int radius) = 0;              // filled circle
     // Draws text with its top left at (x, y). `font` is 0 to 4, the five font slots.

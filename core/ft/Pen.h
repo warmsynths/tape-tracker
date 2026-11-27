@@ -27,6 +27,15 @@ class Pen
         g.color(c);
         g.rect(x, y, w, h);
     }
+    // A card, field, cell or tag: rounded (radius 6) when it is at least 18 x 18, square otherwise. Full-width
+    // bands and list rows stay square (use rect).
+    void card(int x, int y, int w, int h, uint32_t c)
+    {
+        if (w <= 0 || h <= 0) return;
+        g.color(c);
+        if (w >= 18 && h >= 18) g.roundRect(x, y, w, h, 6);
+        else g.rect(x, y, w, h);
+    }
     void frame(int x, int y, int w, int h, uint32_t c)
     {
         g.color(c);
@@ -65,7 +74,7 @@ class Pen
         const int w = width(s, F12) + (filled ? 11 : 13);
         if (filled)
         {
-            rect(x, y, w, 18, fillColor);
+            card(x, y, w, 18, fillColor);
             text(x + 5, y + 2, s, F12, textOn);
         }
         else
@@ -78,8 +87,8 @@ class Pen
     // A cell with the focus look: lighter fill and a bar along its top edge
     void cell(int x, int y, int w, int h, bool focus, uint32_t normal)
     {
-        rect(x, y, w, h, focus ? p.sel : normal);
-        if (focus) rect(x, y, w, 2, p.text);
+        card(x, y, w, h, focus ? p.sel : normal);
+        if (focus) rect(x + 8, y, w - 16 > 0 ? w - 16 : w, 2, p.text); // the focus line, inset from the rounded corners
     }
 
     // The top bar every page shares (design 4.1)

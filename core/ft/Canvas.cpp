@@ -96,6 +96,7 @@ void Canvas::replay(int stage, Gfx& g) const
             case kAlpha: g.alpha(m.a); break;
             case kMask: g.mask(m.a, m.b, m.c, m.d, m.off); break;
             case kRect: g.rect(m.a, m.b, m.c, m.d); break;
+            case kRoundRect: g.roundRect(m.a, m.b, m.c, m.d, m.off); break;
             case kLine: g.line(m.a, m.b, m.c, m.d); break;
             case kDot: g.dot(m.a, m.b, m.c); break;
             case kText:

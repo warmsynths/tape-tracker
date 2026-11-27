@@ -92,6 +92,15 @@
       const op = cmd[i], a = cmd[i + 1], b = cmd[i + 2], c = cmd[i + 3], d = cmd[i + 4], e = cmd[i + 5], n = cmd[i + 6];
       if (op === 1) { color = a; ctx.fillStyle = css(a); }
       else if (op === 2) ctx.fillRect(a, b, c, d);
+      else if (op === 9) {
+        const r = Math.max(1, Math.min(e, c >> 1, d >> 1));
+        ctx.beginPath();
+        ctx.moveTo(a + r, b); ctx.lineTo(a + c - r, b); ctx.arcTo(a + c, b, a + c, b + r, r);
+        ctx.lineTo(a + c, b + d - r); ctx.arcTo(a + c, b + d, a + c - r, b + d, r);
+        ctx.lineTo(a + r, b + d); ctx.arcTo(a, b + d, a, b + d - r, r);
+        ctx.lineTo(a, b + r); ctx.arcTo(a, b, a + r, b, r);
+        ctx.closePath(); ctx.fill();
+      }
       else if (op === 3) {
         if (b === d) ctx.fillRect(Math.min(a, c), b, Math.abs(c - a) + 1, 1);
         else ctx.fillRect(a, Math.min(b, d), 1, Math.abs(d - b) + 1);

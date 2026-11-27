@@ -37,7 +37,7 @@ uint8_t g_adv[5][128];
 
 //------------------------------------------------------------------------------------------
 // Commands for the canvas: 7 ints each.
-enum Op { kColor = 1, kRect = 2, kLine = 3, kDot = 4, kText = 5, kBars = 6, kAlpha = 7, kMask = 8 };
+enum Op { kColor = 1, kRect = 2, kLine = 3, kDot = 4, kText = 5, kBars = 6, kAlpha = 7, kMask = 8, kRoundRect = 9 };
 constexpr int kMaxCommands = 4096;
 constexpr int kPoolSize = 32768;
 int32_t g_cmd[kMaxCommands * 7];
@@ -52,6 +52,7 @@ class BufferGfx : public Gfx
     void alpha(int a) override { push(kAlpha, a, 0, 0, 0, 0, 0); }
     void mask(int slot, int x, int y, int w, int h) override { push(kMask, slot, x, y, w, h, 0); }
     void rect(int x, int y, int w, int h) override { push(kRect, x, y, w, h, 0, 0); }
+    void roundRect(int x, int y, int w, int h, int r) override { push(kRoundRect, x, y, w, h, r, 0); }
     void line(int x0, int y0, int x1, int y1) override { push(kLine, x0, y0, x1, y1, 0, 0); }
     void dot(int x, int y, int radius) override { push(kDot, x, y, radius, 0, 0, 0); }
     void text(int x, int y, const char* s, int font) override

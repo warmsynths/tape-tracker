@@ -1403,7 +1403,7 @@ void App::drawChords(Pen& p)
         else if (t == Tier::Control) fill = pal.cell;
         if (t == Tier::Outside || t == Tier::Off) ink = pal.dim;
         if (held) { fill = pal.text; ink = pal.bg; }
-        p.rect(px, py, 62, gh, fill);
+        p.card(px, py, 62, gh, fill);
         if (!held && t == Tier::Tonic) p.rect(px, py, 62, 3, pal.marker);
         if (!held && t == Tier::ChordTone) p.rect(px, py + gh - 3, 62, 3, pal.meter);
         if (!held && t == Tier::Colour) p.rect(px, py, 62, 3, pal.dim);

@@ -41,6 +41,19 @@ class DisplayGfx : public ft::Gfx
         API_VERTEX2F(x + w - 1, y + h - 1);
         API_END();
     }
+    // Rounded corners: the chip rounds a rectangle by the line width (in sixteenths of a pixel) and grows
+    // it by the same amount, so the corner points move in by r - 1 to cover what rect() covers.
+    void roundRect(int x, int y, int w, int h, int r) override
+    {
+        if (r < 1) r = 1;
+        if (r * 2 > w || r * 2 > h) { rect(x, y, w, h); return; }
+        API_LINE_WIDTH(16 * r);
+        API_BEGIN(RECTS);
+        API_VERTEX2F(x + r - 1, y + r - 1);
+        API_VERTEX2F(x + w - r, y + h - r);
+        API_END();
+        API_LINE_WIDTH(16);
+    }
     void line(int x0, int y0, int x1, int y1) override
     {
         API_BEGIN(LINES);

@@ -25,6 +25,7 @@ class Canvas : public Gfx
 
     void color(uint32_t rgb) override { add(kColor, (int)rgb, 0, 0, 0, 0, 4); }
     void rect(int x, int y, int w, int h) override { add(kRect, x, y, w, h, 0, 20); }
+    void roundRect(int x, int y, int w, int h, int r) override { add(kRoundRect, x, y, w, h, r, 28); } // the corner setting is set and put back around it
     void line(int x0, int y0, int x1, int y1) override { add(kLine, x0, y0, x1, y1, 0, 20); }
     void dot(int x, int y, int r) override { add(kDot, x, y, r, 0, 0, 24); }
     void text(int x, int y, const char* s, int font) override;
@@ -37,7 +38,7 @@ class Canvas : public Gfx
     void setMeasure(Gfx* g) { measure = g; }
 
   private:
-    enum Op : uint8_t { kColor, kRect, kLine, kDot, kText, kBars, kAlpha, kMask };
+    enum Op : uint8_t { kColor, kRect, kLine, kDot, kText, kBars, kAlpha, kMask, kRoundRect };
     struct Cmd
     {
         Op op;
