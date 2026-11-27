@@ -1687,6 +1687,7 @@ void App::fillView()
         v.inL = (uint8_t)(dl < -60 ? 0 : dl + 60);
         v.inR = (uint8_t)(dr < -60 ? 0 : dr + 60);
         v.waitDb = set.waitSound ? set.waitDb : 0;
+        v.waitNow = (int8_t)waitLevelDb;
         fmt(v.inputName, sizeof(v.inputName), "%s", sourceName(trackSource[recTrack >= 0 ? recTrack : session.selected()]));
     }
 
@@ -1787,8 +1788,8 @@ void App::fillView()
         fmt(L.tag, sizeof(L.tag), "%s", set.roleFlow && roleChosen[t] ? (trackRole[t] == TrackRole::Audio ? sourceName(trackSource[t]) : roleTag((int)trackRole[t])) : sourceName(trackSource[t])); // every track shows where it records from, or its role
         if (L.active && mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
         {
-            fmt(L.msg1, sizeof(L.msg1), "Waiting for sound");
-            fmt(L.msg2, sizeof(L.msg2), "input %d dB, starts at %d dB: jog changes it", (int)waitLevelDb, (int)set.waitDb);
+            fmt(L.msg1, sizeof(L.msg1), "Recording starts at the orange line");
+            fmt(L.msg2, sizeof(L.msg2), "Jog moves the line");
         }
         else if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
         {
@@ -1987,6 +1988,7 @@ void App::refresh(bool force)
     sig = hashBytes(sig, &v.barCount, sizeof(v.barCount));
     sig = hashBytes(sig, &v.focusLane, sizeof(v.focusLane));
     sig = hashBytes(sig, &v.waitDb, sizeof(v.waitDb));
+    sig = hashBytes(sig, &v.waitNow, sizeof(v.waitNow));
     sig = hashBytes(sig, v.inputName, sizeof(v.inputName));
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {

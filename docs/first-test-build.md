@@ -329,3 +329,6 @@ FT57 crashed on the first synth note (stuck chord, scratchy sound, then a crash)
 - Wait for sound (Tempo panel, B2: Left/Right to the box, Insert switches it) now replaces the count-in: Rec arms at once.
 - While it waits, the lane shows the input level and the level it starts at, the hint says "Waiting for your first note", and the **jog sets the start level live** (1 dB a click, Shift 3 dB). Set it above any buzz and below your note.
 - The home hint on an empty project says B2 holds tempo, bars and Wait for sound.
+
+## FT60: the start line on the arming screen
+While Wait for sound is armed the lane says "Recording starts at the orange line", draws a thick orange line on the input meter labelled "START -36 dB", and shows the input level now at the right. The jog moves the line; no trip to Config is needed.

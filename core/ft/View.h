@@ -81,6 +81,7 @@ struct View
     bool blink;         // the armed circle
     uint8_t inL, inR;   // input level 0..100 for the armed lane's meters
     int8_t waitDb;      // where the wait level tick sits, 0 when not waiting
+    int8_t waitNow;     // the input level while waiting, in dB
     char inputName[12];
     Lane lane[4];
     Prompt prompt;

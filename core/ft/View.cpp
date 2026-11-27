@@ -315,12 +315,6 @@ void Painter::drawLane(int i)
             rect(190, y + 150, 560, 10, pal.track);
             rect(680, y + 130, 1, 34, dim);
             T(686, y + 169, "-6", kF12, dim);
-            if (v.waitDb != 0)
-            {
-                const int wx = 190 + 560 * (v.waitDb + 48) / 48;
-                rect(wx, y + 130, 1, 34, pal.marker);
-                T(wx + 6, y + 169, "Wait level", kF12, dim);
-            }
         }
         else if (v.loopFrames == 0)
         {
@@ -401,8 +395,19 @@ void Painter::drawDynamic()
                 if (L.msg2[0] != 0) T(190, y + 67, L.msg2, kF14, pal.text);
                 rect(190, y + 136, levelX(v.inL, 560), 10, pal.meter);
                 rect(190, y + 150, levelX(v.inR, 560), 10, pal.meter);
-                const int bx = 190 + 560 * (v.waitDb + 48) / 48;
-                if (v.waitDb != 0) rect(bx, y + 130, 1, 34, pal.marker);
+                if (v.waitDb != 0)
+                {
+                    // the line the input has to reach to start the take, with its level written over it
+                    const int bx = 190 + 560 * (v.waitDb + 48) / 48;
+                    rect(bx - 1, y + 110, 3, 58, pal.marker);
+                    char lv[24];
+                    fmt(lv, sizeof lv, "START %d dB", (int)v.waitDb);
+                    const int tw = textWidth(lv, kF14);
+                    T(bx + tw + 14 > 750 ? bx - tw - 8 : bx + 8, y + 108, lv, kF14, pal.marker);
+                    char now[24];
+                    fmt(now, sizeof now, "input %d dB", (int)v.waitNow);
+                    T(750 - textWidth(now, kF14), y + 108, now, kF14, pal.text);
+                }
             }
             else if (v.loopFrames == 0)
             {
