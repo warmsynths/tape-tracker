@@ -1502,12 +1502,13 @@ void App::resampleJog(int delta)
 
 int App::deviceRowCount(int g) const
 {
-    static const int n[9] = { 3, 1, 1, 1, 3, 8, 7, 2, 2 };
+    static const int n[9] = { 3, 1, 1, 1, 3, 8, 7, 2, 3 };
     return n[g < 0 || g > 8 ? 0 : g];
 }
 
 void App::deviceOpen()
 {
+    synthPeak = 0;
     dvGroup = 0;
     dvRow = 0;
     dvRows = true;
@@ -1605,6 +1606,13 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             break;
         default:
             if (r == 0) { n = "Version"; hal.firmwareVersion(value, size); h = "The firmware version of this Tracker."; }
+            else if (r == 2)
+            {
+                n = "Synth load";
+                if (synthPeak < hal.synthLoad()) synthPeak = hal.synthLoad();
+                fmt(value, size, "%d%%", synthPeak < 0 ? 0 : synthPeak);
+                h = "The heaviest block of the synth since you opened this page, as a share of the time it has. Play a chord and look: above 80% means dropouts.";
+            }
             else { n = "Build"; fmt(value, size, "%s", FT_BUILD_ID); h = "The build of the Four-Track code. The emulator shows the same id when it runs the same code."; }
             break;
     }

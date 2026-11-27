@@ -34,9 +34,7 @@ void Synth::init(float sampleRate)
     drums.init(sampleRate);
     for (Voice& v : voice)
     {
-        v.shapeA.Init(); v.shapeB.Init();
-        v.sawA.Init(); v.sawB.Init();
-        v.squareA.Init(); v.squareB.Init();
+        v.phA = v.phB = 0.0f;
         v.amp = Env(); v.flt = Env();
         for (float& s : v.y) s = 0.0f;
         v.midi = -1;
@@ -165,33 +163,62 @@ void Synth::render(float* left, float* right, int n)
         const float f = noteToNorm(note, rate);
         const float fB = f * detuneRatio > 0.25f ? 0.25f : f * detuneRatio;
 
-        switch (p.osc)
-        {
-            case SynthOsc::Shape:
-                v.shapeA.Render(f, pulse, p.shape, mixA, (size_t)n);
-                if (p.detune != 0.0f) v.shapeB.Render(fB, pulse, p.shape, mixB, (size_t)n);
-                break;
-            case SynthOsc::Saw:
-                v.sawA.Render(f, pulse, p.shape, mixA, (size_t)n);
-                if (p.detune != 0.0f) v.sawB.Render(fB, pulse, p.shape, mixB, (size_t)n);
-                break;
-            case SynthOsc::SuperSquare:
-                v.squareA.Render(f, p.shape, mixA, (size_t)n);
-                if (p.detune != 0.0f) v.squareB.Render(fB, p.shape, mixB, (size_t)n);
-                break;
-        }
-
         const float keyOct = (note - 60.0f) / 12.0f * p.keyTrack;
         const float velScale = 0.4f + 0.6f * v.vel;
         float y0 = v.y[0], y1 = v.y[1], y2 = v.y[2], y3 = v.y[3];
         float sub = v.subPhase;
+        float phA = v.phA, phB = v.phB, g = v.g;
+        const bool two = p.detune != 0.0f;
+        const float shape = p.shape;
+        const SynthOsc oscType = p.osc;
+        // band-limited steps (polyBLEP): the cheap way to a clean saw and pulse
+        auto blep = [](float t, float dt) -> float {
+            if (t < dt) { t /= dt; return t + t - t * t - 1.0f; }
+            if (t > 1.0f - dt) { t = (t - 1.0f) / dt; return t * t + t + t + 1.0f; }
+            return 0.0f;
+        };
+        auto pulseWave = [&](float ph, float freq, float width) -> float {
+            float d = ph - width;
+            if (d < 0.0f) d += 1.0f;
+            return (ph < width ? 1.0f : -1.0f) + blep(ph, freq) - blep(d, freq);
+        };
+        auto oscSample = [&](float& ph, float freq) -> float {
+            ph += freq;
+            if (ph >= 1.0f) ph -= 1.0f;
+            switch (oscType)
+            {
+                case SynthOsc::Shape:
+                {
+                    const float saw = 2.0f * ph - 1.0f - blep(ph, freq);
+                    if (shape <= 0.5f)
+                    {
+                        const float d = ph < 0.5f ? 0.5f - ph : ph - 0.5f;
+                        const float a = shape * 2.0f;
+                        return (1.0f - 4.0f * d) * (1.0f - a) + saw * a;
+                    }
+                    const float a = (shape - 0.5f) * 2.0f;
+                    return saw * (1.0f - a) + pulseWave(ph, freq, pulse) * a;
+                }
+                case SynthOsc::Saw:
+                    return 2.0f * ph - 1.0f - blep(ph, freq);
+                default:
+                {
+                    float ph2 = ph + 0.5f * shape * 0.5f;
+                    if (ph2 >= 1.0f) ph2 -= 1.0f;
+                    return (pulseWave(ph, freq, pulse) + pulseWave(ph2, freq, 1.0f - pulse)) * 0.5f;
+                }
+            }
+        };
         for (int i = 0; i < n; i++)
         {
-            advance(v.amp, aRate, aDecayK, p.sustain, aReleaseK, v.gate);
-            advance(v.flt, fRate, fDecayK, p.fSustain, fReleaseK, v.gate);
+            if ((i & 3) == 0) // the envelopes move every fourth frame
+            {
+                advance(v.amp, aRate * 4.0f, aDecayK * 4.0f > 1.0f ? 1.0f : aDecayK * 4.0f, p.sustain, aReleaseK * 4.0f > 1.0f ? 1.0f : aReleaseK * 4.0f, v.gate);
+                advance(v.flt, fRate * 4.0f, fDecayK * 4.0f > 1.0f ? 1.0f : fDecayK * 4.0f, p.fSustain, fReleaseK * 4.0f > 1.0f ? 1.0f : fReleaseK * 4.0f, v.gate);
+            }
 
-            float x = mixA[i];
-            if (p.detune != 0.0f) x = (x + mixB[i]) * 0.6f;
+            float x = oscSample(phA, f);
+            if (two) x = (x + oscSample(phB, fB)) * 0.6f;
             if (p.subLevel > 0.0f)
             {
                 sub += f * 0.5f;
@@ -204,13 +231,16 @@ void Synth::render(float* left, float* right, int n)
                 x += p.noise * ((float)(int32_t)(noiseState >> 8) / 8388608.0f) * 0.4f;
             }
 
-            // 24 dB per octave low-pass: four one-pole stages with feedback
-            const float oct = (cutoffBase - 0.5f) * 8.0f + v.flt.value * p.envAmount + lfo * p.lfoCutoff + keyOct;
-            float fc = 800.0f * exp2f_(oct);
-            if (fc < 20.0f) fc = 20.0f;
-            if (fc > 0.42f * rate) fc = 0.42f * rate;
-            const float w = 6.2831853f * fc / rate;
-            const float g = w / (1.0f + w);
+            // 24 dB per octave low-pass: four one-pole stages with feedback; the cutoff is worked out every 8 frames
+            if ((i & 7) == 0)
+            {
+                const float oct = (cutoffBase - 0.5f) * 8.0f + v.flt.value * p.envAmount + lfo * p.lfoCutoff + keyOct;
+                float fc = 800.0f * exp2f_(oct);
+                if (fc < 20.0f) fc = 20.0f;
+                if (fc > 0.42f * rate) fc = 0.42f * rate;
+                const float w = 6.2831853f * fc / rate;
+                g = w / (1.0f + w);
+            }
             const float in = stmlib::SoftClip(x * makeup - k * y3);
             y0 += g * (in - y0);
             y1 += g * (y0 - y1);
@@ -219,6 +249,7 @@ void Synth::render(float* left, float* right, int n)
 
             sum[i] += y3 * v.amp.value * velScale * 0.5f;
         }
+        v.phA = phA; v.phB = phB; v.g = g;
         v.y[0] = y0; v.y[1] = y1; v.y[2] = y2; v.y[3] = y3;
         v.subPhase = sub;
     }

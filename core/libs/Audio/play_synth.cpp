@@ -60,9 +60,27 @@ void AudioPlaySynth::setKit(int kit)
     AudioInterrupts();
 }
 
+// How long a block takes, in processor cycles (the Tracker's cycle counter), so the load can be read off
+static inline uint32_t cycleCount()
+{
+    volatile uint32_t* demcr = (volatile uint32_t*)0xE000EDFC;
+    volatile uint32_t* ctrl = (volatile uint32_t*)0xE0001000;
+    if ((*demcr & (1u << 24)) == 0) *demcr |= (1u << 24);
+    if ((*ctrl & 1u) == 0) *ctrl |= 1u;
+    return *(volatile uint32_t*)0xE0001004;
+}
+
+int AudioPlaySynth::loadPercent()
+{
+    const uint32_t peak = peakCycles;
+    peakCycles = 0;
+    return (int)((uint64_t)peak * 100 / 522000u); // one block is 128 frames: about 522,000 cycles at 180 MHz
+}
+
 void AudioPlaySynth::update(void)
 {
     if (!started || !synth.active()) return;
+    const uint32_t t0 = cycleCount();
 
     audio_block_t* left = allocate();
     audio_block_t* right = allocate();
@@ -90,4 +108,6 @@ void AudioPlaySynth::update(void)
     transmit(right, 1);
     release(left);
     release(right);
+    const uint32_t spent = cycleCount() - t0;
+    if (spent > peakCycles) peakCycles = spent;
 }

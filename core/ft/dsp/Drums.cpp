@@ -67,17 +67,17 @@ const char* DrumKit::voiceName(int v) { return kVoiceNames[v < 0 ? 0 : (v >= kVo
 void DrumKit::init(float sampleRate)
 {
     rate = sampleRate;
-    analogKick.Init(); analogKickAlt.Init(); analogTom1.Init(); analogTom2.Init();
-    syntheticKick.Init(); syntheticKickAlt.Init();
-    analogSnare.Init(); analogSnareAlt.Init(); syntheticSnare.Init(); syntheticSnareAlt.Init();
-    hatA.Init(); openA.Init(); hatB.Init(); openB.Init();
     reset();
     setKit(0);
 }
 
 void DrumKit::reset()
 {
-    for (int i = 0; i < kVoices; i++) { simple[i] = Simple(); accent[i] = 0.0f; pending[i] = false; }
+    analogKick.Init(); analogKickAlt.Init(); analogTom1.Init(); analogTom2.Init();
+    syntheticKick.Init(); syntheticKickAlt.Init();
+    analogSnare.Init(); analogSnareAlt.Init(); syntheticSnare.Init(); syntheticSnareAlt.Init();
+    hatA.Init(); openA.Init(); hatB.Init(); openB.Init();
+    for (int i = 0; i < kVoices; i++) { simple[i] = Simple(); accent[i] = 0.0f; pending[i] = false; left[i] = 0; }
     activeFor = 0;
     chokeTarget = chokeGain = 1.0f;
 }
@@ -89,6 +89,8 @@ void DrumKit::trigger(int voice, int velocity)
     if (voice < 0 || voice >= kVoices) return;
     accent[voice] = (float)(velocity < 1 ? 1 : (velocity > 127 ? 127 : velocity)) / 127.0f;
     pending[voice] = true;
+    static const float secs[kVoices] = { 0.3f, 0.5f, 2.0f, 2.0f, 0.4f, 0.1f, 0.6f, 0.6f, 0.5f, 1.5f, 1.4f, 1.4f, 1.2f, 1.2f, 2.2f, 2.2f };
+    left[voice] = (int)(rate * secs[voice] / (float)kMaxBlock) + 1;
     activeFor = (int)(rate * 2.5f / (float)kMaxBlock); // about 2.5 s of sound after a hit
 }
 
@@ -181,6 +183,8 @@ void DrumKit::render(float* left, float* right, int n)
     float mix[kMaxBlock];
     for (int i = 0; i < n; i++) mix[i] = 0.0f;
     float a[kMaxBlock], t1[kMaxBlock], t2[kMaxBlock];
+    bool run[kVoices];
+    for (int v = 0; v < kVoices; v++) { run[v] = pending[v] || left[v] > 0; if (left[v] > 0) left[v]--; }
     auto clear = [&](float* b) { for (int i = 0; i < n; i++) b[i] = 0.0f; };
     const float sr = 44100.0f;
 
@@ -189,12 +193,12 @@ void DrumKit::render(float* left, float* right, int n)
         const bool trig = pending[Kick]; const float acc = accent[Kick]; pending[Kick] = false;
         const float tone = (float)k.kickTone / 100.0f, decay = (float)k.kickDecay / 100.0f;
         clear(a);
-        if (k.kickSynthetic) syntheticKick.Render(false, trig, acc, (float)k.kickHz / sr, tone, decay, 0.3f, 0.5f, 0.5f, a, (size_t)n);
+        if (!run[Kick]) {} else if (k.kickSynthetic) syntheticKick.Render(false, trig, acc, (float)k.kickHz / sr, tone, decay, 0.3f, 0.5f, 0.5f, a, (size_t)n);
         else analogKick.Render(false, trig, acc, (float)k.kickHz / sr, tone, decay, 0.5f, 0.5f, a, (size_t)n);
         for (int i = 0; i < n; i++) mix[i] += a[i] * 0.9f;
         const bool trigB = pending[KickAlt]; const float accB = accent[KickAlt]; pending[KickAlt] = false;
         clear(a);
-        if (!k.kickSynthetic) syntheticKickAlt.Render(false, trigB, accB, (float)(k.kickHz + 8) / sr, 0.5f, decay * 0.8f, 0.3f, 0.5f, 0.5f, a, (size_t)n);
+        if (!run[KickAlt]) {} else if (!k.kickSynthetic) syntheticKickAlt.Render(false, trigB, accB, (float)(k.kickHz + 8) / sr, 0.5f, decay * 0.8f, 0.3f, 0.5f, 0.5f, a, (size_t)n);
         else analogKickAlt.Render(false, trigB, accB, (float)(k.kickHz + 8) / sr, 0.4f, decay * 0.8f, 0.5f, 0.5f, a, (size_t)n);
         for (int i = 0; i < n; i++) mix[i] += a[i] * 0.9f;
     }
@@ -203,12 +207,12 @@ void DrumKit::render(float* left, float* right, int n)
         const bool trig = pending[Snare]; const float acc = accent[Snare]; pending[Snare] = false;
         const float decay = (float)k.snareDecay / 100.0f, snappy = (float)k.snareSnappy / 100.0f;
         clear(a);
-        if (k.snareSynthetic) syntheticSnare.Render(false, trig, acc, (float)k.snareHz * 2.0f / sr, 0.5f, decay, snappy, a, (size_t)n);
+        if (!run[Snare]) {} else if (k.snareSynthetic) syntheticSnare.Render(false, trig, acc, (float)k.snareHz * 2.0f / sr, 0.5f, decay, snappy, a, (size_t)n);
         else analogSnare.Render(false, trig, acc, (float)k.snareHz * 2.0f / sr, 0.5f, decay, snappy, a, (size_t)n);
         for (int i = 0; i < n; i++) mix[i] += a[i] * 0.8f;
         const bool trigB = pending[SnareAlt]; const float accB = accent[SnareAlt]; pending[SnareAlt] = false;
         clear(a);
-        if (!k.snareSynthetic) syntheticSnareAlt.Render(false, trigB, accB, (float)(k.snareHz + 20) * 2.0f / sr, 0.6f, decay * 0.7f, snappy, a, (size_t)n);
+        if (!run[SnareAlt]) {} else if (!k.snareSynthetic) syntheticSnareAlt.Render(false, trigB, accB, (float)(k.snareHz + 20) * 2.0f / sr, 0.6f, decay * 0.7f, snappy, a, (size_t)n);
         else analogSnareAlt.Render(false, trigB, accB, (float)(k.snareHz + 20) * 2.0f / sr, 0.6f, decay * 0.7f, snappy, a, (size_t)n);
         for (int i = 0; i < n; i++) mix[i] += a[i] * 0.8f;
     }
@@ -216,11 +220,11 @@ void DrumKit::render(float* left, float* right, int n)
     {
         const bool t1 = pending[Tom1]; const float acc1 = accent[Tom1]; pending[Tom1] = false;
         clear(a);
-        analogTom1.Render(false, t1, acc1, (float)k.tomHz / sr, 0.7f, 0.35f, 0.4f, 0.4f, a, (size_t)n);
+        if (run[Tom1]) analogTom1.Render(false, t1, acc1, (float)k.tomHz / sr, 0.7f, 0.35f, 0.4f, 0.4f, a, (size_t)n);
         for (int i = 0; i < n; i++) mix[i] += a[i] * 0.8f;
         const bool t2 = pending[Tom2]; const float acc2 = accent[Tom2]; pending[Tom2] = false;
         clear(a);
-        analogTom2.Render(false, t2, acc2, (float)(k.tomHz + 40) / sr, 0.7f, 0.3f, 0.4f, 0.4f, a, (size_t)n);
+        if (run[Tom2]) analogTom2.Render(false, t2, acc2, (float)(k.tomHz + 40) / sr, 0.7f, 0.3f, 0.4f, 0.4f, a, (size_t)n);
         for (int i = 0; i < n; i++) mix[i] += a[i] * 0.8f;
     }
     // hats: closed and alt, then open and open alt; a closed hat chokes the open ones
@@ -230,19 +234,19 @@ void DrumKit::render(float* left, float* right, int n)
         const bool trigB = pending[HatAlt]; const float accB = accent[HatAlt]; pending[HatAlt] = false;
         if (trig || trigB) chokeTarget = 0.0f;
         clear(a);
-        hatA.Render(false, trig, acc, 414.0f / sr, tone, (float)k.hatDecay / 100.0f, 0.2f, t1, t2, a, (size_t)n);
+        if (run[Hat]) hatA.Render(false, trig, acc, 414.0f / sr, tone, (float)k.hatDecay / 100.0f, 0.2f, t1, t2, a, (size_t)n);
         for (int i = 0; i < n; i++) mix[i] += a[i] * 0.5f;
         clear(a);
-        hatB.Render(false, trigB, accB, 480.0f / sr, tone, (float)k.hatDecay / 100.0f, 0.3f, t1, t2, a, (size_t)n);
+        if (run[HatAlt]) hatB.Render(false, trigB, accB, 480.0f / sr, tone, (float)k.hatDecay / 100.0f, 0.3f, t1, t2, a, (size_t)n);
         for (int i = 0; i < n; i++) mix[i] += a[i] * 0.5f;
         const bool trigO = pending[Open]; const float accO = accent[Open]; pending[Open] = false;
         const bool trigOB = pending[OpenAlt]; const float accOB = accent[OpenAlt]; pending[OpenAlt] = false;
         if (trigO || trigOB) chokeTarget = 1.0f;
         clear(a);
-        openA.Render(false, trigO, accO, 414.0f / sr, tone, (float)k.openDecay / 100.0f, 0.2f, t1, t2, a, (size_t)n);
+        if (run[Open]) openA.Render(false, trigO, accO, 414.0f / sr, tone, (float)k.openDecay / 100.0f, 0.2f, t1, t2, a, (size_t)n);
         float b2[kMaxBlock];
         clear(b2);
-        openB.Render(false, trigOB, accOB, 480.0f / sr, tone, (float)k.openDecay / 100.0f, 0.3f, t1, t2, b2, (size_t)n);
+        if (run[OpenAlt]) openB.Render(false, trigOB, accOB, 480.0f / sr, tone, (float)k.openDecay / 100.0f, 0.3f, t1, t2, b2, (size_t)n);
         for (int i = 0; i < n; i++)
         {
             chokeGain += (chokeTarget - chokeGain) * 0.02f; // a few milliseconds

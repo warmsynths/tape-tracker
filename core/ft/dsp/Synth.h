@@ -7,9 +7,6 @@
 #include "SynthPatch.h"
 #include "plaits/dsp/fx/ensemble.h"
 #include "plaits/dsp/fx/overdrive.h"
-#include "plaits/dsp/oscillator/super_square_oscillator.h"
-#include "plaits/dsp/oscillator/variable_saw_oscillator.h"
-#include "plaits/dsp/oscillator/variable_shape_oscillator.h"
 
 namespace ft
 {
@@ -55,9 +52,8 @@ class Synth
     };
     struct Voice
     {
-        plaits::VariableShapeOscillator shapeA, shapeB;
-        plaits::VariableSawOscillator sawA, sawB;
-        plaits::SuperSquareOscillator squareA, squareB;
+        float phA = 0.0f, phB = 0.0f; // oscillator phases (0 to 1)
+        float g = 0.1f;               // the filter's coefficient
         Env amp, flt;
         float y[4] = {};       // the filter's four stages
         float subPhase = 0.0f;
