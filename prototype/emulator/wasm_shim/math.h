@@ -11,6 +11,7 @@ inline float sqrt(float x) { return __builtin_sqrtf(x); }
 inline float floor(float x) { return __builtin_floorf(x); }
 float sinf(float);
 float cosf(float);
+float tanf(float);
 float powf(float, float);
 float expf(float);
 float logf(float);

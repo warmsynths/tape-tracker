@@ -165,6 +165,8 @@ class Hal
     virtual void synthSetPatch(const SynthPatch& /*patch*/) {}
     virtual void synthNote(int /*note*/, int /*velocity*/, bool /*on*/) {}
     virtual void synthAllOff() {}
+    virtual void synthDrum(int /*voice*/, int /*velocity*/) {}   // a drum hit (the Drums role), voice 0 to 15, velocity 1 to 127
+    virtual void synthSetKit(int /*kit*/) {}                    // which of the 24 drum kits
     virtual void synthSetLevelDb10(int /*db10*/) {}  // how loud the synth is, in tenths of a dB (0 is as the patch says)
     virtual void sampleNote(int /*id*/, int /*note*/, int /*velocity*/, bool /*on*/) {}
 };

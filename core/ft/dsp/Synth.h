@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "Drums.h"
 #include "SynthPatch.h"
 #include "plaits/dsp/fx/ensemble.h"
 #include "plaits/dsp/fx/overdrive.h"
@@ -31,6 +32,8 @@ class Synth
 
     // A user macro on top of the patch, 0 to 1 (0.5: as the patch says)
     void setBrightness(float b) { brightness = b; }
+
+    DrumKit drums;   // the Drums role plays through the same output
 
     void noteOn(int note, int velocity); // velocity 1 to 127
     void noteOff(int note);

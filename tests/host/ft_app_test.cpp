@@ -183,6 +183,9 @@ struct FakeHal : Hal
     int vmin = 127, vmax = 0;
     void synthNote(int note, int vel, bool on) override { notesOn += on ? 1 : -1; noteEvents++; if (on) { lastNote = note; if (vel < vmin) vmin = vel; if (vel > vmax) vmax = vel; } }
     void synthAllOff() override { notesOn = 0; }
+    int drumHits = 0, lastDrum = -1, kitSet = -1;
+    void synthDrum(int voice, int) override { drumHits++; lastDrum = voice; }
+    void synthSetKit(int kit) override { kitSet = kit; }
     int synthLevel = 0;
     void synthSetLevelDb10(int db10) override { synthLevel = db10; }
     void sampleNote(int, int, int, bool on) override { sampleNotes += on ? 1 : -1; }

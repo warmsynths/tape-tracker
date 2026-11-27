@@ -97,6 +97,8 @@ class FourTrackHal : public ft::Hal
     void synthSetPatch(const ft::SynthPatch& patch) override;
     void synthNote(int note, int velocity, bool on) override;
     void synthAllOff() override;
+    void synthDrum(int voice, int velocity) override;
+    void synthSetKit(int kit) override;
     void synthSetLevelDb10(int db10) override;
     void sampleNote(int id, int note, int velocity, bool on) override;
 

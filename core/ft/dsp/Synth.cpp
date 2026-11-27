@@ -31,6 +31,7 @@ void Synth::init(float sampleRate)
     rate = sampleRate;
     ensemble.Init(ensembleBuffer);
     overdrive.Init();
+    drums.init(sampleRate);
     for (Voice& v : voice)
     {
         v.shapeA.Init(); v.shapeB.Init();
@@ -52,7 +53,7 @@ void Synth::setPatch(const SynthPatch& patch)
 bool Synth::active() const
 {
     for (const Voice& v : voice) if (v.busy()) return true;
-    return false;
+    return drums.active();
 }
 
 void Synth::startVoice(Voice& v, int note, int velocity)
@@ -231,5 +232,6 @@ void Synth::render(float* left, float* right, int n)
         ensemble.set_depth(p.depth);
         ensemble.Process(left, right, (size_t)n);
     }
+    drums.render(left, right, n);
 }
 } // namespace ft

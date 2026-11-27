@@ -39,6 +39,20 @@ void AudioPlaySynth::allNotesOff()
     AudioInterrupts();
 }
 
+void AudioPlaySynth::drum(int voice, int velocity)
+{
+    AudioNoInterrupts();
+    if (started) synth.drums.trigger(voice, velocity);
+    AudioInterrupts();
+}
+
+void AudioPlaySynth::setKit(int kit)
+{
+    AudioNoInterrupts();
+    synth.drums.setKit(kit);
+    AudioInterrupts();
+}
+
 void AudioPlaySynth::update(void)
 {
     if (!started || !synth.active()) return;

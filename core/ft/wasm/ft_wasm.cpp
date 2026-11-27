@@ -23,6 +23,7 @@ float sinf(float x)
     return 0.225f * (y * __builtin_fabsf(y) - y) + y;
 }
 float cosf(float x) { return sinf(x + 1.57079633f); }
+float tanf(float x) { return sinf(x) / cosf(x); }
 
 inline void* operator new(size_t, void* where) noexcept { return where; }
 void operator delete(void*) noexcept {} // nothing is ever freed here
@@ -422,6 +423,8 @@ class EmuHal : public Hal
     void synthNote(int note, int velocity, bool on) override { if (on) synth.noteOn(note, velocity); else synth.noteOff(note); }
     float synthAmp = 1.0f;
     void synthAllOff() override { synth.allNotesOff(); }
+    void synthDrum(int voice, int velocity) override { synth.drums.trigger(voice, velocity); }
+    void synthSetKit(int kit) override { synth.drums.setKit(kit); }
     void synthSetLevelDb10(int db10) override { synthAmp = ft::synthLevelAmp(db10); }
     void sampleNote(int id, int note, int velocity, bool on) override
     {
