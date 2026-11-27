@@ -52,6 +52,7 @@ void AudioPlayLoops::update(void)
     const uint32_t length = loopLength;
     bank.render(currentPosition, AUDIO_BLOCK_SAMPLES, l, r);
     lofi.process(l, r, AUDIO_BLOCK_SAMPLES, 44100);
+    ft::liveFilterProcess(ft::liveFilter(), liveState, l, r, AUDIO_BLOCK_SAMPLES);
     for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++)
     {
         float a = l[i] * 32767.0f, b = r[i] * 32767.0f;

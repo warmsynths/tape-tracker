@@ -49,6 +49,7 @@ class AudioPlayLoops : public AudioStream
   private:
     ft::TrackBank bank;
     ft::Lofi lofi;
+    ft::LiveFilterState liveState; // the live filter (core/ft/dsp/SendFx.h)
     volatile uint32_t loopLength = 0;
     volatile uint32_t currentPosition = 0;
     volatile bool playing = false;

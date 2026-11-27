@@ -60,6 +60,8 @@ static void functSampleRec() { functKey(ft::kSampleRec); } // resample the mix
 static void functSampleLoad() { functKey(ft::kSampleLoad); } // load samples from the card
 static void functNote() { functKey(ft::kNote); } // chords and scale notes on the pads
 static void functInstr() { functKey(ft::kInstr); } // the sound of the chord pads
+static void functFx1() { functKey(ft::kFx1); } // reverb and delay sends
+static void functFx2() { functKey(ft::kFx2); } // live filter
 static void functEncoder(int16_t value) { FT->application().jog(value); }
 static void functPads(uint8_t pad, uint8_t state, int16_t velo)
 {
@@ -116,6 +118,8 @@ void cFourTrack::start(uint32_t options)
     ip->setButtonObj(interfaceButtonDelete, buttonPress, functDelete);
     ip->setButtonObj(interfaceButtonNote, buttonPress, functNote);
     ip->setButtonObj(interfaceButtonInstr, buttonPress, functInstr);
+    ip->setButtonObj(interfaceButtonFx1, buttonPress, functFx1);
+    ip->setButtonObj(interfaceButtonFx2, buttonPress, functFx2);
     ip->setButtonObj(interfaceButtonPattern, buttonPress, functPattern);
 
 #ifndef TRACKER_MINI

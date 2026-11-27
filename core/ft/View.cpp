@@ -136,14 +136,21 @@ void Painter::drawTop()
         frame(540, 7, ow, 18, dim);
         T(542, 9, "MON OFF", kF12, dim);
     }
+    int cx = 610;
+    if (v.filter)
+    {
+        card(cx, 7, textWidth("FILTER", kF12) + 11, 18, pal.marker);
+        T(cx + 5, 9, "FILTER", kF12, pal.bg);
+        cx += textWidth("FILTER", kF12) + 17;
+    }
     if (v.click)
     {
-        rect(610, 7, textWidth("CLICK", kF12) + 11, 18, pal.meter);
-        T(615, 9, "CLICK", kF12, pal.bg);
+        rect(cx, 7, textWidth("CLICK", kF12) + 11, 18, pal.meter);
+        T(cx + 5, 9, "CLICK", kF12, pal.bg);
     }
     if (v.wait)
     {
-        const int wx = v.click ? 610 + textWidth("CLICK", kF12) + 17 : 610;
+        const int wx = v.click ? cx + textWidth("CLICK", kF12) + 17 : cx;
         rect(wx, 7, textWidth("WAIT", kF12) + 11, 18, pal.marker);
         T(wx + 5, 9, "WAIT", kF12, pal.bg);
     }

@@ -590,7 +590,7 @@ static void pagesAndProjects()
             return total;
         };
         struct Row { const char* name; int bytes; };
-        Row rows[8];
+        Row rows[12];
         int n = 0;
         app.key(kNote); hal.advance(app, 2000); rows[n++] = Row{ "Chords 1", bytes() };
         app.pad(0, true); hal.advance(app, 2000); rows[n++] = Row{ "Chords, a pad held", bytes() };
@@ -608,6 +608,30 @@ static void pagesAndProjects()
         app.key(kNote);
         app.key(kInstr); hal.advance(app, 2000); rows[n++] = Row{ "Sound", bytes() };
         app.key(kB7); hal.advance(app, 2000); rows[n++] = Row{ "Sound, every setting", bytes() };
+        app.key(kFx1); hal.advance(app, 2000);
+        CHECK(app.screen() == Screen::Fx, "FX1 opens the sends page");
+        app.key(kB1);
+        CHECK(hal.bank().fx.cfg.reverbOn, "B1 switches the reverb on");
+        rows[n++] = Row{ "FX1 reverb on", bytes() };
+        app.key(kDown); app.key(kDown); app.key(kDown); app.jog(1); app.jog(1);
+        CHECK(hal.bank().cfg[0].sendReverb == 10, "the jog changes the send of Track 1 by 5%");
+        app.key(kRight); app.key(kB2); app.jog(1);
+        CHECK(hal.bank().fx.cfg.delayOn, "B2 switches the delay on");
+        rows[n++] = Row{ "FX1 delay focused", bytes() };
+        app.key(kFx2); hal.advance(app, 2000);
+        CHECK(app.screen() == Screen::Filter, "FX2 opens the live filter");
+        app.key(kB1);
+        CHECK(liveFilter().held && app.view().filter, "B1 holds the filter and the top bar says so");
+        app.keyUp(kB1);
+        CHECK(!liveFilter().held && !app.view().filter, "letting go opens it");
+        app.key(kB2);
+        CHECK(liveFilter().latched, "B2 latches it");
+        rows[n++] = Row{ "Filter latched", bytes() };
+        app.key(kB8);
+        CHECK(app.view().filter, "a latched filter stays in when the page closes");
+        app.key(kFx2); app.key(kB3);
+        CHECK(!liveFilter().latched && liveFilter().set == 50, "B3 opens it and puts Set back to the middle");
+        app.key(kB8);
         for (int i = 0; i < n; i++)
         {
             if (std::getenv("FT_PRINT_COSTS")) std::printf("cost %-24s %5d bytes\n", rows[i].name, rows[i].bytes);

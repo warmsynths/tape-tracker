@@ -3,6 +3,7 @@
 
 #include "AudioStream.h"
 #include "dsp/Synth.h"
+#include "dsp/SendFx.h"
 
 // The Four-Track synth as an audio source: the shared synth (core/ft/dsp/Synth.*, Plaits
 // oscillators and ensemble) rendered one block at a time. Output 0 is the left channel, output 1
@@ -26,6 +27,7 @@ class AudioPlaySynth : public AudioStream
 
   private:
     ft::Synth synth;
+    ft::LiveFilterState liveState;
     bool started = false;
     volatile float levelAmp = 1.0f;
 };

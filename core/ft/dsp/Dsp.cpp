@@ -222,7 +222,8 @@ int toneCutoffHz(int tone)
 
 void TrackBank::render(uint32_t pos, int n, float* left, float* right)
 {
-    for (int i = 0; i < n; i++) left[i] = right[i] = 0.0f;
+    if (n > kMaxBlock) n = kMaxBlock;
+    for (int i = 0; i < n; i++) left[i] = right[i] = sendRev[i] = sendDel[i] = 0.0f;
     if (loop == 0) return;
     if (pos < lastPos) pass++;
     lastPos = pos;
@@ -239,6 +240,7 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
         TrackCfg& c = cfg[t];
         const float levelAmp = c.levelDb10 <= -600 ? 0.0f : exp2Approx((float)c.levelDb10 / 10.0f / 6.0206f);
         const float mixPan = (float)c.pan / 100.0f;
+        const float revSend = (float)c.sendReverb / 100.0f, delSend = (float)c.sendDelay / 100.0f;
         const int toneHz = toneCutoffHz(c.tone);
         const float toneA = toneHz > 0 ? clampf(6.2832f * (float)toneHz / (float)kRate, 0.0f, 1.0f) : 0.0f;
         bool act[4];
@@ -432,9 +434,12 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
             const float gr = pn < 0 ? 1.0f + pn : 1.0f;
             left[i] += sample * gl;
             right[i] += sample * gr;
+            sendRev[i] += sample * revSend;
+            sendDel[i] += sample * delSend;
         }
         peak[t] = pk;
     }
+    fx.process(sendRev, sendDel, left, right, n);
 }
 
 //------------------------------------------------------------------------------------------

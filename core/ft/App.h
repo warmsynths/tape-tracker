@@ -38,12 +38,14 @@ enum Key
     kDelete,       // clear a Part (Shift: all)
     kNote,         // chords and scale notes on the pads
     kInstr,        // the sound of the chord pads: patches and tweaks
+    kFx1,          // reverb and delay sends
+    kFx2,          // live filter
     kKeyCount
 };
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate, Sets, Play
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate, Sets, Play, Fx, Filter
 };
 
 enum class Popup : uint8_t
@@ -179,6 +181,14 @@ class App
     // Chords page and chord pads
     void drawChords(class Pen& p);
     void drawPlayView(class Pen& p);
+    void drawFx(class Pen& p);
+    void drawFilter(class Pen& p);
+    void fxKey(int k);
+    void fxJog(int delta);
+    void filterKey(int k);
+    void filterJog(int delta);
+    void fxPush();                // the delay time from the tempo, and the settings to the audio side
+    int fxBlock = 0, fxRow = 0;   // FX1 page: 0 reverb, 1 delay; the row in the block (4 settings, then the 4 sends)
     // New projects start at 80 BPM, 4 bars and a count-in of one bar (the owner's default); Free stays one button away
     void newProjectDefaults();
     uint32_t autoFrames() const;          // length of a first take with the bars set up front, 0 when it is open

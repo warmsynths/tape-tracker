@@ -151,6 +151,7 @@ class EmuHal : public Hal
 
     TrackBank trackBank;
     Lofi lofiMaster;
+    LiveFilterState liveState;
 
     // recording
     bool recActive = false, full = false, captured = false;
@@ -187,6 +188,7 @@ class EmuHal : public Hal
 
     void playerSetTrack(int t, const int16_t* d) override { trackBank.data[t] = d; }
     void playerStart(uint32_t f) override { loop = f; trackBank.loop = f; pos = 0; playing = f > 0; }
+    SendFxMemory* fxMemory() override { static SendFxMemory mem; return &mem; }
     void playerStop() override { playing = false; }
     void playerSeek(uint32_t f) override { if (loop > 0) pos = f % loop; }
     bool playerPlaying() override { return playing; }
@@ -569,6 +571,7 @@ class EmuHal : public Hal
             g_outR[i] = pr[i] + padR[i] + cl + mr;
             loopRing[(loopFrames + (uint32_t)i) & 4095] = (g_outL[i] + g_outR[i]) * 0.5f;
         }
+        liveFilterProcess(liveFilter(), liveState, g_outL, g_outR, n); // the live filter sweeps the whole mix
         loopFrames += (uint32_t)n;
     }
 };

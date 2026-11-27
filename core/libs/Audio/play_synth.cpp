@@ -53,6 +53,7 @@ void AudioPlaySynth::update(void)
     }
     float l[AUDIO_BLOCK_SAMPLES], r[AUDIO_BLOCK_SAMPLES];
     synth.render(l, r, AUDIO_BLOCK_SAMPLES);
+    ft::liveFilterProcess(ft::liveFilter(), liveState, l, r, AUDIO_BLOCK_SAMPLES);
     const float amp = levelAmp;
     for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++)
     {

@@ -91,6 +91,8 @@ class Hal
     virtual uint32_t playerPosition() = 0;
     virtual uint16_t playerTakePeak(int track) = 0; // largest sample since last call, 0 to 32767
     virtual TrackBank& bank() = 0;
+    // Where the reverb and delay keep their memory (about 300 KB, external RAM on the Tracker); nullptr: no effects
+    virtual SendFxMemory* fxMemory() { return nullptr; }
     virtual Lofi& lofi() = 0;
 
     // Input gain, 0 to 100 percent, per source; and monitoring of the live input

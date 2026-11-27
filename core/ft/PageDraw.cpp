@@ -75,6 +75,8 @@ void App::buildPage()
         case Screen::PadSample: drawPadSample(p); break;
         case Screen::Chords: drawChords(p); break;
         case Screen::Play: drawPlayView(p); break;
+        case Screen::Fx: drawFx(p); break;
+        case Screen::Filter: drawFilter(p); break;
         case Screen::Sound: drawSound(p); break;
         case Screen::Calibrate: drawCalibrate(p); break;
         case Screen::Sets: drawSets(p); break;

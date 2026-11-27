@@ -118,14 +118,21 @@ class Pen
             frame(540, 7, width("MON OFF", F12) + 5, 18, p.dim);
             text(542, 9, "MON OFF", F12, p.dim);
         }
+        int cx = 610;
+        if (v.filter)
+        {
+            card(cx, 7, width("FILTER", F12) + 11, 18, p.marker);
+            text(cx + 5, 9, "FILTER", F12, p.bg);
+            cx += width("FILTER", F12) + 17;
+        }
         if (v.click)
         {
-            rect(610, 7, width("CLICK", F12) + 11, 18, p.meter);
-            text(615, 9, "CLICK", F12, p.bg);
+            rect(cx, 7, width("CLICK", F12) + 11, 18, p.meter);
+            text(cx + 5, 9, "CLICK", F12, p.bg);
         }
         if (v.wait)
         {
-            const int wx = v.click ? 610 + width("CLICK", F12) + 17 : 610;
+            const int wx = v.click ? cx + width("CLICK", F12) + 17 : cx;
             rect(wx, 7, width("WAIT", F12) + 11, 18, p.marker);
             text(wx + 5, 9, "WAIT", F12, p.bg);
         }

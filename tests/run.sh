@@ -14,9 +14,11 @@ for t in four_track_session loop_bars loop_fill loop_mix; do
   echo "== $t"; "$OUT/$t"
 done
 echo "== ft_dsp"
-$CXX -std=c++17 $INC tests/host/ft_dsp_test.cpp core/ft/dsp/Dsp.cpp -o "$OUT/ft_dsp" && "$OUT/ft_dsp"
+$CXX -std=c++17 $INC tests/host/ft_dsp_test.cpp core/ft/dsp/Dsp.cpp core/ft/dsp/SendFx.cpp -o "$OUT/ft_dsp" && "$OUT/ft_dsp"
 echo "== ft_latency"
 $CXX -std=c++17 $INC tests/host/ft_latency_test.cpp core/ft/Latency.cpp -o "$OUT/ft_latency" && "$OUT/ft_latency"
+echo "== ft_sendfx"
+$CXX -std=c++17 $INC tests/host/ft_sendfx_test.cpp core/ft/dsp/SendFx.cpp core/ft/dsp/Dsp.cpp -o "$OUT/ft_sendfx" && "$OUT/ft_sendfx"
 echo "== ft_art"
 $CXX -std=c++17 $INC tests/host/ft_art_test.cpp core/ft/SoundArt.cpp core/ft/dsp/SynthPatch.cpp -o "$OUT/ft_art" && "$OUT/ft_art"
 echo "== ft_chords"

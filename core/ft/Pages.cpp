@@ -84,6 +84,7 @@ void App::open(Screen s)
 
 void App::back()
 {
+    liveFilter().held = false; // a held filter lets go when its page closes; a latched one stays in
     if (current == Screen::Load) loadStopPreview();
     if (job == Job::Resample) { job = Job::None; rsState = Rs::Ready; }
     if (auditioning)
@@ -176,6 +177,7 @@ void App::popupKey(int k)
 
 void App::keyUp(int k)
 {
+    if (current == Screen::Filter && k == kB1) { liveFilter().held = false; refresh(true); }
     if ((current == Screen::Sound || current == Screen::SoundAdv) && k == kB1) soundHear(false);
     if (current == Screen::PadSample && k == kB1 && psAuditioning)
     {
@@ -270,6 +272,8 @@ void App::keyScreen(int k)
             for (int i = 0; i < 48; i++) padModeKeys[i] = padsKeysMode;
             break;
         case Screen::Chords: chordsKey(k); break;
+        case Screen::Fx: fxKey(k); return;
+        case Screen::Filter: filterKey(k); return;
         case Screen::Calibrate: calibrateKey(k); break;
         case Screen::Sets: setsKey(k); break;
         case Screen::Sound: soundKey(k); break;
@@ -415,6 +419,8 @@ void App::jogScreen(int delta)
         }
         case Screen::PadSample: psChange(delta); break;
         case Screen::Chords: chordsJog(delta); break;
+        case Screen::Fx: fxJog(delta); return;
+        case Screen::Filter: filterJog(delta); return;
         case Screen::Sets: setsJog(delta); break;
         case Screen::Sound: soundJog(delta); break;
         case Screen::SoundAdv: soundAdvJog(delta); break;
@@ -741,6 +747,7 @@ void App::newProject(bool everything)
         trackSource[t] = Source::Line;
     }
     if (everything) hal.lofi().cfg = LofiCfg(); // and the lo-fi master
+    hal.bank().fx.cfg = SendFxCfg();            // reverb and delay off, their settings back
     if (hal.startsAtSetTempo()) newProjectDefaults();
     else { set.tempoTenths = 0; set.bars = 0; }
     fmt(projectName, sizeof(projectName), "Untitled");
@@ -924,6 +931,12 @@ void App::startSave()
     for (int i = 0; i < 48; i++) w.u8(padModeKeys[i] ? 1 : 0);
     for (int t = 0; t < 4; t++) { const TrackCfg& c = hal.bank().cfg[t]; w.u16((uint16_t)c.levelDb10); w.u8((uint8_t)c.pan); w.u8((uint8_t)c.tone); w.u8(c.solo ? 1 : 0); }
     w.u8(set.bars);
+    for (int t = 0; t < 4; t++) { const TrackCfg& c = hal.bank().cfg[t]; w.u8(c.sendReverb); w.u8(c.sendDelay); }
+    {
+        const SendFxCfg& f = hal.bank().fx.cfg;
+        w.u8(f.reverbOn ? 1 : 0); w.u8(f.reverbSize); w.u8(f.reverbDamp); w.u8(f.reverbReturn);
+        w.u8(f.delayOn ? 1 : 0); w.u8(f.delayDiv); w.u8(f.delayFeedback); w.u8(f.delayTone); w.u8(f.delayReturn);
+    }
     if (!hal.fileWrite(jobPath, h, kHeader, false)) { showPopup(Popup::SdMissing); return; }
     projectChordsWrite(projectName);
     job = Job::Save;
@@ -977,6 +990,13 @@ void App::startLoad(const char* name)
     for (int i = 0; i < 48; i++) padModeKeys[i] = r.u8() != 0;
     for (int t = 0; t < 4; t++) { TrackCfg& c = hal.bank().cfg[t]; c.levelDb10 = (int16_t)r.u16(); c.pan = (int8_t)r.u8(); c.tone = (int8_t)r.u8(); c.solo = r.u8() != 0; }
     set.bars = (uint8_t)r.u8();
+    for (int t = 0; t < 4; t++) { TrackCfg& c = hal.bank().cfg[t]; c.sendReverb = (uint8_t)clampi((int)r.u8(), 0, 100); c.sendDelay = (uint8_t)clampi((int)r.u8(), 0, 100); }
+    {
+        SendFxCfg& f = hal.bank().fx.cfg;
+        f.reverbOn = r.u8() != 0; f.reverbSize = (uint8_t)clampi((int)r.u8(), 0, 100); f.reverbDamp = (uint8_t)clampi((int)r.u8(), 0, 100); f.reverbReturn = (uint8_t)clampi((int)r.u8(), 0, 100);
+        f.delayOn = r.u8() != 0; f.delayDiv = (uint8_t)clampi((int)r.u8(), 0, kDelayDivs - 1); f.delayFeedback = (uint8_t)clampi((int)r.u8(), 0, 95); f.delayTone = (uint8_t)clampi((int)r.u8(), 0, 100); f.delayReturn = (uint8_t)clampi((int)r.u8(), 0, 100);
+        if (f.reverbOn || f.delayOn) hal.bank().fx.init(hal.fxMemory());
+    }
     session.restore(loop, bars, mask);
     fmt(projectName, sizeof(projectName), "%s", name);
     for (int t = 0; t < 4; t++) hasUndoTake[t] = false;

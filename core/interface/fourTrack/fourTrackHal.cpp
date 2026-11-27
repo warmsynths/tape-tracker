@@ -137,6 +137,9 @@ bool FourTrackHal::recordActive() { return recorder.isRecordingActive(); }
 
 void FourTrackHal::playerSetTrack(int track, const int16_t* data) { engine.getLoopPlayer()->setTrack(track, data); }
 void FourTrackHal::playerStart(uint32_t frames) { engine.getLoopPlayer()->start(frames); }
+// Reverb and delay memory (about 300 KB, see core/ft/dsp/SendFx.h)
+__NOINIT(EXTERNAL_RAM) static ft::SendFxMemory fxMemoryStore;
+ft::SendFxMemory* FourTrackHal::fxMemory() { return &fxMemoryStore; }
 void FourTrackHal::playerStop() { engine.getLoopPlayer()->stop(); }
 void FourTrackHal::playerSeek(uint32_t frames) { engine.getLoopPlayer()->seek(frames); }
 bool FourTrackHal::playerPlaying() { return engine.getLoopPlayer()->isPlaying(); }

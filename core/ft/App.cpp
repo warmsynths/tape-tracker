@@ -38,6 +38,7 @@ App::App(Hal& h, const Palette& palette)
     sndBase = synthPreset(0);
     for (int i = 0; i < 48; i++) lightSent[i] = 255;
     set.waveBitmap = hal.maskDefault();
+    hal.bank().fx.init(hal.fxMemory());
     if (hal.startsAtSetTempo()) newProjectDefaults();
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
@@ -146,7 +147,7 @@ void App::key(int k)
         // A button that opens a page also works from another page: go home, then open it
         struct Open { int key; Screen page; };
         static const Open pages[] = { { kSampleEdit, Screen::Editor }, { kPerformance, Screen::Glitch }, { kMaster, Screen::Master }, { kFile, Screen::Project },
-                                      { kParams, Screen::Mixer }, { kSamplePlay, Screen::PadSample }, { kSampleLoad, Screen::Load }, { kSampleRec, Screen::Resample }, { kConfig, Screen::Device }, { kNote, Screen::Chords }, { kInstr, Screen::Sound } };
+                                      { kParams, Screen::Mixer }, { kSamplePlay, Screen::PadSample }, { kSampleLoad, Screen::Load }, { kSampleRec, Screen::Resample }, { kConfig, Screen::Device }, { kNote, Screen::Chords }, { kInstr, Screen::Sound }, { kFx1, Screen::Fx }, { kFx2, Screen::Filter } };
         for (const Open& o : pages)
             if (o.key == k && o.page != current)
             {
@@ -160,7 +161,7 @@ void App::key(int k)
         // Play and Stop work on the pages that sit beside the recorder
         const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
                                current == Screen::Input || current == Screen::Pads || current == Screen::Memory || current == Screen::Mixer || current == Screen::PadSample || current == Screen::Load || current == Screen::Resample ||
-                               current == Screen::Settings || current == Screen::Chords || current == Screen::Sound || current == Screen::SoundAdv || current == Screen::Sets;
+                               current == Screen::Settings || current == Screen::Chords || current == Screen::Sound || current == Screen::SoundAdv || current == Screen::Sets || current == Screen::Fx || current == Screen::Filter;
         if (transport && k == kPlay) { togglePlay(); refresh(true); return; }
         if (transport && k == kStop) { pressStop(); refresh(true); return; }
         keyScreen(k);
@@ -288,6 +289,8 @@ void App::key(int k)
             open(Screen::Sound);
             break;
         case kFile: refreshProjectList(); open(Screen::Project); break;
+        case kFx1: open(Screen::Fx); break;
+        case kFx2: open(Screen::Filter); break;
         default: break;
     }
 }
@@ -981,6 +984,7 @@ void App::pushBank()
     b.slice = b.loop / (bars * 8);
     b.playOnce = set.loopOnce;
     for (int t = 0; t < FourTrackSession::kTracks; t++) b.cfg[t].offset = alignShift[t] + userOffset[t];
+    fxPush();
 }
 
 void App::startPlayer()
@@ -1618,6 +1622,7 @@ void App::fillView()
     fmt(v.input, sizeof(v.input), "%s", sourceName(trackSource[session.selected()]));
     v.monitor = monitorFor(trackSource[session.selected()]);
     v.click = set.click;
+    v.filter = liveFilter().active();
     v.wait = set.waitSound;
     {
         float l = 0.0f, r = 0.0f;

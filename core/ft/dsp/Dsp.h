@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "SendFx.h"
+
 // Audio maths of the Four-Track recorder. Portable and free of hardware calls and of the C
 // library: the Tracker firmware and the web emulator run exactly this code. Everything here is
 // unit-tested on a PC (tests/host/ft_dsp_test.cpp).
@@ -72,6 +74,8 @@ struct TrackCfg
     int8_t pan = 0;                 // -100 left to +100 right
     int8_t tone = 0;                // -100 low-pass (darker) to +100 high-pass (thinner), 0 flat
     bool solo = false;
+    uint8_t sendReverb = 0;         // how much of the track goes to the reverb, 0..100 (after level, mute and tone)
+    uint8_t sendDelay = 0;          // and to the delay
     bool granular = false;          // pitch style: granular (same length) or tape (speed follows)
     bool held[4] = { false, false, false, false }; // slots held down right now (momentary)
 };
@@ -92,6 +96,7 @@ class TrackBank
     uint16_t peak[4] = {};
     uint32_t pass = 0;          // how many times the loop has come round (the random effects differ each time)
     uint32_t lastPos = 0;      // largest sample of each track since the caller cleared it
+    SendFx fx;                 // reverb and delay returns, added to the mix (see SendFx.h)
 
     // Renders `n` frames starting at loop position `pos` into stereo float buffers (-1..1).
     void render(uint32_t pos, int n, float* left, float* right);
@@ -99,6 +104,8 @@ class TrackBank
 
   private:
     float readAt(int t, float srcIndex) const;
+    static constexpr int kMaxBlock = 1024;
+    float sendRev[kMaxBlock] = {}, sendDel[kMaxBlock] = {};
     float lp[4] = {}, hp[4] = {}, hpPrev[4] = {};
     float toneLp[4] = {}, toneHp[4] = {};
     float crushHold[4] = {};
