@@ -28,3 +28,10 @@ Latency cable test: owner asked what it needs (see the session notes); a Calibra
 9. **Later Parts: a count-in?** On-screen countdown for the last 4 beats before a later Part starts, no extra clicks (option 2).
 10. **Changing the tempo or bars after the first take:** allowed while every Part is a pad Part; locked once an audio Part exists, with a message saying why (option 2).
 Q10 (later-Part recording model) is being reshaped: the owner asked for a looper-pedal overdub where older layers fade over time (feedback). Feasibility being checked (memory for a scratch pass buffer).
+
+### Loop mechanics, third round (owner, 2026-11-27)
+11. **Later Parts: Layer (overdub) with a Fade.** Each pass adds to the Part; older layers fade by the Fade amount (100% = plain overdub, down to about 40%) and only on passes you record over. Pad Parts: each note remembers its pass and is rendered at Fade^age. Audio Parts: the new pass is mixed in with the old audio times Fade (needs a spare Part-sized buffer; memory being checked). A way to switch to Replace for redoing a take; Undo covers the last pass. Always-fading ("decay") may come later as an opt-in.
+12. **Fade control:** a Config default, plus a quick control while recording (Shift + Jog while a take is armed or recording, value shown on screen).
+
+### Design exports received (2026-11-27)
+`docs/design/round-6-export/SCREENS.md` and `STYLEGUIDE.md` (exported from the HTML, now complete: roles 6.5, Play view 6.4, Chord sets 6.1d). Build from these. Known conflicts with the decisions above that the design must absorb (round 7 brief): the first-take flow (4.2, 4.3) assumes the old Free/How many bars flow; new frames needed for Bars in the Tempo panel, the later-Part countdown, Layer and Fade, Rendering, and the Config options (quantise grid and strength, tail wrap, calibrate latency).
