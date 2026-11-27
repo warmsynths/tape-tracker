@@ -7,5 +7,5 @@ clang++ --target=wasm32 -std=c++17 -O2 -nostdlib -ffreestanding -fno-exceptions 
   -Iprototype/emulator/wasm_shim -Icore/ft -Icore/ft/dsp -Icore/ft/dsp/third_party -Icore/source -Icore/libs/Audio \
   -Wl,--no-entry -Wl,--export-all -Wl,--initial-memory=33554432 -Wl,--max-memory=33554432 -Wl,-z,stack-size=262144 \
   -o prototype/emulator/build/ft.wasm \
-  core/ft/wasm/ft_wasm.cpp core/ft/App.cpp core/ft/Pages.cpp core/ft/PageDraw.cpp core/ft/Canvas.cpp core/ft/View.cpp core/ft/Chords.cpp core/ft/Latency.cpp core/ft/dsp/Dsp.cpp core/ft/dsp/Synth.cpp core/ft/dsp/SynthPatch.cpp core/ft/dsp/third_party/plaits/resources.cpp core/source/FourTrackSession.cpp
+  core/ft/wasm/ft_wasm.cpp core/ft/App.cpp core/ft/Pages.cpp core/ft/PageDraw.cpp core/ft/Canvas.cpp core/ft/View.cpp core/ft/Chords.cpp core/ft/Latency.cpp core/ft/SoundArt.cpp core/ft/dsp/Dsp.cpp core/ft/dsp/Synth.cpp core/ft/dsp/SynthPatch.cpp core/ft/dsp/third_party/plaits/resources.cpp core/source/FourTrackSession.cpp
 ls -la prototype/emulator/build/ft.wasm

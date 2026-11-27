@@ -53,7 +53,9 @@
 
   // Waveform bitmaps: 1 bit per pixel, 600 wide (75 bytes a row), one per track and lane size
   const MASK_H = [84, 250, 28];
-  const maskW = (slot) => (slot >= 12 ? 760 : 600), maskH = (slot) => (slot >= 12 ? 200 : MASK_H[slot % 3]);
+  // slot 12 the page picture, 13 the dial ring, 14 to 25 patch cycles, 26 and 27 the note picture (see core/ft/Mask.h)
+  const maskW = (slot) => (slot < 12 ? 600 : slot === 12 ? 760 : slot <= 25 ? 64 : 376);
+  const maskH = (slot) => (slot < 12 ? MASK_H[slot % 3] : slot === 12 ? 200 : slot === 13 ? 64 : slot <= 25 ? 16 : 48);
   const masks = {}; // slot -> Uint8Array
   const maskCache = {}; // slot|color -> canvas
   function putMask(m) {

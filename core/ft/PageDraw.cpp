@@ -4,6 +4,9 @@
 #include "Pen.h"
 #include "loop_fill.h"
 #include "BuildId.h"
+#include "Mask.h"
+#include "SoundArt.h"
+#include <math.h>
 
 namespace ft
 {
@@ -1559,42 +1562,124 @@ void App::drawSets(Pen& p)
 
 //--------------------------------------------------------------------------------------------
 // C11 Sound (Instr button)
+static uint32_t patchSig(const SynthPatch& q)
+{
+    auto f = [](float v) { return (uint32_t)(v * 1000.0f + 1000.0f); };
+    uint32_t h = (uint32_t)q.osc * 7919u;
+    h = h * 31u + f(q.attack); h = h * 31u + f(q.decay); h = h * 31u + f(q.sustain); h = h * 31u + f(q.release);
+    h = h * 31u + f(q.shape); h = h * 31u + f(q.pulse);
+    return h;
+}
+
+void App::soundArtSync()
+{
+    if (!hal.maskDefault()) return;
+    if (!artStatic)
+    {
+        artStatic = true;
+        uint8_t ring[kDialBytes];
+        artDialRing(ring);
+        hal.maskWrite(kArtDialSlot, 0, ring, kDialBytes);
+        for (int i = 0; i < kSynthPresets; i++)
+        {
+            uint8_t c[kCycleBytes];
+            artPatchCycle(synthPreset(i), c);
+            hal.maskWrite(kArtCycleSlot + i, 0, c, kCycleBytes);
+        }
+        artSig = 0;
+    }
+    const SynthPatch now = synthApply(sndBase, sndMacros);
+    const uint32_t sig = patchSig(now) | 1u;
+    if (sig != artSig)
+    {
+        artSig = sig;
+        uint8_t wave[kNoteBytes], sil[kNoteBytes];
+        artNote(now, wave, sil);
+        hal.maskWrite(kArtNoteSlot, 0, wave, kNoteBytes);
+        hal.maskWrite(kArtSilSlot, 0, sil, kNoteBytes);
+    }
+}
+
+// 6.2 Sound: twelve patch tiles, the one-note picture and eight dials
 void App::drawSound(Pen& p)
 {
-    heading(p, model, "Sound");
-    const SynthPatch& cur = synthPreset(sndPreset);
-    // the patches
-    p.text(14, 66, "Patch", F12, pal.dim);
+    p.topBar(model);
+    soundArtSync();
+    const bool art = hal.maskDefault();
+    const SynthPatch cur = synthApply(sndBase, sndMacros);
+    // the patch tiles, 3 x 4
     for (int i = 0; i < kSynthPresets; i++)
     {
-        const int y = 84 + i * 26;
+        const int x = 14 + (i % 3) * 128, y = 60 + (i / 3) * 84;
         const bool on = i == sndPreset;
-        p.rect(14, y, 300, 24, on ? pal.sel : pal.panel);
-        if (on) p.rect(14, y, sndField == 0 ? 300 : 3, sndField == 0 ? 2 : 24, pal.text);
-        p.text(26, y + 4, synthPreset(i).name, on ? F14B : F14, pal.text);
-        p.textRight(304, y + 6, synthPreset(i).kind, F12, pal.dim);
+        p.card(x, y, 124, 80, on ? pal.sel : pal.panel);
+        if (on && sndField == 0) p.rect(x + 8, y, 108, 2, pal.text);
+        p.text(x + 12, y + 10, synthPreset(i).kind, F12, pal.dim);
+        p.text(x + 12, y + 25, synthPreset(i).name, F17B, pal.text);
+        if (art)
+        {
+            p.g.color(on ? pal.text : pal.wave);
+            p.g.mask(kArtCycleSlot + i, x + 30, y + 53, kCycleW, kCycleH);
+        }
     }
     // what the patch is
-    const int nx = p.text(334, 66, cur.name, F17B, pal.text);
-    if (sndMacros.any() || soundEdited()) p.text(nx + 12, 71, soundEdited() ? "edited" : "tweaked", F12, pal.marker);
-    p.text(334, 94, cur.blurb, F14, pal.dim);
-    // the knobs
+    const int nx = p.text(414, 60, cur.name, F17B, pal.text);
+    const bool tweaked = sndMacros.any() || soundEdited();
+    int kx = p.text(nx + 10, 66, synthPreset(sndPreset).kind, F12, pal.dim);
+    if (tweaked)
+    {
+        p.rect(kx + 12, 67, 6, 6, pal.marker);
+        p.text(kx + 22, 66, soundEdited() ? "Edited" : "Tweaked", F12, pal.marker);
+    }
+    p.text(414, 84, cur.blurb, F14, pal.dim);
+    // one note of it
+    p.text(414, 112, "ONE NOTE", F12, pal.dim);
+    p.text(414, 176, "press, hold, release", F12, pal.dim);
+    if (art)
+    {
+        p.g.color(tweaked ? pal.marker : pal.text);
+        p.g.alpha(41);
+        p.g.mask(kArtSilSlot, 412, 122, kNoteW, kNoteH);
+        p.g.alpha(255);
+        p.g.mask(kArtNoteSlot, 412, 122, kNoteW, kNoteH);
+        p.rect(414 + 376 * 55 / 100, 122, 1, kNoteH, pal.frame);
+    }
+    // the eight dials, 4 x 2
     for (int i = 0; i < kSynthMacros; i++)
     {
-        const int x = 334 + (i % 4) * 115, y = 126 + (i / 4) * 124;
+        const int x = 414 + (i % 4) * 94, y = 206 + (i / 4) * 98;
         const bool focus = sndField == i + 1;
-        p.cell(x, y, 110, 118, focus, pal.panel);
-        p.text(x + 10, y + 10, synthMacroName(i), F12, pal.dim);
-        char v[8];
         const int m = sndMacros.v[i];
+        if (focus) { p.card(x, y - 6, 90, 92, pal.sel); p.rect(x + 8, y - 6, 74, 2, pal.text); }
+        const int cx = x + 45, cy = y + 30;
+        if (art)
+        {
+            p.g.color(pal.track);
+            p.g.mask(kArtDialSlot, cx - 32, cy - 32, kDialPx, kDialPx);
+        }
+        if (m != 0)
+        {
+            // the moved part of the ring: dots from the top to the value
+            p.g.color(pal.marker);
+            const int a1 = artDialAngle(m), a0 = -90;
+            const int step = m > 0 ? 6 : -6;
+            for (int a = a0; m > 0 ? a <= a1 : a >= a1; a += step)
+            {
+                const float r = (float)a * 3.14159265f / 180.0f;
+                p.g.dot(cx + ftRound(26.0f * cosf(r)), cy + ftRound(26.0f * sinf(r)), 2);
+            }
+        }
+        // the pointer
+        {
+            const float r = (float)artDialAngle(m) * 3.14159265f / 180.0f;
+            p.g.color(pal.text);
+            p.g.line(cx + ftRound(17.0f * cosf(r)), cy + ftRound(17.0f * sinf(r)), cx + ftRound(29.0f * cosf(r)), cy + ftRound(29.0f * sinf(r)));
+        }
+        char v[8];
         if (m == 0) fmt(v, sizeof v, "0"); else fmt(v, sizeof v, "%s%d", m > 0 ? "+" : "-", m > 0 ? m : -m);
-        p.text(x + 10, y + 30, v, F17B, m == 0 ? pal.dim : pal.text);
-        p.rect(x + 10, y + 70, 90, 6, pal.track);
-        p.rect(x + 54, y + 66, 2, 14, pal.dim);
-        const int w = m * 45 / kMacroRange;
-        if (w > 0) p.rect(x + 55, y + 70, w, 6, pal.meter);
-        else if (w < 0) p.rect(x + 55 + w, y + 70, -w, 6, pal.meter);
-        p.text(x + 10, y + 92, synthMacroHint(i), F12, pal.dim);
+        p.textMid(x, 90, y + 19, v, F17B, m == 0 ? pal.text : pal.marker);
+        p.textMid(x, 90, y + 60, synthMacroName(i), F14, pal.text);
+        p.textMid(x, 90, y + 74, synthMacroHint(i), F12, pal.dim);
     }
     p.text(14, 412, "Jog changes the selected patch or knob. Hold B1 to hear it. Pads play it too.", F14, pal.text);
     const char* l[8] = { "Hear", "Knobs to 0", "Reset patch", "", "", "", "Advanced", "Back" };

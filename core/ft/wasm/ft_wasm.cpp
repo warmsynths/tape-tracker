@@ -14,6 +14,16 @@
 
 using namespace ft;
 
+// sinf and cosf for the screens' pictures (the dial rings): a parabola with one correction pass, good to about 0.1%
+float sinf(float x)
+{
+    const float pi = 3.14159265f;
+    x = x - 2.0f * pi * __builtin_floorf(x / (2.0f * pi) + 0.5f);
+    float y = (4.0f / pi) * x - (4.0f / (pi * pi)) * x * __builtin_fabsf(x);
+    return 0.225f * (y * __builtin_fabsf(y) - y) + y;
+}
+float cosf(float x) { return sinf(x + 1.57079633f); }
+
 inline void* operator new(size_t, void* where) noexcept { return where; }
 void operator delete(void*) noexcept {} // nothing is ever freed here
 void operator delete(void*, size_t) noexcept {}

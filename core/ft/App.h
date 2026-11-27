@@ -231,6 +231,9 @@ class App
     uint32_t latencyDirtyAt = 0;
     void drawSound(class Pen& p);
     void drawSoundAdv(class Pen& p);
+    void soundArtSync();          // uploads the Sound screen's pictures to the display chip when they are out of date
+    bool artStatic = false;       // dial ring and patch shapes are in the chip
+    uint32_t artSig = 0;          // which patch the note picture shows
     void soundKey(int k);
     void soundJog(int delta);
     void soundAdvKey(int k);

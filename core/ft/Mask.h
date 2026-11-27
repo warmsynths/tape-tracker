@@ -23,8 +23,20 @@ inline int maskSlot(int track, int size) { return track * kMaskSizes + size; }
 constexpr int kPageMaskSlot = 12;
 constexpr int kPageMaskW = 760, kPageMaskH = 200;
 constexpr int kPageMaskStride = kPageMaskW / 8;
-inline unsigned maskAddress(int slot) { return slot < kPageMaskSlot ? kMaskBase + (unsigned)(slot / kMaskSizes) * kMaskPerTrack + (unsigned)kMaskOffset[slot % kMaskSizes] : kMaskBase + 4u * kMaskPerTrack; }
-inline int maskStride(int slot) { return slot < kPageMaskSlot ? kMaskStride : kPageMaskStride; }
+// The Sound screen's pictures (SoundArt.h), after the page picture: slot 13 the dial ring (64 x 64), slots 14 to 25 the
+// one-cycle shapes of the 12 patch tiles (64 x 16), slot 26 the note's waveform and slot 27 its envelope silhouette
+// (376 x 48). 6,560 bytes from 327,608, ending at 334,168, below the picture viewer's area.
+constexpr int kArtDialSlot = 13, kArtCycleSlot = 14, kArtNoteSlot = 26, kArtSilSlot = 27, kArtLastSlot = 27;
+constexpr unsigned kArtBase = kMaskBase + 4u * kMaskPerTrack + 19000u;
+inline unsigned maskAddress(int slot)
+{
+    if (slot < kPageMaskSlot) return kMaskBase + (unsigned)(slot / kMaskSizes) * kMaskPerTrack + (unsigned)kMaskOffset[slot % kMaskSizes];
+    if (slot == kPageMaskSlot) return kMaskBase + 4u * kMaskPerTrack;
+    if (slot == kArtDialSlot) return kArtBase;
+    if (slot < kArtNoteSlot) return kArtBase + 512u + (unsigned)(slot - kArtCycleSlot) * 128u;
+    return kArtBase + 2048u + (unsigned)(slot - kArtNoteSlot) * 2256u;
+}
+inline int maskStride(int slot) { return slot < kPageMaskSlot ? kMaskStride : (slot == kPageMaskSlot ? kPageMaskStride : (slot < kArtNoteSlot ? 8 : 47)); }
 } // namespace ft
 
 #endif /* FT_MASK_H_ */
