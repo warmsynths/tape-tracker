@@ -324,3 +324,8 @@ Everything below is new on the device and untested there. Built and tested in th
 
 ## FT58: synth CPU fix
 FT57 crashed on the first synth note (stuck chord, scratchy sound, then a crash). Cause found by counting instructions: four voices cost about 90 million instructions a second, too much for the Tracker's processor alongside everything else, so the audio interrupt starved the main loop. FT58 replaces the Plaits oscillators in the synth with lean band-limited ones (the Plaits ensemble, overdrive and drums stay), works the filter cutoff out every 8 frames and the envelopes every 4, and renders a drum voice only while it rings. **New: Config, About, "Synth load"** shows the heaviest block of the synth since you opened the page as a percent of its time. Play a four-note chord, open About and tell me the number; above 80% means dropouts. The sound is a little different from FT57 (the oscillators are not the Plaits ones).
+
+## FT59: waiting for the first note
+- Wait for sound (Tempo panel, B2: Left/Right to the box, Insert switches it) now replaces the count-in: Rec arms at once.
+- While it waits, the lane shows the input level and the level it starts at, the hint says "Waiting for your first note", and the **jog sets the start level live** (1 dB a click, Shift 3 dB). Set it above any buzz and below your note.
+- The home hint on an empty project says B2 holds tempo, bars and Wait for sound.

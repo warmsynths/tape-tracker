@@ -305,6 +305,15 @@ void App::jog(int delta)
         jogScreen(delta);
         return;
     }
+    if (waitingSound && session.mode() == FourTrackSession::Mode::RecordingFirst)
+    {
+        // the level the take starts at, set while you watch the input: above the buzz, below your note
+        set.waitDb = (int8_t)(set.waitDb + (delta > 0 ? 1 : -1) * (shift ? 3 : 1));
+        if (set.waitDb < -60) set.waitDb = -60;
+        if (set.waitDb > -12) set.waitDb = -12;
+        refresh(true);
+        return;
+    }
     if (session.mode() == FourTrackSession::Mode::ChoosingBars)
     {
         promptMove(delta > 0 ? 1 : -1);
@@ -798,7 +807,7 @@ void App::pressRecord()
     // A first take at a set tempo starts with a bar of clicks
     const bool firstTake = session.loopFrames() == 0 || (session.partCount() == 1 && session.hasPart(t) && !layerNow);
     layerPass[t] = layerNow;
-    if (firstTake && set.countBeats() > 0 && set.tempoTenths < 2400)
+    if (firstTake && set.countBeats() > 0 && set.tempoTenths < 2400 && !set.waitSound) // waiting for the first note replaces the count-in
     {
         countingIn = true;
         countInStart = hal.millis();
@@ -1779,7 +1788,7 @@ void App::fillView()
         if (L.active && mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
         {
             fmt(L.msg1, sizeof(L.msg1), "Waiting for sound");
-            fmt(L.msg2, sizeof(L.msg2), "starts at %d dB, then records up to %d s", (int)set.waitDb, (int)kMaxTakeSeconds);
+            fmt(L.msg2, sizeof(L.msg2), "input %d dB, starts at %d dB: jog changes it", (int)waitLevelDb, (int)set.waitDb);
         }
         else if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
         {
@@ -1892,14 +1901,14 @@ void App::fillView()
     if (countingIn) fmt(v.hint, sizeof(v.hint), "Count-in, then the first take starts. Stop cancels.");
     else if (mode == FourTrackSession::Mode::RecordingFirst)
     {
-        if (waitingSound) fmt(v.hint, sizeof(v.hint), "Recording starts when the input reaches %d dB. Stop cancels.", (int)set.waitDb);
+        if (waitingSound) fmt(v.hint, sizeof(v.hint), "Waiting for your first note. Jog sets the level it starts at (%d dB). Stop cancels.", (int)set.waitDb);
         else if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 16 s the take stops by itself and keeps everything.");
         else if (autoFrames() > 0) fmt(v.hint, sizeof(v.hint), "The take stops by itself on the bar line. Stop ends it early.");
         else fmt(v.hint, sizeof(v.hint), "B2 or Stop ends the take. Then: How many bars?");
     }
     else if (mode == FourTrackSession::Mode::Armed) fmt(v.hint, sizeof(v.hint), "Records one Loop from the loop start, then stops. B1 again disarms.");
     else if (mode == FourTrackSession::Mode::RecordingPart) fmt(v.hint, sizeof(v.hint), "Stop keeps what was recorded and fills the rest of the Loop with silence.");
-    else if (loop == 0) fmt(v.hint, sizeof(v.hint), "B1 records the first Part. B2 sets a starting tempo first.");
+    else if (loop == 0) fmt(v.hint, sizeof(v.hint), "B1 records the first Part. B2: tempo, bars and Wait for sound.");
     else if (session.playing()) fmt(v.hint, sizeof(v.hint), "B2 stops. Jog or Up/Down select a track. Insert opens actions.");
     else fmt(v.hint, sizeof(v.hint), "B1 arms Track %d. It records %s from the next loop start.", session.selected() + 1, sourceName(trackSource[session.selected()]));
     if (mode == FourTrackSession::Mode::Idle && loop > 0 && session.hasPart(session.selected()))

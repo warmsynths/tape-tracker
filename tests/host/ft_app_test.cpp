@@ -339,12 +339,11 @@ static void pagesAndProjects()
         app.key(kB7);
         hal.quiet = FakeHal::kRate * 3 / 2;
         app.key(kRec);
-        hal.advance(app, FakeHal::kRate * 3);
-        CHECK(app.state().mode() == Mode::Idle, "still counting in after three seconds");
-        hal.advance(app, FakeHal::kRate * 3 / 2);
-        CHECK(hal.clicks == 8, "eight clicks before it arms");
+        hal.advance(app, FakeHal::kRate / 2);
+        CHECK(hal.clicks == 0, "waiting for sound replaces the count-in");
         CHECK(app.state().mode() == Mode::RecordingFirst, "it is armed and recording is running");
-        CHECK(app.view().statusKind == 3 && std::strstr(app.view().hint, "starts when") != nullptr, "it shows Armed, waiting for sound");
+        CHECK(app.view().statusKind == 3 && std::strstr(app.view().hint, "Waiting for your first note") != nullptr, "it shows Armed, waiting for sound");
+        hal.advance(app, FakeHal::kRate * 2);
         hal.advance(app, FakeHal::kRate * 2);
         CHECK(app.view().statusKind == 2, "the sound starts the take");
         app.key(kStop);
@@ -1160,6 +1159,21 @@ int main()
         app.settingsForTest().roleFlow = true; // Bass reads the chord at the playhead
         app.key(kB5);
         CHECK(app.state().selected() == 0, "still on track 1");
+    }
+    {   // waiting for the first note: no count-in, and the jog sets the level it starts at
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        app.settingsForTest().waitSound = true;
+        app.settingsForTest().waitDb = -36;
+        hal.quiet = 1000000; // silence at first
+        app.key(kRec);
+        CHECK(app.view().statusKind == 3 || app.view().statusKind == 2, "it arms straight away, without a count-in");
+        CHECK(std::strncmp(app.view().hint, "Waiting for your first note", 27) == 0, "the hint says it is waiting");
+        app.jog(1);
+        CHECK(app.settings().waitDb == -35, "the jog raises the level it starts at");
+        app.setShift(true); app.jog(-1); app.setShift(false);
+        CHECK(app.settings().waitDb == -38, "Shift moves it in bigger steps");
     }
     {   // chords: Note opens the page and the pads play chords and scale notes
         FakeHal hal;
