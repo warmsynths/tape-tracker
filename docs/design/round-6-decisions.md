@@ -35,3 +35,11 @@ Q10 (later-Part recording model) is being reshaped: the owner asked for a looper
 
 ### Design exports received (2026-11-27)
 `docs/design/round-6-export/SCREENS.md` and `STYLEGUIDE.md` (exported from the HTML, now complete: roles 6.5, Play view 6.4, Chord sets 6.1d). Build from these. Known conflicts with the decisions above that the design must absorb (round 7 brief): the first-take flow (4.2, 4.3) assumes the old Free/How many bars flow; new frames needed for Bars in the Tempo panel, the later-Part countdown, Layer and Fade, Rendering, and the Config options (quantise grid and strength, tail wrap, calibrate latency).
+
+### Overdub with Fade on audio Parts: memory check (verified in code, 2026-11-27)
+- The four track regions are fixed slices of the sample memory array (each 1,588,248 B: 16 s plus 2 s spare, 16-bit mono). External RAM is 16 MB with 1,768,016 B free (from the FT46 build figure).
+- A scratch pass buffer of one region (1,588,248 B) fits and leaves about 180 KB; a 16 s buffer (1,411,776 B) leaves about 356 KB. Declare it in external RAM; the linker fails loudly if it does not fit. The alternative that frees RAM is lowering the 5.3 MB reserved for loaded samples.
+- Least risky method: record the new pass into the scratch buffer, then mix `old * fade + new` into the track's region in the main loop after the pass (about 700k samples, tens of ms, estimated), keeping the alignment and offset. Today a new pass overwrites the old one in place as it records, so this needs the change.
+- One-step undo already exists: before a new take the old Part is saved to `undo/tN.raw` on the SD card; an overdub through the same path is undone by the existing undo (last pass only).
+- Pad (note) Parts need no scratch buffer: notes carry their pass number and are re-rendered.
+- Cost to remember: this uses nearly all remaining external RAM.
