@@ -17,3 +17,11 @@ Goal: perfect loops, insanely easy to record.
 2. **Tail wrap: yes, as a Config option.** A note's tail past the loop end is folded onto the start of the loop (record a little extra, mix it into the beginning, a few ms of fade). Default on, about 2 s of tail, switchable in Config.
 3. **Live playing is quantised (option 2):** note starts snap to a grid with a strength. This means pad parts are stored as recorded notes (an event list), not only audio. Architecture still to settle.
 Still open: the latency cable test (Calibrate latency button), and what has gone wrong in the owner's loops so far.
+
+### Loop mechanics, second round (owner, 2026-11-27)
+4. **Pad Parts: notes are the source, audio is a cache (option 3).** Recording a pad Part stores the notes; on stop they are rendered (quantised) into the Part's audio, which plays like every other track. Changing quantise, patch or key re-renders. A short "Rendering" step after each pad take.
+5. **Quantise: global setting in Config, default 1/16 at 100%** (grid Off, 1/8, 1/16, 1/32; strength 0 to 100). Humanise is applied after quantising.
+6. **New projects default to Set 80 BPM, 4 bars, a 1-bar count-in** (4 bars at 80 BPM is 12 s, inside the 16 s Part limit). The Tempo panel gets a Bars field (only lengths that fit 16 s at that tempo). Free stays one button away.
+7. **Note editing afterwards: quantise only for now.** Change the sound and transpose come with the track roles. No piano roll.
+8. Owner's pain with loops: "awkward recording and getting the timing right" (start and stop timing, aligning later Parts).
+Latency cable test: owner asked what it needs (see the session notes); a Calibrate latency button in Config is planned.
