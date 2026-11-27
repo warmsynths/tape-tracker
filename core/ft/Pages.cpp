@@ -753,6 +753,7 @@ void App::newProject(bool everything)
     if (everything) hal.lofi().cfg = LofiCfg(); // and the lo-fi master
     hal.bank().fx.cfg = SendFxCfg();            // reverb and delay off, their settings back
     for (int t = 0; t < 4; t++) { trackRole[t] = TrackRole::Chords; roleChosen[t] = false; } // the next Rec asks again
+    chordEvCount = 0;
     if (hal.startsAtSetTempo()) newProjectDefaults();
     else { set.tempoTenths = 0; set.bars = 0; }
     fmt(projectName, sizeof(projectName), "Untitled");
@@ -947,6 +948,7 @@ void App::startSave()
     for (int i = 0; i < kRoleCount; i++) w.u8(roleSound[i]);
     if (!hal.fileWrite(jobPath, h, kHeader, false)) { showPopup(Popup::SdMissing); return; }
     projectChordsWrite(projectName);
+    chordEventsWrite(projectName);
     job = Job::Save;
     jobTrack = 0;
     jobDone = 0;
@@ -965,6 +967,7 @@ void App::startLoad(const char* name)
     uint8_t h[kHeader];
     if (hal.fileRead(jobPath, 0, h, kHeader) != (uint32_t)kHeader || h[0] != 'F' || h[1] != 'T' || h[2] != '2') { showPopup(Popup::Message, 3); return; }
     projectChordsRead(name);
+    chordEventsRead(name);
     R r{ h };
     r.u32();
     const uint32_t loop = r.u32();

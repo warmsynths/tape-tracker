@@ -119,6 +119,8 @@ class App
     Popup popup() const { return popupKind; }
     const Settings& settings() const { return set; }
     Settings& settingsForTest() { return set; }
+    int chordEventCount() const { return chordEvCount; }
+    uint32_t chordEventFrame(int i) const { return chordEv[i].frame; }
     bool waiting() const { return waitingSound; }
     bool pageOverflowed() const { return page.overflowed() || popupPage.overflowed(); }
     int pageStages() const { return page.stageCount(); }
@@ -213,7 +215,14 @@ class App
     void roleAllOff();
     void serviceRoleRepeat(uint32_t now);
     int roleLight(int p) const;
-    int roleCurrentChord(uint8_t* out) const { return chords.lastChord(out); }
+    // The chord changes recorded with a Chords take (the chord track): Bass and Melody follow them
+    static constexpr int kMaxChordEvents = 64;
+    struct ChordEv { uint32_t frame; uint8_t count; uint8_t notes[kMaxChordNotes]; };
+    ChordEv chordEv[kMaxChordEvents] = {};
+    int chordEvCount = 0;
+    int roleCurrentChord(uint8_t* out) const;
+    void chordEventsWrite(const char* name);
+    void chordEventsRead(const char* name);
     void drawRole(class Pen& p);
     void drawRoleSound(class Pen& p);
     void drawRolePad(class Pen& p, int pad, int px, int py, int pw, int ph);

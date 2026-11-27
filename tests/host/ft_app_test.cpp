@@ -1138,6 +1138,29 @@ int main()
         CHECK(app.screen() == Screen::Main, "Shift + Rec arms with the last role");
         CHECK(std::strcmp(app.view().padsMode, "CHORD") == 0, "the last role starts as Chords");
     }
+    {   // the chord track: the chords of a Chords take are written down, saved, and followed by Bass
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        app.key(kNote);
+        app.key(kPattern);        // home, with the pads still playing chords
+        app.key(kRec);
+        hal.advance(app, 100000); // the count-in
+        hal.advance(app, FakeHal::kRate);
+        app.pad(12, true);        // I
+        hal.advance(app, FakeHal::kRate);
+        app.pad(12, false);
+        app.pad(16, true);        // V
+        hal.advance(app, FakeHal::kRate);
+        app.pad(16, false);
+        CHECK(app.chordEventCount() == 2, "two chord changes were written to the chord track");
+        CHECK(app.chordEventFrame(1) > app.chordEventFrame(0), "in order");
+        app.key(kStop);
+        app.key(kB8);
+        app.settingsForTest().roleFlow = true; // Bass reads the chord at the playhead
+        app.key(kB5);
+        CHECK(app.state().selected() == 0, "still on track 1");
+    }
     {   // chords: Note opens the page and the pads play chords and scale notes
         FakeHal hal;
         App app(hal, palette());

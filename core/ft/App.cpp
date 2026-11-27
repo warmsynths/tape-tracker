@@ -539,7 +539,20 @@ void App::chordPad(int p, bool down, int velocity)
         const int count = chords.notes(p, n);
         chords.played(p);
         if (count == 0) return;
-        if (pi.role == Role::Chord) { chords.label(p, lastChordName, sizeof lastChordName); lastFamily = (int)chords.family(p); }
+        if (pi.role == Role::Chord)
+        {
+            chords.label(p, lastChordName, sizeof lastChordName);
+            lastFamily = (int)chords.family(p);
+            // during a take the chord is written to the chord track, for Bass and Melody to follow
+            const FourTrackSession::Mode m = session.mode();
+            if ((m == FourTrackSession::Mode::RecordingFirst || m == FourTrackSession::Mode::RecordingPart) && chordEvCount < kMaxChordEvents && count <= kMaxChordNotes)
+            {
+                ChordEv& e = chordEv[chordEvCount++];
+                e.frame = m == FourTrackSession::Mode::RecordingFirst ? (hal.recordLength() > takeOffset ? hal.recordLength() - takeOffset : 0) : hal.playerPosition();
+                e.count = (uint8_t)count;
+                for (int i = 0; i < count; i++) e.notes[i] = n[i];
+            }
+        }
         const bool chord = pi.role == Role::Chord;
         const int base = c.padVelocity && velocity >= 1 ? (velocity > 127 ? 127 : velocity) : 100;
         for (int i = 0; i < count; i++) heldNote[p][i] = n[i];
@@ -813,6 +826,7 @@ void App::startRecording()
         else layerPass[t] = false; // the old audio could not be kept, so it cannot be laid under the new pass
     }
     else layerPass[t] = false;
+    if (padsChords && trackRole[t] == TrackRole::Chords && !layerPass[t]) chordEvCount = 0; // a new Chords take writes a new chord track
     session.pressRecord(layerPass[t]);
     const int track = session.recordingTrack();
     if (session.mode() == FourTrackSession::Mode::RecordingFirst)

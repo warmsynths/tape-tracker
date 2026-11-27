@@ -196,6 +196,64 @@ void App::drawRoleSound(Pen& p)
 }
 
 //--------------------------------------------------------------------------------------------
+// The chord track: the chords of a Chords take, with the frame each one began on
+
+int App::roleCurrentChord(uint8_t* out) const
+{
+    const bool running = session.mode() == FourTrackSession::Mode::RecordingPart || (hal.playerPlaying() && session.loopFrames() > 0);
+    if (chordEvCount > 0 && running && session.loopFrames() > 0)
+    {
+        const uint32_t pos = hal.playerPosition() % session.loopFrames();
+        int idx = chordEvCount - 1; // before the first change: the last chord is still ringing from the end of the loop
+        for (int i = 0; i < chordEvCount; i++) if (chordEv[i].frame <= pos) idx = i;
+        for (int i = 0; i < chordEv[idx].count; i++) out[i] = chordEv[idx].notes[i];
+        return chordEv[idx].count;
+    }
+    return chords.lastChord(out);
+}
+
+void App::chordEventsWrite(const char* name)
+{
+    char path[64];
+    fmt(path, sizeof path, "Projects/%s.crd", name);
+    if (chordEvCount == 0) return;
+    uint8_t b[8 + kMaxChordEvents * 11];
+    b[0] = 'C'; b[1] = 'R'; b[2] = '0'; b[3] = '1';
+    b[4] = (uint8_t)chordEvCount; b[5] = b[6] = b[7] = 0;
+    int o = 8;
+    for (int i = 0; i < chordEvCount; i++)
+    {
+        const ChordEv& e = chordEv[i];
+        b[o++] = (uint8_t)(e.frame & 255); b[o++] = (uint8_t)((e.frame >> 8) & 255); b[o++] = (uint8_t)((e.frame >> 16) & 255); b[o++] = (uint8_t)((e.frame >> 24) & 255);
+        b[o++] = e.count;
+        for (int k = 0; k < kMaxChordNotes && k < 6; k++) b[o++] = e.notes[k];
+    }
+    hal.fileWrite(path, b, (uint32_t)o, false);
+}
+
+void App::chordEventsRead(const char* name)
+{
+    chordEvCount = 0;
+    char path[64];
+    fmt(path, sizeof path, "Projects/%s.crd", name);
+    uint8_t b[8 + kMaxChordEvents * 11];
+    const uint32_t size = hal.fileSize(path);
+    if (size < 8 || size > sizeof b || hal.fileRead(path, 0, b, size) != size) return;
+    if (b[0] != 'C' || b[1] != 'R' || b[2] != '0' || b[3] != '1') return;
+    const int n = b[4] > kMaxChordEvents ? kMaxChordEvents : b[4];
+    int o = 8;
+    for (int i = 0; i < n && o + 11 <= (int)size; i++)
+    {
+        ChordEv& e = chordEv[i];
+        e.frame = (uint32_t)b[o] | ((uint32_t)b[o + 1] << 8) | ((uint32_t)b[o + 2] << 16) | ((uint32_t)b[o + 3] << 24);
+        e.count = b[o + 4] > kMaxChordNotes ? (uint8_t)kMaxChordNotes : b[o + 4];
+        for (int k = 0; k < 6; k++) e.notes[k] = b[o + 5 + k];
+        o += 11;
+        chordEvCount = i + 1;
+    }
+}
+
+//--------------------------------------------------------------------------------------------
 // The pads
 
 void App::roleAllOff()
