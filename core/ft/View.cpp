@@ -73,6 +73,15 @@ class Painter
         g.rect(x, y, w, h);
         g.alpha(255);
     }
+    // rounded (radius 6) when at least 18 x 18, as the design asks for cards, fields and the M box
+    void card(int x, int y, int w, int h, uint32_t color, int a = 255)
+    {
+        g.color(color);
+        if (a != 255) g.alpha(a);
+        if (w >= 18 && h >= 18) g.roundRect(x, y, w, h, 6);
+        else g.rect(x, y, w, h);
+        if (a != 255) g.alpha(255);
+    }
     void laneGeom(int i, int& y, int& h) const;
     void columns(const Lane& L, int y, int h, int cols, uint32_t color);
     void drawTop();
@@ -224,11 +233,11 @@ void Painter::drawLane(int i)
     const bool strip = v.focusLane >= 0 && !focus;
 
     // header and audio area, each with a faint tint of the track colour; the selected header is stronger
-    rect(0, y, 164, h, pal.panel);
-    tint(0, y, 164, h, tc, L.selected ? 56 : 26);
-    rect(0, y, L.selected ? 6 : 3, h, tc);
-    rect(168, y, 604, h, pal.waveBg);
-    tint(168, y, 604, h, tc, 26);
+    card(0, y, 164, h, pal.panel);
+    card(0, y, 164, h, tc, L.selected ? 56 : 26);
+    rect(0, y + 6, L.selected ? 6 : 3, h - 12, tc);
+    card(168, y, 604, h, pal.waveBg);
+    card(168, y, 604, h, tc, 26);
     if (L.active && v.statusKind == 3) rect(168, y, 3, h, pal.rec); // armed: where recording will begin
 
     // number, name and mute box
@@ -246,7 +255,7 @@ void Painter::drawLane(int i)
     }
     if (L.muted)
     {
-        rect(134, by, 20, 20, pal.marker);
+        card(134, by, 20, 20, pal.marker);
         T(138, by + 2, "M", kF14, pal.bg);
     }
     else
