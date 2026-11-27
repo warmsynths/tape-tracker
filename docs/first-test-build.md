@@ -341,3 +341,6 @@ FT62 put a level test in front of every take; that was wrong, so FT63 removes it
 
 ## FT64: every update file listed
 Config, Firmware now has one row for each `.ptf` in the card's `Firmware` folder (up to 8), newest build first, instead of one row you had to jog through. Move to a row and press B1 to install that file; B1 on the "Installed" row installs the newest.
+
+## FT66: Wait for sound lines up with the grid
+With the bars set, a take that waited for your first note now starts 20 ms before it (was 120 ms), so beat 1 is your first strum, and the click starts on that note (it stays silent while waiting). The loop is the 4 bars counted from there. The click is on by default in new projects (Shift + Play).

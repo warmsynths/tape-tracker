@@ -977,6 +977,7 @@ void App::serviceWait()
         {
             uint32_t pre = preRollFrames();
             if (pre < rate / 50) pre = rate / 50;
+            if (autoFrames() > 0) pre = rate / 50; // with the bars set, beat 1 is your first note: only 20 ms before it
             takeOffset = i > pre ? i - pre : 0;
             waitingSound = false;
             lastClickBeat = -1;
@@ -1081,6 +1082,7 @@ void App::newProjectDefaults()
     set.tempoTenths = 800;
     set.bars = 4;
     set.countIdx = 3; // four beats: one bar of count-in
+    set.click = true; // the click is on: a loop is played against it
 }
 
 uint32_t App::autoFrames() const
@@ -1312,7 +1314,9 @@ void App::serviceClick()
         // the first take has no loop yet: the click follows the starting tempo, or 120 BPM when it is Free
         const uint32_t tenths = set.tempoTenths > 0 ? set.tempoTenths : 1200u;
         const uint32_t beatFrames = (uint32_t)((uint64_t)hal.sampleRate() * 600 / tenths);
-        const int idx = beatFrames > 0 ? (int)(hal.recordLength() / beatFrames) : 0;
+        if (waitingSound) return; // no click while it waits for the first note
+        const uint32_t into = hal.recordLength() > takeOffset ? hal.recordLength() - takeOffset : 0; // beat 1 is the first note
+        const int idx = beatFrames > 0 ? (int)(into / beatFrames) : 0;
         if (idx != lastClickBeat)
         {
             lastClickBeat = idx;
@@ -1338,7 +1342,8 @@ int App::beatIndex()
     {
         const uint32_t tenths = set.tempoTenths > 0 ? set.tempoTenths : 1200u;
         const uint32_t beatFrames = (uint32_t)((uint64_t)hal.sampleRate() * 600 / tenths);
-        return beatFrames > 0 ? (int)(hal.recordLength() / beatFrames) : -1;
+        const uint32_t into = hal.recordLength() > takeOffset ? hal.recordLength() - takeOffset : 0;
+        return beatFrames > 0 ? (int)(into / beatFrames) : -1;
     }
     if (!hal.playerPlaying() || session.bars() <= 0 || session.loopFrames() == 0) return -1;
     const uint32_t beat = session.loopFrames() / ((uint32_t)session.bars() * 4);
