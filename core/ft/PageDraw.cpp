@@ -149,7 +149,7 @@ void App::drawTempo(Pen& p)
     if (set_ && sRow == 3) p.text(330, 328, "JOG", F12, pal.text);
     p.text(386, 330, "Set: one Rec counts in, records the bars and stops on the bar line.", F12, pal.dim);
     p.text(386, 348, "Free: the take sets the Loop. Ask later: you choose the bars afterwards.", F12, pal.dim);
-    p.text(386, 366, "Left/Right choose a box, jog changes it, Insert switches it.", F12, pal.dim);
+    p.text(386, 366, "B3 switches Wait for sound. Left/Right choose a box, jog changes it.", F12, pal.dim);
 }
 
 //--------------------------------------------------------------------------------------------

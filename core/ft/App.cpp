@@ -1953,8 +1953,9 @@ void App::fillView()
     {
         static const char* const tp[8] = { "Free", "Set", "", "", "", "", "OK", "Cancel" };
         for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", tp[b]); v.btnKind[b] = 0; }
+        fmt(v.btn[2], sizeof(v.btn[2]), "Wait: %s", set.waitSound ? "On" : "Off");
         v.btnSelected = -1;
-        v.btnMask = (uint8_t)(set.tempoTenths > 0 ? 2 : 1);
+        v.btnMask = (uint8_t)((set.tempoTenths > 0 ? 2 : 1) | (set.waitSound ? 4 : 0));
         v.hint[0] = 0;
     }
     if (actionMenu)

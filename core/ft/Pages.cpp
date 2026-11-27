@@ -202,6 +202,7 @@ void App::keyScreen(int k)
         case Screen::Tempo:
             if (k == kB1) { set.tempoTenths = 0; unsaved = true; back(); return; }
             else if (k == kB2) { if (set.tempoTenths == 0) { set.tempoTenths = 800; if (set.bars == 0) set.bars = 4; } sRow = 0; }
+            else if (k == kB3) { set.waitSound = !set.waitSound; unsaved = true; }
             else if (k == kB7) { unsaved = true; back(); return; }
             else if (k == kB8) { set.tempoTenths = tempoEntry; set.countIdx = countEntry; set.waitSound = waitEntry; set.waitDb = waitDbEntry; back(); return; }
             else if (k == kLeft) sRow = clampi(sRow - 1, set.tempoTenths > 0 ? 0 : 1, 3);
