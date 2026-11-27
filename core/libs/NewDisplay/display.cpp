@@ -22,6 +22,7 @@
 // BITMAPS
 #ifndef TRACKER_MINI
 #include "images/poly_logo_160x172_L8.h"
+#include "images/ft_boot_logo_200x120_L8.h"
 #else
 #include "images/poly_logo_172x172_L8.h"
 #endif
@@ -112,13 +113,13 @@ strFont fonts[displayFontCount];
 const strBitmap bitmaps[displayBitmapsCount] = {
 #ifndef TRACKER_MINI
     {
-      poly_logo_160x172_l8,
+      poly_logo_160x172_l8, // holds the Four-Track boot logo (200 x 120, 24,000 bytes) after start-up
       80000,
-      27520,
-      160,
-      172,
+      24000,
+      200,
+      120,
       L8,
-      160,
+      200,
     },
 #else
     {
@@ -270,8 +271,8 @@ void cDisplay::begin(DisplayDriver* displayDriver, Timer* timer)
     this->timer = timer;
     // ####################################
 #ifndef TRACKER_MINI
-    decompress(poly_logo_160x172_l8_compressed,
-               sizeof(poly_logo_160x172_l8_compressed) / sizeof(poly_logo_160x172_l8_compressed[0]),
+    decompress(ft_boot_logo_200x120_l8_compressed,
+               sizeof(ft_boot_logo_200x120_l8_compressed) / sizeof(ft_boot_logo_200x120_l8_compressed[0]),
                poly_logo_160x172_l8);
 #endif
 
@@ -306,7 +307,11 @@ void cDisplay::begin(DisplayDriver* displayDriver, Timer* timer)
       NEAREST, BORDER, BORDER, bitmaps[bitmap_index].width, bitmaps[bitmap_index].height);
 
     API_BEGIN(BITMAPS);
+#ifdef TRACKER_MINI
     API_VERTEX2F((800 / 2) - (bitmaps[bitmap_index].width / 2), 100);
+#else
+    API_VERTEX2F((800 / 2) - (bitmaps[bitmap_index].width / 2), (480 - bitmaps[bitmap_index].height) / 2); // centred
+#endif
     API_END();
 
     API_RESTORE_CONTEXT();
