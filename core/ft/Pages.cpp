@@ -198,11 +198,11 @@ void App::keyScreen(int k)
     {
         case Screen::Tempo:
             if (k == kB1) { set.tempoTenths = 0; unsaved = true; back(); return; }
-            else if (k == kB2) { if (set.tempoTenths == 0) set.tempoTenths = 1200; sRow = 0; }
+            else if (k == kB2) { if (set.tempoTenths == 0) { set.tempoTenths = 800; if (set.bars == 0) set.bars = 4; } sRow = 0; }
             else if (k == kB7) { unsaved = true; back(); return; }
             else if (k == kB8) { set.tempoTenths = tempoEntry; set.countIdx = countEntry; set.waitSound = waitEntry; set.waitDb = waitDbEntry; back(); return; }
-            else if (k == kLeft) sRow = clampi(sRow - 1, set.tempoTenths > 0 ? 0 : 1, 2);
-            else if (k == kRight) sRow = clampi(sRow + 1, set.tempoTenths > 0 ? 0 : 1, 2);
+            else if (k == kLeft) sRow = clampi(sRow - 1, set.tempoTenths > 0 ? 0 : 1, 3);
+            else if (k == kRight) sRow = clampi(sRow + 1, set.tempoTenths > 0 ? 0 : 1, 3);
             else if (k == kUp) jogScreen(1);
             else if (k == kDown) jogScreen(-1);
             else if (k == kJogPress) { if (sRow == 1) set.countIdx = (uint8_t)((set.countIdx + 1) % 5); else if (sRow == 2) set.waitSound = !set.waitSound; }
@@ -339,9 +339,11 @@ void App::jogScreen(int delta)
                 if (t == 0) t = 1200;
                 else t += delta * (shift ? 10 : 1);
                 set.tempoTenths = (uint16_t)clampi(t, 400, 2400);
+                while (set.bars > 0 && set.bars > barsFit(set.tempoTenths)) set.bars = (uint8_t)barsStep(set.bars, -1); // only lengths that fit one Part
             }
+            else if (sRow == 3) set.bars = (uint8_t)barsStep(set.bars, delta > 0 ? 1 : -1);
             else if (sRow == 1) set.countIdx = (uint8_t)clampi(set.countIdx + (delta > 0 ? 1 : -1), 0, 4);
-            else { if (!set.waitSound) set.waitSound = true; else set.waitDb = (int8_t)clampi(set.waitDb + delta, -60, -12); }
+            else if (sRow == 2) { if (!set.waitSound) set.waitSound = true; else set.waitDb = (int8_t)clampi(set.waitDb + delta, -60, -12); }
             break;
         case Screen::Editor:
         {
@@ -739,7 +741,8 @@ void App::newProject(bool everything)
         trackSource[t] = Source::Line;
     }
     if (everything) hal.lofi().cfg = LofiCfg(); // and the lo-fi master
-    set.tempoTenths = 0;
+    if (hal.startsAtSetTempo()) newProjectDefaults();
+    else { set.tempoTenths = 0; set.bars = 0; }
     fmt(projectName, sizeof(projectName), "Untitled");
     unsaved = false;
     pushBank();
@@ -919,6 +922,7 @@ void App::startSave()
     w.u8(l.glue); w.u8(l.sat); w.u8(l.wowDepth); w.u8(l.wowSpeed); w.u8(l.crushBits); w.u8(l.volume);
     for (int i = 0; i < 48; i++) w.u8(padModeKeys[i] ? 1 : 0);
     for (int t = 0; t < 4; t++) { const TrackCfg& c = hal.bank().cfg[t]; w.u16((uint16_t)c.levelDb10); w.u8((uint8_t)c.pan); w.u8((uint8_t)c.tone); w.u8(c.solo ? 1 : 0); }
+    w.u8(set.bars);
     if (!hal.fileWrite(jobPath, h, kHeader, false)) { showPopup(Popup::SdMissing); return; }
     projectChordsWrite(projectName);
     job = Job::Save;
@@ -971,6 +975,7 @@ void App::startLoad(const char* name)
     l.glue = (uint8_t)r.u8(); l.sat = (uint8_t)r.u8(); l.wowDepth = (uint8_t)r.u8(); l.wowSpeed = (uint8_t)r.u8(); l.crushBits = (uint8_t)r.u8(); l.volume = (uint8_t)r.u8();
     for (int i = 0; i < 48; i++) padModeKeys[i] = r.u8() != 0;
     for (int t = 0; t < 4; t++) { TrackCfg& c = hal.bank().cfg[t]; c.levelDb10 = (int16_t)r.u16(); c.pan = (int8_t)r.u8(); c.tone = (int8_t)r.u8(); c.solo = r.u8() != 0; }
+    set.bars = (uint8_t)r.u8();
     session.restore(loop, bars, mask);
     fmt(projectName, sizeof(projectName), "%s", name);
     for (int t = 0; t < 4; t++) hasUndoTake[t] = false;
@@ -1459,7 +1464,7 @@ void App::resampleJog(int delta)
 
 int App::deviceRowCount(int g) const
 {
-    static const int n[9] = { 3, 1, 1, 1, 3, 5, 7, 2, 2 };
+    static const int n[9] = { 3, 1, 1, 1, 3, 6, 7, 2, 2 };
     return n[g < 0 || g > 8 ? 0 : g];
 }
 
@@ -1519,6 +1524,11 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             else if (r == 1) { n = "Pre-roll"; fmt(value, size, "%s", rolls[set.preRollIdx % 5]); h = "How long before the loop start a Part begins recording, so nothing is missed."; }
             else if (r == 2) { n = "Tempo rounding"; fmt(value, size, "%s", rounds[set.roundIdx % 3]); h = "The tempo worked out from the first take is rounded to this step."; }
             else if (r == 3) { n = "Wait level"; fmt(value, size, "%d dB", (int)set.waitDb); h = "How loud the input must get before a waiting first take starts."; }
+            else if (r == 5)
+            {
+                n = "Tail wrap"; fmt(value, size, "%s", set.tailWrap ? "On" : "Off");
+                h = "A note ringing past the end of a first take is folded onto the start of the loop, so the loop does not click.";
+            }
             else
             {
                 n = "Input latency";
@@ -1581,6 +1591,7 @@ void App::deviceChange(int g, int r, int delta)
             else if (r == 1) set.preRollIdx = (uint8_t)clampi(set.preRollIdx + d, 0, 4);
             else if (r == 2) set.roundIdx = (uint8_t)clampi(set.roundIdx + d, 0, 2);
             else if (r == 3) set.waitDb = (int8_t)clampi(set.waitDb + d, -60, -12);
+            else if (r == 5) set.tailWrap = !set.tailWrap;
             else { latencyFrames = clampi(latencyFrames + d * (shift ? 1 : 4), 0, 4000); latencyMark(); }
             break;
         case 6:

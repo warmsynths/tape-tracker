@@ -38,6 +38,7 @@ App::App(Hal& h, const Palette& palette)
     sndBase = synthPreset(0);
     for (int i = 0; i < 48; i++) lightSent[i] = 255;
     set.waveBitmap = hal.maskDefault();
+    if (hal.startsAtSetTempo()) newProjectDefaults();
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
         FxSlot defaults[4] = { { FxType::RandomJumps, false, 50, 0, 50 }, { FxType::PitchSteps, false, 50, 0, 40 }, { FxType::Stutter, false, 50, 7, 100 }, { FxType::Reverse, false, 50, 7, 100 } };
@@ -697,6 +698,7 @@ void App::selectTrack(int track)
 
 void App::pressRecord()
 {
+    finishTail(true);
     if (countingIn)
     {
         countingIn = false; // cancels the count-in
@@ -738,6 +740,7 @@ void App::pressRecord()
 
 void App::startRecording()
 {
+    finishTail(true);
     lastClickBeat = -1;
     const int t = session.selected();
     if ((lastOp.mask >> t) & 1) lastOp = LastOp(); // the memory behind this track is about to be written over
@@ -952,10 +955,13 @@ void App::onFirstTakeFinished()
     if (session.mode() == FourTrackSession::Mode::ChoosingBars && rec >= 0)
     {
         const uint32_t frames = session.pendingFrames();
-        const int onset = findFirstOnset(hal.region(rec) + takeOffset, 0, frames, hal.sampleRate());
+        const int heard = findFirstOnset(hal.region(rec) + takeOffset, 0, frames, hal.sampleRate());
+        const bool onGrid = autoFrames() > 0; // the take starts on the bar line: nothing before the first note is cut
+        const int onset = onGrid && heard >= 0 ? 0 : heard;
         if (onset < 0)
         {
             // Nothing was heard: throw it away
+            finishTail(false);
             session.cancelBars();
             hal.playerStop();
             showPopup(Popup::NoSound, rec + 1);
@@ -975,8 +981,89 @@ void App::onFirstTakeFinished()
     hal.playerStop();
 }
 
+//--------------------------------------------------------------------------------------------
+// The first take with the bars set up front: it records exactly that many bars and stops itself on the bar line
+
+void App::newProjectDefaults()
+{
+    set.tempoTenths = 800;
+    set.bars = 4;
+    set.countIdx = 3; // four beats: one bar of count-in
+}
+
+uint32_t App::autoFrames() const
+{
+    if (set.tempoTenths == 0 || set.bars == 0) return 0;
+    const uint32_t rate = hal.sampleRate();
+    uint32_t frames = (uint32_t)(((uint64_t)set.bars * 4u * 60u * 10u * rate + set.tempoTenths / 2) / set.tempoTenths);
+    const uint32_t limit = hal.regionFrames() - kPostFrames - 2000;
+    return frames > limit ? limit : frames;
+}
+
+int App::barsFit(int tempoTenths) const
+{
+    return tempoTenths / 150; // 16 s at 4 beats a bar: bars * 2400 / tempo <= 16
+}
+
+int App::barsStep(int from, int dir) const
+{
+    static const int options[9] = { 0, 1, 2, 3, 4, 6, 8, 12, 16 };
+    const int fit = barsFit(set.tempoTenths > 0 ? set.tempoTenths : 1200);
+    int idx = 0;
+    for (int i = 0; i < 9; i++) if (options[i] <= from) idx = i;
+    for (int i = idx + dir; i >= 0 && i < 9; i += dir)
+        if (options[i] <= fit) return options[i];
+    return from;
+}
+
+void App::finishTail(bool all)
+{
+    if (tailTrack < 0) return;
+    const int t = tailTrack;
+    tailTrack = -1;
+    const uint32_t got = hal.recordLength();
+    if (hal.recordActive()) hal.recordStop();
+    if (!all || got <= tailAt || !session.hasPart(t) || partData[t] == nullptr) return;
+    uint32_t n = got - tailAt;
+    if (n > tailWant) n = tailWant;
+    // what rang on past the end of the loop joins the start of the loop, fading out as the take did not
+    int16_t* d = const_cast<int16_t*>(partData[t]);
+    for (uint32_t i = 0; i < n; i++)
+    {
+        const int32_t v = d[i] + (int32_t)((int64_t)d[tailAt + i] * (int64_t)(n - i) / (int64_t)n);
+        d[i] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+    }
+    waveDirty[t] = true;
+}
+
+void App::serviceTail()
+{
+    if (tailTrack < 0) return;
+    if (!hal.recordActive() || hal.recordLength() >= tailAt + tailWant) finishTail(true);
+}
+
 void App::serviceFirstTake()
 {
+    const uint32_t want = autoFrames();
+    if (want > 0 && hal.recordActive() && hal.recordLength() >= takeOffset + want)
+    {
+        const int rec = session.recordingTrack();
+        const uint32_t room = hal.regionFrames() > want + kPostFrames ? hal.regionFrames() - want - kPostFrames : 0;
+        tailWant = set.tailWrap ? (hal.sampleRate() * 2 < room ? hal.sampleRate() * 2 : room) : 0;
+        if (tailWant > 0) { tailTrack = rec; tailAt = want; }
+        else hal.recordStop();
+        session.firstRecordedFrames(want, false);
+        if (session.mode() == FourTrackSession::Mode::RecordingFirst) session.pressStop();
+        onFirstTakeFinished();
+        if (session.mode() == FourTrackSession::Mode::ChoosingBars)
+        {
+            promptCount = 1;
+            promptBars[0] = (uint8_t)set.bars;
+            promptSelected = 0;
+            promptConfirm();
+        }
+        return;
+    }
     const bool stoppedByItself = !hal.recordActive();
     session.firstRecordedFrames(hal.recordLength() - takeOffset, hal.recordFull() || stoppedByItself);
     if (session.mode() == FourTrackSession::Mode::RecordingFirst && stoppedByItself) session.pressStop();
@@ -1207,6 +1294,7 @@ void App::tick()
         case FourTrackSession::Mode::Idle:
         case FourTrackSession::Mode::ChoosingBars: break;
     }
+    serviceTail();
     serviceCountIn();
     serviceClick();
     serviceChordNotes();
@@ -1567,6 +1655,14 @@ void App::fillView()
             fmt(L.msg1, sizeof(L.msg1), "First take");
             const uint32_t took = hal.recordLength() > takeOffset ? hal.recordLength() - takeOffset : 0;
             formatTime(L.msg2, sizeof(L.msg2), took, rate);
+            const uint32_t want = autoFrames();
+            if (want > 0)
+            {
+                // the bars were set up front: say where in them the take is
+                const uint32_t sixteenths = (uint32_t)((uint64_t)(took < want ? took : want) * set.bars * 16 / want);
+                fmt(L.msg1, sizeof(L.msg1), "Recording %d bars", (int)set.bars);
+                fmt(L.msg2, sizeof(L.msg2), "bar %u.%u of %d", (unsigned)(sixteenths / 16 + 1), (unsigned)((sixteenths % 16) / 4 + 1), (int)set.bars);
+            }
             const uint32_t maxFrames = rate * kMaxTakeSeconds;
             const uint32_t got = took < maxFrames ? took : maxFrames;
             const uint32_t leftTenths = (maxFrames - got) * 10 / rate;
@@ -1574,6 +1670,14 @@ void App::fillView()
             L.warn = leftTenths <= 30;
             fmt(L.side1, sizeof(L.side1), "%s", L.warn ? "Memory nearly full" : "Up to 16 s per Part");
             fmt(L.side2, sizeof(L.side2), "%u.%u s left", (unsigned)(leftTenths / 10), (unsigned)(leftTenths % 10));
+            if (want > 0)
+            {
+                const uint32_t toGo = want > took ? want - took : 0;
+                L.progress = (uint8_t)((took < want ? took : want) * 100 / want);
+                L.warn = false;
+                fmt(L.side1, sizeof(L.side1), "Stops on the bar line");
+                fmt(L.side2, sizeof(L.side2), "%u.%u s left", (unsigned)(toGo * 10 / rate / 10), (unsigned)(toGo * 10 / rate % 10));
+            }
         }
         else if (L.active && mode == FourTrackSession::Mode::Armed)
         {
@@ -1582,6 +1686,13 @@ void App::fillView()
             const uint32_t toEnd = (loop > pos) ? (loop - pos) : 0;
             const uint32_t tenths = toEnd * 10 / rate;
             fmt(L.msg2, sizeof(L.msg2), "in %u.%u s - records one Loop, then stops", (unsigned)(tenths / 10), (unsigned)(tenths % 10));
+            const uint32_t beat = session.bars() > 0 ? loop / ((uint32_t)session.bars() * 4) : 0;
+            if (beat > 0 && toEnd <= beat * 4)
+            {
+                // the last four beats before the Part starts: a countdown on the screen
+                fmt(L.msg1, sizeof(L.msg1), "Get ready");
+                fmt(L.msg2, sizeof(L.msg2), "%u", (unsigned)((toEnd + beat - 1) / beat));
+            }
         }
         else if (L.active && mode == FourTrackSession::Mode::RecordingPart)
         {
@@ -1652,6 +1763,7 @@ void App::fillView()
     {
         if (waitingSound) fmt(v.hint, sizeof(v.hint), "Recording starts when the input reaches %d dB. Stop cancels.", (int)set.waitDb);
         else if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 16 s the take stops by itself and keeps everything.");
+        else if (autoFrames() > 0) fmt(v.hint, sizeof(v.hint), "The take stops by itself on the bar line. Stop ends it early.");
         else fmt(v.hint, sizeof(v.hint), "B2 or Stop ends the take. Then: How many bars?");
     }
     else if (mode == FourTrackSession::Mode::Armed) fmt(v.hint, sizeof(v.hint), "Records one Loop from the loop start, then stops. B1 again disarms.");

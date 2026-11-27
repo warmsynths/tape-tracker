@@ -60,6 +60,8 @@ struct Settings
     uint8_t roundIdx = 0;      // device: tempo rounding off, 0.1, 1
     uint16_t tempoTenths = 0;  // starting tempo in tenths of a BPM, 0: Free
     uint8_t countIdx = 3;      // count-in: 0 Off, 1 beat, 2 beats, 4 beats, 8 beats
+    uint8_t bars = 0;          // project: bars of the first take at a set tempo, 0: asked afterwards
+    bool tailWrap = true;      // device: a note's tail past the loop end is folded onto the start
     bool waitSound = false;    // project: the first take waits for the input to get loud
     int8_t waitDb = -36;       // device: how loud, in dB
     int countBeats() const { static const int b[5] = { 0, 1, 2, 4, 8 }; return b[countIdx > 4 ? 4 : countIdx]; }
@@ -174,6 +176,14 @@ class App
     // Chords page and chord pads
     void drawChords(class Pen& p);
     void drawPlayView(class Pen& p);
+    // New projects start at 80 BPM, 4 bars and a count-in of one bar (the owner's default); Free stays one button away
+    void newProjectDefaults();
+    uint32_t autoFrames() const;          // length of a first take with the bars set up front, 0 when it is open
+    void finishTail(bool all);            // stop recording the tail past the loop end and fold it onto the start
+    void serviceTail();
+    int barsFit(int tempoTenths) const;   // the most bars that fit one Part at this tempo
+    int barsStep(int from, int dir) const;
+
     bool onHome() const { return current == Screen::Main || current == Screen::Play; }
     void chordsKey(int k);
     void chordsJog(int delta);
@@ -524,6 +534,9 @@ class App
     void serviceWait();
     void cancelWait();
     bool countingIn = false;
+    int tailTrack = -1;          // a first take whose tail is still being recorded
+    uint32_t tailAt = 0;         // frame where the loop ends
+    uint32_t tailWant = 0;       // how many frames of tail to record
     uint32_t countInStart = 0;
     int countInBeats = 0;
     bool replaceConfirmed = false;

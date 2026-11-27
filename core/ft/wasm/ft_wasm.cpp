@@ -327,6 +327,7 @@ class EmuHal : public Hal
     bool previewActive() override { for (auto& v : voices) if (v.on && v.pad == 950) return true; return false; }
 
     bool maskDefault() override { return true; }
+    bool startsAtSetTempo() override { return true; }
     void maskWrite(int slot, uint32_t offset, const uint8_t* data, uint32_t len) override { host_mask_write(slot, offset, data, len); }
 
     // device settings and the firmware update (a pretend update: it counts up and then restarts)

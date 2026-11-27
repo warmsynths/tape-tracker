@@ -129,9 +129,18 @@ void App::drawTempo(Pen& p)
     else fmt(w, sizeof w, "Off");
     p.text(13, 344, w, F17B, pal.text);
     if (sRow == 2) p.text(150, 328, "JOG", F12, pal.text);
-    p.text(220, 340, "Free: the take sets the Loop and the tempo is worked out from its length.", F12, pal.dim);
-    p.text(220, 358, "Set: the take lands on the grid. Left/Right choose a box, Insert switches it.", F12, pal.dim);
-    p.text(220, 376, "Wait for sound: Rec arms, and recording begins when the input is loud enough.", F12, pal.dim);
+    const bool barsOn = set_;
+    p.cell(220, 322, 150, 52, set_ && sRow == 3, pal.cell);
+    p.text(232, 328, "Bars", F12, pal.dim);
+    char bb[24];
+    if (!set_) fmt(bb, sizeof bb, "-");
+    else if (set.bars == 0) fmt(bb, sizeof bb, "Ask later");
+    else fmt(bb, sizeof bb, "%d  (%d s)", (int)set.bars, (int)((set.bars * 2400u + set.tempoTenths / 2) / set.tempoTenths));
+    p.text(232, 344, bb, F17B, barsOn ? pal.text : pal.dim);
+    if (set_ && sRow == 3) p.text(330, 328, "JOG", F12, pal.text);
+    p.text(386, 330, "Set: one Rec counts in, records the bars and stops on the bar line.", F12, pal.dim);
+    p.text(386, 348, "Free: the take sets the Loop. Ask later: you choose the bars afterwards.", F12, pal.dim);
+    p.text(386, 366, "Left/Right choose a box, jog changes it, Insert switches it.", F12, pal.dim);
 }
 
 //--------------------------------------------------------------------------------------------

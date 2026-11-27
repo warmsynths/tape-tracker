@@ -73,6 +73,7 @@ class FourTrackHal : public ft::Hal
     bool previewActive() override;
 
     bool maskDefault() override { return true; } // tried on a Tracker: works
+    bool startsAtSetTempo() override { return true; }
     void maskWrite(int slot, uint32_t byteOffset, const uint8_t* data, uint32_t len) override;
     int deviceValue(ft::Dev d) override;
     void setDeviceValue(ft::Dev d, int value) override;

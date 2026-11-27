@@ -104,6 +104,8 @@ class Hal
     // Waveform bitmaps (Mask.h): `slot` is track * 3 + size. maskDefault is whether to use them unless
     // the user says otherwise (false on the Tracker until it has been tried there).
     virtual bool maskDefault() { return false; }
+    // A real machine (firmware, emulator) starts new projects at 80 BPM, 4 bars; the test machines keep Free.
+    virtual bool startsAtSetTempo() { return false; }
     virtual void maskWrite(int /*slot*/, uint32_t /*byteOffset*/, const uint8_t* /*data*/, uint32_t /*len*/) {}
 
     // Files (the SD card on the Tracker, browser storage in the emulator). Paths use '/'.

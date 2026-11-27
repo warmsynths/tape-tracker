@@ -42,6 +42,8 @@ struct FakeHal : Hal
     int clicks = 0;
     int curSample = 0; // the sample the pads play
     uint32_t quiet = 0; // frames of silence at the start of a take
+    bool setDefaults = false; // start like a real machine: 80 BPM, 4 bars
+    bool startsAtSetTempo() override { return setDefaults; }
 
     FakeHal()
     {
@@ -994,6 +996,24 @@ int main()
         CHECK(hal.padsOn == 0, "a pad release reaches the machine");
         app.key(kB4);
         CHECK(!app.view().monitor, "B4 switches the monitor off");
+    }
+    {   // bars up front: one Rec counts in, records the bars and stops on the bar line; the tail is folded onto the start
+        FakeHal hal;
+        hal.setDefaults = true;
+        App app(hal, palette());
+        app.enter();
+        app.key(kRec);
+        hal.advance(app, FakeHal::kRate * 3 + 4000); // the one-bar count-in at 80 BPM
+        CHECK(app.view().statusKind == 2, "the take starts after the count-in");
+        hal.advance(app, FakeHal::kRate * 11);
+        CHECK(app.view().statusKind == 2, "it is still recording before the bar line");
+        hal.advance(app, FakeHal::kRate * 2);
+        CHECK(app.view().loopFrames == FakeHal::kRate * 12, "four bars at 80 BPM is exactly 12 s");
+        CHECK(app.view().barCount == 4, "the take is 4 bars without asking");
+        CHECK(app.view().statusKind == 1, "the loop plays by itself");
+        CHECK(hal.recActive, "the recorder runs on a little for the tail");
+        hal.advance(app, FakeHal::kRate * 2);
+        CHECK(!hal.recActive, "the tail has been recorded and the recorder is off");
     }
     {   // chords: Note opens the page and the pads play chords and scale notes
         FakeHal hal;
