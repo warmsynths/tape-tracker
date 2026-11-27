@@ -147,6 +147,11 @@ class Hal
     virtual void padOff(int pad) = 0;
     virtual void padsReleaseAll() = 0;
 
+    // The latency test (Latency.h): a buffer of kLatencyLoopFrames frames for the clicks, and, in the
+    // emulator only, a loopback from the output to the input that stands in for the cable.
+    virtual int16_t* calibrationBuffer(uint32_t& frames) { frames = 0; return nullptr; }
+    virtual void calibrationLoopback(bool /*on*/) {}
+
     // The light of a pad, 0 (off) to 31 (full). Only the Tracker has lights; the emulator draws them.
     virtual void padLight(int /*pad*/, int /*level*/) {}
 

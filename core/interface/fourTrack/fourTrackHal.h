@@ -90,6 +90,7 @@ class FourTrackHal : public ft::Hal
     void padOff(int pad) override;
     void padsReleaseAll() override;
     void padLight(int pad, int level) override;
+    int16_t* calibrationBuffer(uint32_t& frames) override;
     void synthSetPatch(const ft::SynthPatch& patch) override;
     void synthNote(int note, int velocity, bool on) override;
     void synthAllOff() override;

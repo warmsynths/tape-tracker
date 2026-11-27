@@ -298,3 +298,10 @@ New, and the first firmware with sound that comes from the Tracker rather than a
 - **Home screen levels:** Left and Right change the synth's level (1 dB a click, -30 to +12 dB, saved with the sound settings); Shift + Jog changes the selected track's level (1 dB a click). The hint line shows the value. The synth level is also on the Chords page 3 ("Synth level").
 - Because the loop no longer gets the boost, recorded loops are about 10 dB quieter than before relative to the live synth. Raise a track with Shift + Jog if you want it louder.
 
+## FT47 (sent on request): input latency calibration
+This is FT46 (chord pads, synth, play styles, Sound page, lo-fi master off by default, levels on Left and Right and Shift + Jog) plus the latency test. **Everything from FT45 on is new on the device: the synth's CPU load and the chord pads have not run on a Tracker yet.** Keep a stock `.ptf` on the card.
+- **Calibrate:** Config, Four-Track, Input latency (row 5), B1 Calibrate. Connect a cable from the Tracker's output to its line input, turn the volume to about 40, press B8 Start. It plays a loop of clicks through the normal loop player and records the line input (4 seconds), then shows the delay in ms. B8 Keep stores it (the file `FourTrack/latency.cfg` on the card); B7 Retry. It needs an empty project (it uses Track 4's memory): clear all Parts first (Shift + Delete) if it says so.
+- **What it changes:** line and mic Parts are moved earlier by the measured latency when they are recorded (first takes and later Parts); pad and synth Parts are not. You can also set the number by hand with the jog on the Input latency row (Shift: finer).
+- **What to report:** the number it gives (it should be around 6 to 12 ms if the research guess is right; ticket 13 wants the value), whether the clicks were heard ("Heard nothing" means the cable or the volume), and whether a guitar or line take then lands where you played it.
+- Tests: the measurement is checked against known delays from 0 to 2,500 frames at every loop start position, a quiet noisy line, no cable and a steady tone; in the emulator the same test measures the simulated cable delay exactly.
+

@@ -168,6 +168,11 @@ struct FakeHal : Hal
     void padOn(int, bool) override { padsOn++; }
     void padOff(int) override { padsOn--; }
     void padsReleaseAll() override { padsOn = 0; }
+    std::vector<int16_t> calBuf = std::vector<int16_t>(44100);
+    bool loopbackOn = false;
+    int loopbackDelay = 384;
+    int16_t* calibrationBuffer(uint32_t& frames) override { frames = 44100; return calBuf.data(); }
+    void calibrationLoopback(bool on) override { loopbackOn = on; }
     int notesOn = 0, noteEvents = 0, lastNote = 0, sampleNotes = 0;
     int patches = 0;
     float lastCutoff = 0;
@@ -192,6 +197,13 @@ struct FakeHal : Hal
                     captured = true;
                     startPos = pos;
                 }
+                if (loopbackOn && data[recTrack] == calBuf.data())
+                    for (int i = 0; i < 128; i++)
+                    {
+                        const int64_t src = (int64_t)startPos + recLen + i - loopbackDelay;
+                        mem[recTrack][recLen + i] = src < 0 ? 0 : calBuf[(uint64_t)src % 44100];
+                    }
+                else
                 for (int i = 0; i < 128; i++) mem[recTrack][recLen + i] = (recLen + i) < quiet ? 0 : (int16_t)(((recLen + i) / 50 % 2) ? 9000 : -9000);
                 recLen += 128;
                 if (recLen + 128 > regionFrames()) { recActive = false; full = true; }
@@ -1099,6 +1111,48 @@ int main()
         CHECK(app.chordSettings().humanise == 100, "humanise goes to 100");
         for (int k = 0; k < 6; k++) { app.pad(0, true); hal.advance(app, 128 * 20); app.pad(0, false); }
         CHECK(hal.vmax <= 100 && hal.vmin >= 65 && hal.vmin < hal.vmax, "humanised velocities vary but stay within a third of the base");
+    }
+    {   // calibrating the input latency with a cable (simulated by the fake machine)
+        FakeHal hal;
+        hal.loopbackDelay = 520;
+        App app(hal, palette());
+        app.enter();
+        app.key(kConfig);
+        app.key(kLeft);
+        for (int i = 0; i < 5; i++) app.key(kDown); // group Four-Track
+        app.key(kRight);
+        for (int i = 0; i < 4; i++) app.key(kDown); // row Input latency
+        app.key(kB1);
+        CHECK(app.screen() == Screen::Calibrate, "B1 on Input latency opens the calibration");
+        app.key(kB8);
+        hal.advance(app, 44100 * 5);
+        app.key(kB8); // Keep
+        CHECK(app.screen() == Screen::Device, "Keep goes back to Device settings");
+        CHECK(app.inputLatencyFrames() == 520, "the measured latency is kept");
+        // it is saved, and a Line take is moved back by it
+        hal.advance(app, 100000);
+        FakeHal hal2;
+        hal2.files = hal.files;
+        App app2(hal2, palette());
+        app2.enter();
+        CHECK(app2.inputLatencyFrames() == 520, "the latency is saved on the card");
+        recordLoop(hal2, app2);
+        CHECK(hal2.bank().cfg[0].offset == -520, "a Line take is moved earlier by the input latency");
+    }
+    {   // calibration refuses when there are Parts, and reports a missing cable
+        FakeHal hal;
+        hal.loopbackDelay = 0;
+        App app(hal, palette());
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kConfig);
+        app.key(kLeft);
+        for (int i = 0; i < 5; i++) app.key(kDown);
+        app.key(kRight);
+        for (int i = 0; i < 4; i++) app.key(kDown);
+        app.key(kB1);
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Calibrate, "with Parts the test does not start (Start is dim)");
     }
     {   // levels from the home screen; the lo-fi master is opt in
         FakeHal hal;

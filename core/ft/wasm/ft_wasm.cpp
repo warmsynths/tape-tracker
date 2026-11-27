@@ -420,6 +420,14 @@ class EmuHal : public Hal
         }
         else for (auto& v : voices) if (v.on && v.pad == id) v.held = false;
     }
+    // the latency test: a cable from the output to the input is pretended by a delayed copy of the output
+    int16_t calClicks[44100];
+    bool loopback = false;
+    float loopRing[4096];
+    uint32_t loopFrames = 0;
+    static constexpr int kLoopDelay = 392; // about 8.9 ms
+    int16_t* calibrationBuffer(uint32_t& frames) override { frames = 44100; return calClicks; }
+    void calibrationLoopback(bool on) override { loopback = on; for (auto& v : loopRing) v = 0.0f; }
     void padLight(int pad, int level) override { if (pad >= 0 && pad < 48) g_padLights[pad] = (uint8_t)level; }
     void padOff(int pad) override { for (auto& v : voices) if (v.on && v.pad == pad) v.held = false; }
     void padsReleaseAll() override { for (auto& v : voices) v.held = false; }
@@ -443,6 +451,15 @@ class EmuHal : public Hal
         levelL = levelL * 0.9f + sl * 0.1f;
         levelR = levelR * 0.9f + sr * 0.1f;
 
+        if (loopback)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                const int64_t idx = (int64_t)loopFrames + i - kLoopDelay;
+                const float v = idx < 0 ? 0.0f : loopRing[idx & 4095];
+                g_inL[i] = g_inR[i] = v;
+            }
+        }
         // pads
         float pad[kBlock], padL[kBlock], padR[kBlock];
         for (int i = 0; i < n; i++) pad[i] = padL[i] = padR[i] = 0;
@@ -537,7 +554,9 @@ class EmuHal : public Hal
             float ml = mon ? g_inL[i] : 0.0f, mr = mon ? g_inR[i] : 0.0f;
             g_outL[i] = pl[i] + padL[i] + cl + ml;
             g_outR[i] = pr[i] + padR[i] + cl + mr;
+            loopRing[(loopFrames + (uint32_t)i) & 4095] = (g_outL[i] + g_outR[i]) * 0.5f;
         }
+        loopFrames += (uint32_t)n;
     }
 };
 

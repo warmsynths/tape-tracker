@@ -7,6 +7,7 @@
 #include "Hal.h"
 #include "Mask.h"
 #include "Chords.h"
+#include "Latency.h"
 #include "View.h"
 #include "loop_bars.h"
 
@@ -42,7 +43,7 @@ enum Key
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate
 };
 
 enum class Popup : uint8_t
@@ -88,6 +89,7 @@ class App
     void jog(int delta);
     void setShift(bool held) { shift = held; }
     const ChordCfg& chordSettings() const { return chords.cfg; }
+    int32_t inputLatencyFrames() const { return latencyFrames; }
     void pad(int pad, bool down, int velocity = 0); // velocity 1 to 127 if the pads send one, 0 if not
 
     // One pass of the main loop.
@@ -182,6 +184,29 @@ class App
     int chField = 0;              // chords page 1: 0 key, 1 scale, 2 style, 3 chord rows, 4 notes, 5 octave, 6 sound; page 2: 0 to 3 row types, 4 to 9 colour chords
     int chSound = 0;              // 0 .. kSynthPresets - 1 the patches, then kSynthPresets: the pad sample
     // Sound page (Instr): a patch, eight tweak knobs on top, and every raw setting on the Advanced page
+    // Input latency: how late line and mic recordings arrive, measured with a cable from the output to the line input
+    void drawCalibrate(class Pen& p);
+    void calibrateOpen();
+    void calibrateKey(int k);
+    void calibrateStart();
+    void calibrateAbort();
+    void calibrateRestore();
+    void serviceCalibrate();
+    bool calibrateAllowed() const;
+    void latencySave();
+    void latencyLoad();
+    void latencyMark() { latencyDirty = true; latencyDirtyAt = hal.millis(); }
+    enum class CalState : uint8_t { Ready, Running, Done, Failed };
+    CalState calState = CalState::Ready;
+    int calWhy = 0;
+    uint32_t calStart = 0, calDrawAt = 0;
+    int calPercent = 0;
+    LatencyResult calResult;
+    TrackCfg calSaveCfg;
+    bool calSaveBypass = false;
+    int32_t latencyFrames = 0;    // line and mic Parts are moved this much earlier
+    bool latencyDirty = false;
+    uint32_t latencyDirtyAt = 0;
     void drawSound(class Pen& p);
     void drawSoundAdv(class Pen& p);
     void soundKey(int k);

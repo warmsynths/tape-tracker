@@ -1,4 +1,5 @@
 #include "fourTrackHal.h"
+#include "cr_section_macros.h"
 
 #include "Platform.h"
 #include "fileManager.h"
@@ -172,6 +173,14 @@ void FourTrackHal::padsReleaseAll()
 {
     mtPadBoard.releaseAllInstruments();
     padsBacklight.clearGlobalPads(1, 1, 1);
+}
+
+// The clicks for the latency test sit in external RAM (88 KB)
+__NOINIT(EXTERNAL_RAM) int16_t calibrationClicks[44100];
+int16_t* FourTrackHal::calibrationBuffer(uint32_t& frames)
+{
+    frames = 44100;
+    return calibrationClicks;
 }
 
 // Lights from the chord pads sit on the back layer: the front layer is the stock hit light

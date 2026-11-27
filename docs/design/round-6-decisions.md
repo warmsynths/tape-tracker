@@ -43,3 +43,13 @@ Q10 (later-Part recording model) is being reshaped: the owner asked for a looper
 - One-step undo already exists: before a new take the old Part is saved to `undo/tN.raw` on the SD card; an overdub through the same path is undone by the existing undo (last pass only).
 - Pad (note) Parts need no scratch buffer: notes carry their pass number and are re-rendered.
 - Cost to remember: this uses nearly all remaining external RAM.
+
+### Round 6, questions 14 to 19 (owner, 2026-11-27)
+13. **Fade control:** Config default plus a quick control while recording (Shift + Jog when armed or recording).
+14. **Style = a feel preset** (sets Voicing, Humanise, strum speed, arp rate and range, and whether the top row defaults to 7ths or 9ths). A Set saves the result.
+15. **Chord Sets: both.** 8 device-wide slots on the SD card, and each project remembers its current chord set.
+16. **Drums: the owner asks whether we can use Plaits or another Mutable Instruments engine** instead of writing our own drum synth. Plaits (MIT, already vendored in part) has analog and synthetic bass drum, snare and hi-hat models; Peaks (MIT) has 808-style drums. Toms from the kick model; clap needs a small noise burst of our own. To be done with the roles, after the restyle and chord work.
+17. **Rec on an empty track arms straight away with the last role and sound** (a new project starts with Track 1 as Chords and Warm Pad); change role by pressing the track button twice.
+18. **Adopt the design's home controls** (jog scrubs, Left and Right step a beat, Up and Down choose the track) with my level mapping: Shift + Up and Down is the selected track's level, Shift + Left and Right the synth level; output volume moves to Config and Params; Undo take moves to Shift + Delete; Settings joins Project.
+19. **Live filter: whole mix** (two stock filters on the final mix).
+Also: the owner asked for a firmware with the latency calibration test now (FT47).

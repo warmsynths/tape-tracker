@@ -270,6 +270,7 @@ void App::keyScreen(int k)
             for (int i = 0; i < 48; i++) padModeKeys[i] = padsKeysMode;
             break;
         case Screen::Chords: chordsKey(k); break;
+        case Screen::Calibrate: calibrateKey(k); break;
         case Screen::Sound: soundKey(k); break;
         case Screen::SoundAdv: soundAdvKey(k); break;
         case Screen::Load: loadKey(k); break;
@@ -1429,7 +1430,7 @@ void App::resampleJog(int delta)
 
 int App::deviceRowCount(int g) const
 {
-    static const int n[8] = { 3, 1, 1, 1, 3, 4, 2, 2 };
+    static const int n[8] = { 3, 1, 1, 1, 3, 5, 2, 2 };
     return n[g < 0 || g > 7 ? 0 : g];
 }
 
@@ -1488,7 +1489,15 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             if (r == 0) { n = "Alignment window"; fmt(value, size, "%s", wins[set.windowIdx % 5]); h = "A new Part whose first sound lands this close to the loop start is moved onto it."; }
             else if (r == 1) { n = "Pre-roll"; fmt(value, size, "%s", rolls[set.preRollIdx % 5]); h = "How long before the loop start a Part begins recording, so nothing is missed."; }
             else if (r == 2) { n = "Tempo rounding"; fmt(value, size, "%s", rounds[set.roundIdx % 3]); h = "The tempo worked out from the first take is rounded to this step."; }
-            else { n = "Wait level"; fmt(value, size, "%d dB", (int)set.waitDb); h = "How loud the input must get before a waiting first take starts."; }
+            else if (r == 3) { n = "Wait level"; fmt(value, size, "%d dB", (int)set.waitDb); h = "How loud the input must get before a waiting first take starts."; }
+            else
+            {
+                n = "Input latency";
+                const uint32_t rate = hal.sampleRate() ? hal.sampleRate() : 44100;
+                const int t10 = (int)((int64_t)latencyFrames * 10000 / (int64_t)rate);
+                fmt(value, size, "%d.%d ms", t10 / 10, t10 % 10);
+                h = "How late line and mic recordings arrive. B1 measures it with a cable from output to line input. Jog sets it by hand.";
+            }
             break;
         case 6:
             if (r == 0) { n = "Installed"; hal.firmwareVersion(value, size); h = "The firmware on this Tracker."; }
@@ -1527,7 +1536,8 @@ void App::deviceChange(int g, int r, int delta)
             if (r == 0) set.windowIdx = (uint8_t)clampi(set.windowIdx + d, 0, 4);
             else if (r == 1) set.preRollIdx = (uint8_t)clampi(set.preRollIdx + d, 0, 4);
             else if (r == 2) set.roundIdx = (uint8_t)clampi(set.roundIdx + d, 0, 2);
-            else set.waitDb = (int8_t)clampi(set.waitDb + d, -60, -12);
+            else if (r == 3) set.waitDb = (int8_t)clampi(set.waitDb + d, -60, -12);
+            else { latencyFrames = clampi(latencyFrames + d * (shift ? 1 : 4), 0, 4000); latencyMark(); }
             break;
         case 6: if (r == 1 && fwCount > 0) fwSel = clampi(fwSel + d, 0, fwCount - 1); break;
         default: break;
@@ -1559,6 +1569,7 @@ void App::deviceKey(int k)
         case kLeft: dvRows = false; break;
         case kRight: dvRows = true; break;
         case kB1:
+            if (dvGroup == 5 && dvRow == 4) { calibrateOpen(); return; }
             if (dvGroup == 6 && fwCount > 0)
             {
                 if (unsaved) { pendingAction = 3; startSave(); }
@@ -1978,5 +1989,145 @@ void App::soundLoad()
         synthParamSet(sndBase, i, v.f);
     }
     chords.rebuild();
+}
+
+//--------------------------------------------------------------------------------------------
+// Input latency: Config, Four-Track, Input latency, B1 Calibrate
+
+bool App::calibrateAllowed() const
+{
+    if (session.mode() != FourTrackSession::Mode::Idle || session.loopFrames() > 0) return false;
+    for (int t = 0; t < 4; t++) if (session.hasPart(t)) return false;
+    return true;
+}
+
+void App::calibrateOpen()
+{
+    calState = CalState::Ready;
+    calWhy = 0;
+    open(Screen::Calibrate);
+}
+
+void App::calibrateStart()
+{
+    uint32_t cap = 0;
+    int16_t* buf = hal.calibrationBuffer(cap);
+    if (buf == nullptr || cap < kLatencyLoopFrames) { calState = CalState::Failed; calWhy = 5; refresh(true); return; }
+    const int t = 3; // an empty track: its memory takes the recording
+    makeLatencyClicks(buf, kLatencyLoopFrames, kLatencyPulses);
+    calSaveCfg = hal.bank().cfg[t];
+    calSaveBypass = hal.lofi().cfg.bypass;
+    TrackCfg c; // plain: 0 dB, centre, flat, no effects
+    c.levelDb10 = 0;
+    hal.bank().cfg[t] = c;
+    hal.bank().playOnce = false;
+    hal.lofi().cfg.bypass = true;
+    appliedSource = -1;
+    applySource(Source::Line);
+    hal.setMonitor(false);
+    hal.calibrationLoopback(true);
+    hal.playerSetTrack(t, buf);
+    hal.playerStart(kLatencyLoopFrames);
+    hal.recordStart(t, Source::Line);
+    calStart = hal.millis();
+    calPercent = 0;
+    calDrawAt = calStart;
+    calState = CalState::Running;
+    refresh(true);
+}
+
+void App::calibrateRestore()
+{
+    hal.calibrationLoopback(false);
+    hal.bank().cfg[3] = calSaveCfg;
+    hal.lofi().cfg.bypass = calSaveBypass;
+    hal.playerSetTrack(3, nullptr);
+    pushBank();
+    appliedSource = -1;
+    applySource(trackSource[session.selected()]);
+}
+
+void App::calibrateAbort()
+{
+    if (hal.recordActive()) hal.recordStop();
+    hal.playerStop();
+    calibrateRestore();
+    calState = CalState::Ready;
+}
+
+void App::serviceCalibrate()
+{
+    if (calState != CalState::Running) return;
+    const uint32_t need = (hal.sampleRate() ? hal.sampleRate() : 44100) * 7 / 2; // 3.5 s
+    const uint32_t now = hal.millis();
+    const bool timeout = now - calStart > 9000;
+    if (hal.recordActive() && hal.recordLength() < need && !timeout)
+    {
+        if (now - calDrawAt > 250)
+        {
+            calDrawAt = now;
+            calPercent = (int)((uint64_t)hal.recordLength() * 100 / need);
+            redraw[4] = true;
+            refresh(true);
+        }
+        return;
+    }
+    const bool captured = hal.recordStartCaptured();
+    const uint32_t startPos = hal.recordStartPosition() % kLatencyLoopFrames;
+    uint32_t got = hal.recordLength();
+    if (got > need) got = need;
+    if (hal.recordActive()) hal.recordStop();
+    hal.playerStop();
+    LatencyResult r;
+    if (!captured) { r.why = 6; }
+    else r = measureLatency(hal.region(3), got, startPos, kLatencyLoopFrames, kLatencyPulses);
+    calibrateRestore();
+    calResult = r;
+    calWhy = r.why;
+    calState = r.ok ? CalState::Done : CalState::Failed;
+    redraw[4] = true;
+    refresh(true);
+}
+
+void App::calibrateKey(int k)
+{
+    switch (calState)
+    {
+        case CalState::Ready:
+            if (k == kB8 && calibrateAllowed()) calibrateStart();
+            else if (k == kB7 || k == kConfig) open(Screen::Device);
+            break;
+        case CalState::Running:
+            if (k == kB7) { calibrateAbort(); refresh(true); }
+            break;
+        case CalState::Done:
+            if (k == kB8)
+            {
+                latencyFrames = calResult.frames;
+                latencyMark();
+                open(Screen::Device);
+            }
+            else if (k == kB7) { calState = CalState::Ready; refresh(true); }
+            break;
+        case CalState::Failed:
+            if (k == kB8 && calibrateAllowed()) calibrateStart();
+            else if (k == kB7) { calState = CalState::Ready; open(Screen::Device); }
+            break;
+    }
+}
+
+void App::latencySave()
+{
+    if (!hal.sdPresent()) return;
+    uint8_t b[8] = { 'F', 'L', '0', '1', (uint8_t)(latencyFrames & 255), (uint8_t)((latencyFrames >> 8) & 255), (uint8_t)((latencyFrames >> 16) & 255), (uint8_t)((latencyFrames >> 24) & 255) };
+    hal.fileWrite("latency.cfg", b, 8, false);
+}
+
+void App::latencyLoad()
+{
+    uint8_t b[8];
+    if (hal.fileSize("latency.cfg") != 8 || hal.fileRead("latency.cfg", 0, b, 8) != 8) return;
+    if (b[0] != 'F' || b[1] != 'L' || b[2] != '0' || b[3] != '1') return;
+    latencyFrames = clampi((int32_t)((uint32_t)b[4] | ((uint32_t)b[5] << 8) | ((uint32_t)b[6] << 16) | ((uint32_t)b[7] << 24)), 0, 4000);
 }
 } // namespace ft

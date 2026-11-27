@@ -83,6 +83,7 @@ void App::enter()
     for (int t = 0; t < FourTrackSession::kTracks; t++) waveDirty[t] = true;
     pushBank();
     soundLoad();
+    latencyLoad();
     soundApply();
     refresh(true);
 }
@@ -618,7 +619,8 @@ void App::promptConfirm()
         userOffset[t] = 0;
         hasUndoTake[t] = false;
     }
-    (void)active;
+    // a line or mic take arrived late by the input latency: move it back (a pad take has none)
+    if (active >= 0 && trackSource[active] != Source::Pads) alignShift[active] = -latencyFrames;
     unsaved = true;
     pushBank();
     syncPlayer();
@@ -990,9 +992,12 @@ void App::applyAlignment(int track, uint32_t firstSample)
         partData[track] = nullptr;
         return;
     }
-    const int32_t rel = onset - (int32_t)firstSample; // first note, relative to the loop start
+    // line and mic audio arrives late by the input latency; a pad Part has none
+    const int32_t lat = trackSource[track] == Source::Pads ? 0 : latencyFrames;
+    const int32_t rel = onset - (int32_t)firstSample - lat; // first note, relative to the loop start
     const uint32_t window = windowFrames();
-    if (window > 0 && (uint32_t)(rel < 0 ? -rel : rel) <= window) alignShift[track] = -rel;
+    alignShift[track] = -lat;
+    if (window > 0 && (uint32_t)(rel < 0 ? -rel : rel) <= window) alignShift[track] = -rel - lat;
 }
 
 void App::finishPart(int track, uint32_t firstSample, bool early)
@@ -1172,6 +1177,8 @@ void App::tick()
     serviceCountIn();
     serviceClick();
     serviceChordNotes();
+    serviceCalibrate();
+    if (latencyDirty && hal.millis() - latencyDirtyAt > 1500) { latencyDirty = false; latencySave(); }
     serviceLights();
     if (soundDirty && hal.millis() - soundDirtyAt > 1500) { soundDirty = false; soundSave(); }
     serviceJob();

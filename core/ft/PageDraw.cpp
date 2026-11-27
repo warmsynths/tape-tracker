@@ -72,6 +72,7 @@ void App::buildPage()
         case Screen::PadSample: drawPadSample(p); break;
         case Screen::Chords: drawChords(p); break;
         case Screen::Sound: drawSound(p); break;
+        case Screen::Calibrate: drawCalibrate(p); break;
         case Screen::SoundAdv: drawSoundAdv(p); break;
         case Screen::Load: drawLoad(p); break;
         case Screen::Resample: drawResample(p); break;
@@ -687,7 +688,7 @@ void App::drawDevice(Pen& p)
     fmt(title, sizeof title, "%s - %s", focusName, groups[dvGroup]);
     p.text(14, 387, title, F17B, pal.text);
     p.text(14, 411, focusHelp, F14, pal.text);
-    const char* l[8] = { dvGroup == 6 && fwCount > 0 ? "Update" : "", "", "", "", "", "", "", "Back" };
+    const char* l[8] = { dvGroup == 6 && fwCount > 0 ? "Update" : (dvGroup == 5 && dvRow == 4 ? "Calibrate" : ""), "", "", "", "", "", "", "Back" };
     p.buttons(l);
 }
 
@@ -1485,5 +1486,76 @@ void App::drawSoundAdv(Pen& p)
     p.text(14, 412, "Jog changes the setting (Shift: finer). A changed setting is orange. B2 puts one back.", F14, pal.text);
     const char* l[8] = { "Hear", "Reset one", "Reset all", "", "", "", "", "Back" };
     p.buttons(l, hearPad >= 0 ? 1 : 0);
+}
+
+//--------------------------------------------------------------------------------------------
+// Input latency test
+void App::drawCalibrate(Pen& p)
+{
+    heading(p, model, "Calibrate input latency");
+    char b[100];
+    const uint32_t rate = hal.sampleRate() ? hal.sampleRate() : 44100;
+    const char* l[8] = { "", "", "", "", "", "", "", "" };
+    switch (calState)
+    {
+        case CalState::Ready:
+        {
+            p.text(14, 70, "How late does audio from the line input arrive? This measures it,", F14, pal.text);
+            p.text(14, 90, "and then line and mic Parts are moved back by that much.", F14, pal.text);
+            p.text(14, 128, "1", F17B, pal.dim);
+            p.text(44, 128, "Connect a cable from the Tracker's output to its line input.", F17, pal.text);
+            p.text(14, 162, "2", F17B, pal.dim);
+            p.text(44, 162, "Turn the volume to about 40. The test plays short clicks.", F17, pal.text);
+            p.text(14, 196, "3", F17B, pal.dim);
+            p.text(44, 196, "Press Start. It takes about 4 seconds.", F17, pal.text);
+            const int t10 = (int)((int64_t)latencyFrames * 10000 / (int64_t)rate);
+            fmt(b, sizeof b, "Now: %d.%d ms", t10 / 10, t10 % 10);
+            p.text(14, 240, b, F17B, pal.text);
+            if (!calibrateAllowed()) p.text(14, 280, "Clear all Parts first (Shift + Delete), then come back. The test uses Track 4.", F14, pal.warn);
+            l[6] = "Cancel";
+            l[7] = "Start";
+            p.buttons(l, 0, -1, calibrateAllowed() ? 0 : (uint8_t)(1u << 7));
+            break;
+        }
+        case CalState::Running:
+            p.text(14, 76, "Measuring. Please wait and do not touch anything.", F17B, pal.text);
+            p.bar(14, 112, 680, 10, calPercent, pal.meter, pal.track);
+            fmt(b, sizeof b, "%d%%", calPercent);
+            p.textRight(786, 107, b, F17, pal.text);
+            p.text(14, 150, "The clicks go out of the output and come back in through the cable.", F14, pal.dim);
+            l[6] = "Cancel";
+            p.buttons(l);
+            break;
+        case CalState::Done:
+        {
+            const int t10 = (int)((int64_t)calResult.frames * 10000 / (int64_t)rate);
+            fmt(b, sizeof b, "%d.%d ms", t10 / 10, t10 % 10);
+            p.text(14, 76, "Input latency", F12, pal.dim);
+            p.text(14, 96, b, F17B, pal.text);
+            fmt(b, sizeof b, "%d frames, %d clicks heard, spread %d frames", (int)calResult.frames, calResult.count, (int)calResult.spread);
+            p.text(14, 130, b, F14, pal.dim);
+            p.text(14, 170, "Keep it and line and mic Parts will be moved earlier by this much when they are recorded.", F14, pal.text);
+            p.text(14, 194, "Pad and synth Parts have no input delay and are not moved.", F14, pal.text);
+            l[6] = "Retry";
+            l[7] = "Keep";
+            p.buttons(l);
+            break;
+        }
+        case CalState::Failed:
+        {
+            const char* why = calWhy == 1 ? "Heard nothing. Is the cable in the line input, and the volume up?"
+                            : calWhy == 2 ? "The clicks did not agree. Check the cable and try again."
+                            : calWhy == 3 ? "The result was out of range (over 90 ms). Check the cable."
+                            : calWhy == 4 ? "Too few clicks were heard. Turn the volume up a little and try again."
+                            : calWhy == 5 ? "This build cannot run the test."
+                                          : "The recording did not start. Try again.";
+            p.text(14, 76, "The test did not work", F17B, pal.warn);
+            p.text(14, 112, why, F14, pal.text);
+            l[6] = "Back";
+            l[7] = "Retry";
+            p.buttons(l);
+            break;
+        }
+    }
 }
 } // namespace ft
