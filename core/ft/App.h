@@ -432,7 +432,7 @@ class App
     int synthPeak = 0;            // the synth load shown in About
     int dvGroup = 0, dvRow = 0;
     bool dvRows = true;           // focus is on the rows (false: on the list of groups)
-    char fwNames[4][48] = {};
+    char fwNames[8][48] = {};
     int fwCount = 0, fwSel = 0;
     bool fwUpdating = false, fwInstalled = false, fwSavedFirst = false;
     uint32_t fwStartMs = 0;

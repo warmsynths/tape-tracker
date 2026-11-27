@@ -1508,6 +1508,7 @@ void App::resampleJog(int delta)
 int App::deviceRowCount(int g) const
 {
     static const int n[9] = { 3, 1, 1, 1, 3, 8, 7, 2, 3 };
+    if (g == 7) return 1 + (fwCount > 0 ? fwCount : 1);
     return n[g < 0 || g > 8 ? 0 : g];
 }
 
@@ -1517,7 +1518,15 @@ void App::deviceOpen()
     dvGroup = 0;
     dvRow = 0;
     dvRows = true;
-    fwCount = hal.firmwareFiles(fwNames, 4);
+    fwCount = hal.firmwareFiles(fwNames, 8);
+    // newest first: the build number after "FT" in the name, largest first
+    auto num = [](const char* s) { int v = 0; for (; *s != 0; s++) if (s[0] == 'F' && s[1] == 'T' && s[2] >= '0' && s[2] <= '9') { for (s += 2; *s >= '0' && *s <= '9'; s++) v = v * 10 + (*s - '0'); return v; } return 0; };
+    for (int i = 1; i < fwCount; i++)
+        for (int j = i; j > 0 && num(fwNames[j]) > num(fwNames[j - 1]); j--)
+        {
+            char t[48];
+            fmt(t, 48, "%s", fwNames[j]); fmt(fwNames[j], 48, "%s", fwNames[j - 1]); fmt(fwNames[j - 1], 48, "%s", t);
+        }
     fwSel = 0;
 }
 
@@ -1601,10 +1610,17 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
         }
         case 7:
             if (r == 0) { n = "Installed"; hal.firmwareVersion(value, size); h = "The firmware on this Tracker."; }
+            else if (fwCount > 0 && r - 1 < fwCount)
+            {
+                // one row for every update file on the card, newest first
+                fmt(name, size, "Update file %d of %d", r, fwCount);
+                fmt(value, size, "%s", fwNames[r - 1]);
+                fmt(help, size, "B1 installs %s from the card. The project is saved first.", fwNames[r - 1]);
+                return;
+            }
             else
             {
                 n = "Update file";
-                if (fwCount > 0) { fmt(value, size, "%s", fwNames[fwSel]); fmt(help, size, "B1 installs %s from the card. The project is saved first.", fwNames[fwSel]); { fmt(name, size, "%s", n); return; } }
                 fmt(value, size, "None found");
                 h = "Put a .ptf update file in the Firmware folder on the card.";
             }
@@ -1662,7 +1678,7 @@ void App::deviceChange(int g, int r, int delta)
             soundMark();
             break;
         }
-        case 7: if (r == 1 && fwCount > 0) fwSel = clampi(fwSel + d, 0, fwCount - 1); break;
+        case 7: break;
         default: break;
     }
 }
@@ -1696,6 +1712,7 @@ void App::deviceKey(int k)
             if (dvGroup == 5 && dvRow == 3) { armLevelOpen(); return; }
             if (dvGroup == 7 && fwCount > 0)
             {
+                fwSel = clampi(dvRow - 1, 0, fwCount - 1); // on the first row: the newest
                 if (unsaved) { pendingAction = 3; startSave(); }
                 else firmwareGo();
             }

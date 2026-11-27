@@ -338,3 +338,6 @@ FT60 and earlier recorded a layer over the Part's own memory, so the old audio w
 
 ## FT62 and FT63: the arm level is a Config setting
 FT62 put a level test in front of every take; that was wrong, so FT63 removes it. Arming a take shows only the start line (the level is not changed there). **Config, Four-Track, Wait level, B1 "Set level"** opens a page with the live input, the orange start line, a peak mark and "would start / stays below"; the jog moves the line; it is saved (`loop.cfg`) so you set it once for a new device or guitar. Wait for sound itself is still switched on or off in the Tempo panel (B2).
+
+## FT64: every update file listed
+Config, Firmware now has one row for each `.ptf` in the card's `Firmware` folder (up to 8), newest build first, instead of one row you had to jog through. Move to a row and press B1 to install that file; B1 on the "Installed" row installs the newest.
