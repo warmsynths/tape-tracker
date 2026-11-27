@@ -25,3 +25,6 @@ Still open: the latency cable test (Calibrate latency button), and what has gone
 7. **Note editing afterwards: quantise only for now.** Change the sound and transpose come with the track roles. No piano roll.
 8. Owner's pain with loops: "awkward recording and getting the timing right" (start and stop timing, aligning later Parts).
 Latency cable test: owner asked what it needs (see the session notes); a Calibrate latency button in Config is planned.
+9. **Later Parts: a count-in?** On-screen countdown for the last 4 beats before a later Part starts, no extra clicks (option 2).
+10. **Changing the tempo or bars after the first take:** allowed while every Part is a pad Part; locked once an audio Part exists, with a message saying why (option 2).
+Q10 (later-Part recording model) is being reshaped: the owner asked for a looper-pedal overdub where older layers fade over time (feedback). Feasibility being checked (memory for a scratch pass buffer).
