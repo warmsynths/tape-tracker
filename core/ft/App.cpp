@@ -39,7 +39,7 @@ App::App(Hal& h, const Palette& palette)
     for (int i = 0; i < 48; i++) lightSent[i] = 255;
     set.waveBitmap = hal.maskDefault();
     hal.bank().fx.init(hal.fxMemory());
-    if (hal.startsAtSetTempo()) newProjectDefaults();
+    if (hal.startsAtSetTempo()) { newProjectDefaults(); set.roleFlow = true; }
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
         FxSlot defaults[4] = { { FxType::RandomJumps, false, 50, 0, 50 }, { FxType::PitchSteps, false, 50, 0, 40 }, { FxType::Stutter, false, 50, 7, 100 }, { FxType::Reverse, false, 50, 7, 100 } };
@@ -334,9 +334,10 @@ void App::jog(int delta)
 void App::pad(int p, bool down, int velocity)
 {
     if (p < 0 || p >= 48) return;
-    if (padsChords && current != Screen::PadSample)
+    if (padsChords && current != Screen::PadSample && selectedRole() != TrackRole::Audio)
     {
-        chordPad(p, down, velocity);
+        if (selectedRole() == TrackRole::Bass || selectedRole() == TrackRole::Melody || selectedRole() == TrackRole::Drums) rolePadPress(p, down, velocity);
+        else chordPad(p, down, velocity);
         if (current == Screen::Chords || current == Screen::Play) refresh(true);
         return;
     }
@@ -738,6 +739,7 @@ void App::selectTrack(int track)
     else
         session.selectTrack(track);
     if (idle) applySource(trackSource[session.selected()]);
+    if (idle && set.roleFlow && roleChosen[session.selected()]) { roleAllOff(); roleSoundApply(trackRole[session.selected()]); if (trackRole[session.selected()] != TrackRole::Audio && !padsChords) { hal.padsReleaseAll(); padsChords = true; } }
     refresh(true);
 }
 
@@ -759,6 +761,12 @@ void App::pressRecord()
         return;
     }
     const int t = session.selected();
+    if (set.roleFlow && !session.hasPart(t) && !roleChosen[t])
+    {
+        // Rec on an empty track asks what to record (Shift + Rec skips the question and uses the last role)
+        if (shift) applyRole(t, lastRole);
+        else { roleList = 0; open(Screen::Role); return; }
+    }
     const bool layerNow = set.layer && session.loopFrames() > 0 && session.hasPart(t) && hal.sdPresent() && partData[t] != nullptr;
     if (session.loopFrames() > 0 && session.hasPart(t) && !replaceConfirmed && !layerNow)
     {
@@ -767,7 +775,7 @@ void App::pressRecord()
     }
     replaceConfirmed = false;
     // With the chord pads on, Rec records them: the track's source becomes Pads (change it back in Input)
-    if (padsChords && trackSource[t] != Source::Pads)
+    if (padsChords && trackSource[t] != Source::Pads && trackRole[t] != TrackRole::Audio)
     {
         trackSource[t] = Source::Pads;
         applySource(Source::Pads);
@@ -1330,6 +1338,13 @@ void App::serviceLights()
         // brightness: held, latched or chosen 100%; in-key chords 40%; chord tones of the sounding chord 70%;
         // other modifiers and styles 25%; free pads off
         int base = 0;
+        const TrackRole sr = selectedRole();
+        if (sr == TrackRole::Bass || sr == TrackRole::Melody || sr == TrackRole::Drums)
+        {
+            const int lv = roleLight(p);
+            if (lightSent[p] != (uint8_t)lv) { lightSent[p] = (uint8_t)lv; hal.padLight(p, lv); }
+            continue;
+        }
         const PadInfo pi = Chords::info(p);
         switch (pi.role)
         {
@@ -1398,6 +1413,7 @@ void App::tick()
     serviceCountIn();
     serviceClick();
     serviceChordNotes();
+    serviceRoleRepeat(hal.millis());
     serviceCalibrate();
     if (latencyDirty && hal.millis() - latencyDirtyAt > 1500) { latencyDirty = false; latencySave(); loopCfgSave(); }
     serviceLights();
@@ -1745,7 +1761,7 @@ void App::fillView()
         if (!L.hasPart) { L.waveCount = 0; maskOk[t] = false; }
         L.bitmap = set.waveBitmap && maskOk[t] && L.hasPart;
 
-        fmt(L.tag, sizeof(L.tag), "%s", sourceName(trackSource[t])); // every track shows where it records from
+        fmt(L.tag, sizeof(L.tag), "%s", set.roleFlow && roleChosen[t] ? (trackRole[t] == TrackRole::Audio ? sourceName(trackSource[t]) : roleTag((int)trackRole[t])) : sourceName(trackSource[t])); // every track shows where it records from, or its role
         if (L.active && mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
         {
             fmt(L.msg1, sizeof(L.msg1), "Waiting for sound");
@@ -1878,7 +1894,7 @@ void App::fillView()
     if (moveMode) fmt(v.hint, sizeof(v.hint), "Move Track %d: jog or arrows step by the grid, Shift+arrows by 1 ms.", session.selected() + 1);
     if (noteHint[0] != 0) fmt(v.hint, sizeof(v.hint), "%s", noteHint);
     fmt(v.loopMode, sizeof(v.loopMode), "%s", set.loopOnce ? "Play once" : "Repeat");
-    fmt(v.padsMode, sizeof(v.padsMode), "%s", padsChords ? "CHORD" : padsKeysMode ? "KEYS" : "PAD");
+    fmt(v.padsMode, sizeof(v.padsMode), "%s", padsChords ? (set.roleFlow ? roleTag((int)selectedRole()) : "CHORD") : padsKeysMode ? "KEYS" : "PAD");
 
     static const char* const names[8] = { "Rec", "Stop", "Play", "", "Track 1", "Track 2", "Track 3", "Track 4" };
     for (int b = 0; b < 8; b++)

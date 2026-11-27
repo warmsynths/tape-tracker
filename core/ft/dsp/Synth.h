@@ -35,6 +35,8 @@ class Synth
 
     DrumKit drums;   // the Drums role plays through the same output
 
+    void setMod(float bend, float vibrato) { bendSemis = bend; vibDepth = vibrato; } // pitch bend and vibrato depth in semitones
+
     void noteOn(int note, int velocity); // velocity 1 to 127
     void noteOff(int note);
     void allNotesOff();
@@ -78,6 +80,7 @@ class Synth
     Voice voice[kVoices];
     uint32_t clock = 0;
     float lfoPhase = 0.0f;
+    float bendSemis = 0.0f, vibDepth = 0.0f, vibPhase = 0.0f;
     uint32_t noiseState = 22222;
     plaits::Overdrive overdrive;
     plaits::Ensemble ensemble;

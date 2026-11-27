@@ -23,6 +23,7 @@ class AudioPlaySynth : public AudioStream
     void noteOff(int note);
     void allNotesOff();
     void drum(int voice, int velocity);
+    void setMod(float bend, float vibrato);
     void setKit(int kit);
 
     virtual void update(void) override;

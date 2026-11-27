@@ -46,6 +46,13 @@ void AudioPlaySynth::drum(int voice, int velocity)
     AudioInterrupts();
 }
 
+void AudioPlaySynth::setMod(float bend, float vibrato)
+{
+    AudioNoInterrupts();
+    synth.setMod(bend, vibrato);
+    AudioInterrupts();
+}
+
 void AudioPlaySynth::setKit(int kit)
 {
     AudioNoInterrupts();

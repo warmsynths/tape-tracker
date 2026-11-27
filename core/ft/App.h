@@ -7,6 +7,7 @@
 #include "Hal.h"
 #include "Mask.h"
 #include "Chords.h"
+#include "Roles.h"
 #include "Latency.h"
 #include "View.h"
 #include "loop_bars.h"
@@ -45,7 +46,7 @@ enum Key
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate, Sets, Play, Fx, Filter
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate, Sets, Play, Fx, Filter, Role, RoleSound
 };
 
 enum class Popup : uint8_t
@@ -64,6 +65,7 @@ struct Settings
     uint8_t countIdx = 3;      // count-in: 0 Off, 1 beat, 2 beats, 4 beats, 8 beats
     uint8_t bars = 0;          // project: bars of the first take at a set tempo, 0: asked afterwards
     bool tailWrap = true;      // device: a note's tail past the loop end is folded onto the start
+    bool roleFlow = false;     // Rec on an empty track asks what to record (Chords, Bass, Melody, Drums, Audio); real machines only
     bool layer = true;         // device: a later take on a track that has a Part is laid over it (false: replaces it)
     uint8_t fadePct = 100;     // device: how much of the older layers stays under a new pass, 40 to 100
     bool waitSound = false;    // project: the first take waits for the input to get loud
@@ -181,6 +183,41 @@ class App
     // Chords page and chord pads
     void drawChords(class Pen& p);
     void drawPlayView(class Pen& p);
+    // Track roles (Roles.h): what you record decides what the pads are
+    TrackRole trackRole[4] = {};
+    bool roleChosen[4] = {};
+    TrackRole lastRole = TrackRole::Chords;
+    uint8_t roleSound[kRoleCount] = { 0, 8, 10, 0, 0 }; // the patch of Chords, Bass and Melody and the kit of Drums
+    int roleList = 0;                    // the row in focus on the sound list
+    int roleOct[kRoleCount] = {};        // Oct - and Oct + for Bass and Melody, in octaves
+    uint8_t roleMode = 0;                // Melody: 0 scale, 1 pentatonic, 2 blues
+    bool roleGlide = false, roleMono = true, roleHold = false, roleChordLock = false, roleRepeat = false;
+    uint8_t roleMods = 0;                // held: bit 0 Accent, 1 Ghost, 2 Short, 3 Soft
+    int8_t roleSounding[48] = {};        // the note a role pad is sounding, 0 none
+    uint32_t roleOffAt[48] = {};         // Short: when a note ends by itself
+    bool roleLatched[48] = {};
+    int drumRate = -1, drumRateHeld = -1; // note repeat rate of the drum pads: latched, or held now
+    bool drumLatch = false, drumSoft = false;
+    uint8_t drumSwing = 50;              // percent, 50 is straight
+    int repPad = -1, repStep = 0;        // the pad that is repeating
+    uint32_t repNext = 0;
+    void applyRole(int track, TrackRole role);
+    void roleSoundApply(TrackRole role);
+    int roleSoundCount(TrackRole role) const;
+    int roleSoundId(TrackRole role, int listIndex) const;
+    const char* roleSoundName(TrackRole role, int id) const;
+    void roleKey(int k);
+    void roleSoundKey(int k);
+    void roleSoundJog(int delta);
+    void rolePadPress(int p, bool down, int velocity);
+    void roleAllOff();
+    void serviceRoleRepeat(uint32_t now);
+    int roleLight(int p) const;
+    int roleCurrentChord(uint8_t* out) const { return chords.lastChord(out); }
+    void drawRole(class Pen& p);
+    void drawRoleSound(class Pen& p);
+    void drawRolePad(class Pen& p, int pad, int px, int py, int pw, int ph);
+    TrackRole selectedRole() const { return trackRole[session.selected()]; }
     void drawFx(class Pen& p);
     void drawFilter(class Pen& p);
     void fxKey(int k);

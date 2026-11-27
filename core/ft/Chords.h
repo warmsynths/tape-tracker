@@ -97,6 +97,10 @@ class Chords
     // "C4" for the tonic note pads, else the note name
     static const char* modName(int mod);
     static const char* scaleName(int s);
+    // The seven semitone offsets of a scale from its tonic (0 to 11)
+    static const uint8_t* scaleSemis(int scale);
+    // The chord played last: its MIDI notes (up to kMaxChordNotes) and how many, or the tonic triad when none was played yet
+    int lastChord(uint8_t* out) const;
     static const char* styleName(int s);
     static const char* keyName(int k);
     static const char* voicingName(int v);

@@ -186,6 +186,8 @@ struct FakeHal : Hal
     int drumHits = 0, lastDrum = -1, kitSet = -1;
     void synthDrum(int voice, int) override { drumHits++; lastDrum = voice; }
     void synthSetKit(int kit) override { kitSet = kit; }
+    float bend = 0, vib = 0;
+    void synthMod(float b, float v) override { bend = b; vib = v; }
     int synthLevel = 0;
     void synthSetLevelDb10(int db10) override { synthLevel = db10; }
     void sampleNote(int, int, int, bool on) override { sampleNotes += on ? 1 : -1; }
@@ -777,6 +779,7 @@ static void pagesAndProjects()
         hal.setDefaults = true;
         App app(hal, palette());
         app.enter();
+        app.settingsForTest().roleFlow = false;
         recordLoop(hal, app);
         app.key(kStop);
         CHECK(app.view().posFrames == 0, "stopped at the start");
@@ -1064,7 +1067,11 @@ int main()
         hal.setDefaults = true;
         App app(hal, palette());
         app.enter();
+        CHECK(app.settings().roleFlow, "a real machine asks what to record");
         app.key(kRec);
+        CHECK(app.screen() == Screen::Role, "Rec on an empty track opens the role choice");
+        app.key(kB5); // Audio: a line take
+        CHECK(app.screen() == Screen::Main, "Audio arms the take");
         hal.advance(app, FakeHal::kRate * 3 + 4000); // the one-bar count-in at 80 BPM
         CHECK(app.view().statusKind == 2, "the take starts after the count-in");
         hal.advance(app, FakeHal::kRate * 11);
@@ -1076,6 +1083,60 @@ int main()
         CHECK(hal.recActive, "the recorder runs on a little for the tail");
         hal.advance(app, FakeHal::kRate * 2);
         CHECK(!hal.recActive, "the tail has been recorded and the recorder is off");
+    }
+    {   // roles: Bass puts scale notes in low octaves on the pads
+        FakeHal hal;
+        hal.setDefaults = true;
+        App app(hal, palette());
+        app.enter();
+        app.key(kRec);
+        app.key(kB2);
+        CHECK(app.screen() == Screen::RoleSound, "a role opens its sound list");
+        app.jog(1);
+        app.key(kB8); // arms: the count-in starts
+        CHECK(app.screen() == Screen::Main && app.state().selected() == 0, "B8 arms the track");
+        CHECK(std::strcmp(app.view().padsMode, "BASS") == 0 && std::strcmp(app.view().lane[0].tag, "BASS") == 0, "the pads and the track say Bass");
+        app.pad(0, true);
+        CHECK(hal.lastNote == 48, "the top left bass pad is C3");
+        app.pad(0, false);
+        app.pad(24, true);
+        CHECK(hal.lastNote == 24, "the bottom bass row is C1");
+        app.pad(24, false);
+        app.pad(8, true); // Root of the chord that sounds (none yet: the tonic triad), an octave up
+        CHECK(hal.lastNote == 36, "Root plays the tonic one octave up");
+        app.pad(8, false);
+        CHECK(hal.notesOn == 0, "letting go ends the notes");
+    }
+    {   // roles: Drums play the voices and the kits
+        FakeHal hal;
+        hal.setDefaults = true;
+        App app(hal, palette());
+        app.enter();
+        app.key(kRec);
+        app.key(kB4);
+        CHECK(app.screen() == Screen::RoleSound, "Drums open the kit list");
+        app.jog(1); app.jog(1);
+        CHECK(hal.kitSet == 2, "the jog chooses a kit and loads it");
+        app.key(kB8);
+        app.pad(47, true);
+        CHECK(hal.drumHits == 1 && hal.lastDrum == 15, "the bottom right pad is the kick");
+        app.pad(47, false);
+        app.pad(8, true);
+        CHECK(hal.lastDrum == 0, "the top left of the kit is the shaker");
+        app.pad(8, false);
+        app.pad(5, true); // kit 6 on the first row
+        CHECK(hal.kitSet == 5, "a kit pad chooses the kit");
+        app.pad(5, false);
+        CHECK(std::strcmp(app.view().padsMode, "DRUM") == 0, "the pads say Drum");
+    }
+    {   // roles: Shift + Rec skips the question; Audio leaves the pads alone
+        FakeHal hal;
+        hal.setDefaults = true;
+        App app(hal, palette());
+        app.enter();
+        app.setShift(true); app.key(kRec); app.setShift(false);
+        CHECK(app.screen() == Screen::Main, "Shift + Rec arms with the last role");
+        CHECK(std::strcmp(app.view().padsMode, "CHORD") == 0, "the last role starts as Chords");
     }
     {   // chords: Note opens the page and the pads play chords and scale notes
         FakeHal hal;

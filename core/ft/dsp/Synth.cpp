@@ -144,6 +144,9 @@ void Synth::render(float* left, float* right, int n)
     lfoPhase += p.lfoRate * (float)n / rate;
     if (lfoPhase >= 1.0f) lfoPhase -= 1.0f;
     const float lfo = plaits::Sine(lfoPhase);
+    vibPhase += 5.5f * (float)n / rate;
+    if (vibPhase >= 1.0f) vibPhase -= 1.0f;
+    const float mod = bendSemis + (vibDepth > 0.0f ? plaits::Sine(vibPhase) * vibDepth : 0.0f);
     const float glideK = p.glide > 0.0f ? timeK(p.glide) * (float)n : 1.0f;
     const float detuneRatio = p.detune != 0.0f ? exp2f_(p.detune / 1200.0f) : 1.0f;
     const float cutoffBase = p.cutoff + (brightness - 0.5f) * 0.6f;
@@ -158,7 +161,7 @@ void Synth::render(float* left, float* right, int n)
         if (!v.busy()) continue;
         // pitch: glide in a mono lead, then vibrato
         v.pitch += (v.note - v.pitch) * (glideK > 1.0f ? 1.0f : glideK);
-        const float note = v.pitch + lfo * p.lfoPitch;
+        const float note = v.pitch + lfo * p.lfoPitch + mod;
         const float f = noteToNorm(note, rate);
         const float fB = f * detuneRatio > 0.25f ? 0.25f : f * detuneRatio;
 

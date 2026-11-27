@@ -5,6 +5,7 @@
 #include "loop_fill.h"
 #include "BuildId.h"
 #include "Mask.h"
+#include "dsp/Drums.h"
 #include "SoundArt.h"
 #include <math.h>
 
@@ -76,6 +77,8 @@ void App::buildPage()
         case Screen::Chords: drawChords(p); break;
         case Screen::Play: drawPlayView(p); break;
         case Screen::Fx: drawFx(p); break;
+        case Screen::Role: drawRole(p); break;
+        case Screen::RoleSound: drawRoleSound(p); break;
         case Screen::Filter: drawFilter(p); break;
         case Screen::Sound: drawSound(p); break;
         case Screen::Calibrate: drawCalibrate(p); break;
@@ -1515,14 +1518,33 @@ void App::drawPlayView(Pen& p)
         if (O.muted) { p.card(x + 98, 147, 20, 16, pal.sel); p.text(x + 103, 148, "M", F12, pal.text); }
         x += 130;
     }
-    if (lastChordName[0] != 0 && lastFamily >= 0)
+    const TrackRole role = selectedRole();
+    const bool roleMap = role == TrackRole::Bass || role == TrackRole::Melody || role == TrackRole::Drums;
+    if (roleMap)
     {
-        p.text(590, 142, lastChordName, F17B, pal.t[lastFamily]);
-        p.text(670, 148, lastFamily == 2 ? "Tension" : lastFamily == 1 ? "Away" : "Home", F12, pal.dim);
+        // the role's own pad map: row labels at the left, 57 px pads (design 6.5)
+        static const int rx[12] = { 84, 141, 197, 254, 311, 367, 424, 481, 559, 616, 673, 729 };
+        static const int ry[4] = { 172, 224, 276, 338 };
+        char st[40];
+        fmt(st, sizeof st, "%s - %s", roleName((int)role), roleSoundName(role, roleSound[(int)role]));
+        p.text(590, 148, st, F12, pal.dim);
+        static const char* const labels[3][4] = { { "HIGH", "MID", "LOW", "SAFE" }, { "HIGH", "MID", "LOW", "SAFE" }, { "HIP-HOP", "DANCE", "LIVE", "REPEAT" } };
+        const int li = role == TrackRole::Bass ? 0 : role == TrackRole::Melody ? 1 : 2;
+        for (int r = 0; r < 4; r++) p.text(14, ry[r] + 20, labels[li][r], F12, pal.dim);
+        p.rect(534, 172, 1, 218, pal.frame);
+        for (int pad = 0; pad < 48; pad++) drawRolePad(p, pad, rx[pad % 12], ry[pad / 12], 57, 52);
     }
-    else p.text(590, 148, "Play a chord", F12, pal.dim);
-    p.rect(524, 172, 1, 230, pal.frame);
-    for (int pad = 0; pad < 48; pad++) drawChordPad(p, pad, px[pad % 12], py[pad / 12], 63, ph[pad / 12]);
+    else
+    {
+        if (lastChordName[0] != 0 && lastFamily >= 0)
+        {
+            p.text(590, 142, lastChordName, F17B, pal.t[lastFamily]);
+            p.text(670, 148, lastFamily == 2 ? "Tension" : lastFamily == 1 ? "Away" : "Home", F12, pal.dim);
+        }
+        else p.text(590, 148, "Play a chord", F12, pal.dim);
+        p.rect(524, 172, 1, 230, pal.frame);
+        for (int pad = 0; pad < 48; pad++) drawChordPad(p, pad, px[pad % 12], py[pad / 12], 63, ph[pad / 12]);
+    }
     drawLayer(2, 0, model, pal, p.g);
     drawLayer(2, 1, model, pal, p.g);
 }

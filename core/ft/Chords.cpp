@@ -76,6 +76,23 @@ void sortAscending(int8_t* a, int n)
 }
 } // namespace
 
+const uint8_t* Chords::scaleSemis(int s) { return kScales[s < 0 || s >= kScaleCount ? 0 : s].semi; }
+
+int Chords::lastChord(uint8_t* out) const
+{
+    if (lastCount > 0)
+    {
+        for (int i = 0; i < lastCount; i++) out[i] = lastNotes[i];
+        return lastCount;
+    }
+    const uint8_t* sc = kScales[cfg.scale].semi;
+    const int root = 48 + cfg.key;
+    out[0] = (uint8_t)root;
+    out[1] = (uint8_t)(root + sc[2]);
+    out[2] = (uint8_t)(root + sc[4]);
+    return 3;
+}
+
 const char* Chords::scaleName(int s) { return kScales[s < 0 || s >= kScaleCount ? 0 : s].name; }
 const char* Chords::styleName(int s) { return kStyles[s < 0 || s >= kStyleCount ? 0 : s].name; }
 const char* Chords::keyName(int k) { return kKeys[((k % 12) + 12) % 12]; }

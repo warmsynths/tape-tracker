@@ -6,6 +6,7 @@
 #include "MiniFmt.h"
 #include "Pen.h"
 #include "loop_fill.h"
+#include "dsp/Drums.h"
 
 namespace ft
 {
@@ -273,6 +274,8 @@ void App::keyScreen(int k)
             break;
         case Screen::Chords: chordsKey(k); break;
         case Screen::Fx: fxKey(k); return;
+        case Screen::Role: roleKey(k); return;
+        case Screen::RoleSound: roleSoundKey(k); return;
         case Screen::Filter: filterKey(k); return;
         case Screen::Calibrate: calibrateKey(k); break;
         case Screen::Sets: setsKey(k); break;
@@ -420,6 +423,7 @@ void App::jogScreen(int delta)
         case Screen::PadSample: psChange(delta); break;
         case Screen::Chords: chordsJog(delta); break;
         case Screen::Fx: fxJog(delta); return;
+        case Screen::RoleSound: roleSoundJog(delta); return;
         case Screen::Filter: filterJog(delta); return;
         case Screen::Sets: setsJog(delta); break;
         case Screen::Sound: soundJog(delta); break;
@@ -748,6 +752,7 @@ void App::newProject(bool everything)
     }
     if (everything) hal.lofi().cfg = LofiCfg(); // and the lo-fi master
     hal.bank().fx.cfg = SendFxCfg();            // reverb and delay off, their settings back
+    for (int t = 0; t < 4; t++) { trackRole[t] = TrackRole::Chords; roleChosen[t] = false; } // the next Rec asks again
     if (hal.startsAtSetTempo()) newProjectDefaults();
     else { set.tempoTenths = 0; set.bars = 0; }
     fmt(projectName, sizeof(projectName), "Untitled");
@@ -937,6 +942,9 @@ void App::startSave()
         w.u8(f.reverbOn ? 1 : 0); w.u8(f.reverbSize); w.u8(f.reverbDamp); w.u8(f.reverbReturn);
         w.u8(f.delayOn ? 1 : 0); w.u8(f.delayDiv); w.u8(f.delayFeedback); w.u8(f.delayTone); w.u8(f.delayReturn);
     }
+    w.u8(1); // track roles, version 1
+    for (int t = 0; t < 4; t++) w.u8((uint32_t)trackRole[t] | (roleChosen[t] ? 0x80u : 0u));
+    for (int i = 0; i < kRoleCount; i++) w.u8(roleSound[i]);
     if (!hal.fileWrite(jobPath, h, kHeader, false)) { showPopup(Popup::SdMissing); return; }
     projectChordsWrite(projectName);
     job = Job::Save;
@@ -997,6 +1005,12 @@ void App::startLoad(const char* name)
         f.delayOn = r.u8() != 0; f.delayDiv = (uint8_t)clampi((int)r.u8(), 0, kDelayDivs - 1); f.delayFeedback = (uint8_t)clampi((int)r.u8(), 0, 95); f.delayTone = (uint8_t)clampi((int)r.u8(), 0, 100); f.delayReturn = (uint8_t)clampi((int)r.u8(), 0, 100);
         if (f.reverbOn || f.delayOn) hal.bank().fx.init(hal.fxMemory());
     }
+    if (r.u8() == 1)
+    {
+        for (int t = 0; t < 4; t++) { const uint32_t b = r.u8(); trackRole[t] = (TrackRole)clampi((int)(b & 0x7F), 0, kRoleCount - 1); roleChosen[t] = (b & 0x80) != 0 || ((mask >> t) & 1); }
+        for (int i = 0; i < kRoleCount; i++) roleSound[i] = (uint8_t)clampi((int)r.u8(), 0, i == (int)TrackRole::Drums ? DrumKit::kKits - 1 : kSynthPresets - 1);
+    }
+    else for (int t = 0; t < 4; t++) { trackRole[t] = trackSource[t] == Source::Pads ? TrackRole::Chords : TrackRole::Audio; roleChosen[t] = ((mask >> t) & 1) != 0; }
     session.restore(loop, bars, mask);
     fmt(projectName, sizeof(projectName), "%s", name);
     for (int t = 0; t < 4; t++) hasUndoTake[t] = false;
@@ -1783,6 +1797,7 @@ void App::doClear()
         {
             snapshotForUndo(i);
             session.clearPart(i);
+            roleChosen[i] = false; // the next Rec asks again what to record
             partData[i] = nullptr;
             alignShift[i] = 0;
             userOffset[i] = 0;

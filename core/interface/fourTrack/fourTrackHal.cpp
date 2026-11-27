@@ -204,6 +204,7 @@ void FourTrackHal::synthNote(int note, int velocity, bool on)
 void FourTrackHal::synthSetLevelDb10(int db10) { engine.getSynthPlayer()->setLevelDb10(db10); }
 void FourTrackHal::synthAllOff() { engine.getSynthPlayer()->allNotesOff(); }
 void FourTrackHal::synthDrum(int voice, int velocity) { engine.getSynthPlayer()->drum(voice, velocity); }
+void FourTrackHal::synthMod(float bend, float vibrato) { engine.getSynthPlayer()->setMod(bend, vibrato); }
 void FourTrackHal::synthSetKit(int kit) { engine.getSynthPlayer()->setKit(kit); }
 void FourTrackHal::sampleNote(int id, int note, int velocity, bool on)
 {

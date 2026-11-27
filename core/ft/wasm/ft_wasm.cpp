@@ -425,6 +425,7 @@ class EmuHal : public Hal
     void synthAllOff() override { synth.allNotesOff(); }
     void synthDrum(int voice, int velocity) override { synth.drums.trigger(voice, velocity); }
     void synthSetKit(int kit) override { synth.drums.setKit(kit); }
+    void synthMod(float bend, float vibrato) override { synth.setMod(bend, vibrato); }
     void synthSetLevelDb10(int db10) override { synthAmp = ft::synthLevelAmp(db10); }
     void sampleNote(int id, int note, int velocity, bool on) override
     {
