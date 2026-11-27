@@ -342,11 +342,7 @@ static void pagesAndProjects()
         hal.advance(app, FakeHal::kRate / 2);
         CHECK(hal.clicks == 0, "waiting for sound replaces the count-in");
         CHECK(app.state().mode() == Mode::RecordingFirst, "it is armed and recording is running");
-        CHECK(app.view().levelTest && std::strstr(app.view().hint, "Play your loudest") != nullptr, "first it is a level test");
-        hal.advance(app, FakeHal::kRate * 2);
-        CHECK(app.view().statusKind == 3 && app.view().levelTest, "a loud input does not start the take during the test");
-        app.key(kRec);
-        CHECK(!app.view().levelTest && std::strstr(app.view().hint, "Waiting for your first note") != nullptr, "Rec arms it: now it waits for the sound");
+        CHECK(std::strstr(app.view().hint, "Waiting for your first note") != nullptr, "it waits for the sound straight away");
         hal.advance(app, FakeHal::kRate * 2);
         hal.advance(app, FakeHal::kRate * 2);
         CHECK(app.view().statusKind == 2, "the sound starts the take");
@@ -1164,22 +1160,33 @@ int main()
         app.key(kB5);
         CHECK(app.state().selected() == 0, "still on track 1");
     }
-    {   // waiting for the first note: no count-in, and the jog sets the level it starts at
+    {   // the level a waiting take starts at is set in Config, not while recording
         FakeHal hal;
         App app(hal, palette());
         app.enter();
-        app.settingsForTest().waitSound = true;
-        app.settingsForTest().waitDb = -36;
-        hal.quiet = 1000000; // silence at first
-        app.key(kRec);
-        CHECK(app.view().statusKind == 3 || app.view().statusKind == 2, "it arms straight away, without a count-in");
-        CHECK(app.view().levelTest, "Rec first shows the level test");
-        app.key(kRec);
-        CHECK(std::strncmp(app.view().hint, "Waiting for your first note", 27) == 0, "a second Rec arms: the hint says it is waiting");
+        app.key(kConfig);
+        app.key(kLeft);
+        for (int i = 0; i < 5; i++) app.key(kDown);   // the Four-Track group
+        app.key(kRight);
+        for (int i = 0; i < 3; i++) app.key(kDown);   // Wait level
+        app.key(kB1);
+        CHECK(app.screen() == Screen::ArmLevel, "B1 on Wait level opens the level page");
+        const int before = app.settings().waitDb;
         app.jog(1);
-        CHECK(app.settings().waitDb == -35, "the jog raises the level it starts at");
+        CHECK(app.settings().waitDb == before + 1, "the jog moves the line");
         app.setShift(true); app.jog(-1); app.setShift(false);
-        CHECK(app.settings().waitDb == -38, "Shift moves it in bigger steps");
+        CHECK(app.settings().waitDb == before - 2, "Shift moves it in bigger steps");
+        for (int st = 0; st < app.stagesOf(4); st++) { }
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Device, "Back returns to Config");
+        // recording does not take the jog
+        app.key(kB8);
+        app.settingsForTest().waitSound = true;
+        hal.quiet = 1000000;
+        app.key(kRec);
+        const int armed = app.settings().waitDb;
+        app.jog(1);
+        CHECK(app.settings().waitDb == armed, "the jog does not change the level while a take waits");
     }
     {   // chords: Note opens the page and the pads play chords and scale notes
         FakeHal hal;

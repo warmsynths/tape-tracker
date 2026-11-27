@@ -305,15 +305,6 @@ void App::jog(int delta)
         jogScreen(delta);
         return;
     }
-    if (waitingSound && session.mode() == FourTrackSession::Mode::RecordingFirst)
-    {
-        // the level the take starts at, set while you watch the input: above the buzz, below your note
-        set.waitDb = (int8_t)(set.waitDb + (delta > 0 ? 1 : -1) * (shift ? 3 : 1));
-        if (set.waitDb < -60) set.waitDb = -60;
-        if (set.waitDb > -12) set.waitDb = -12;
-        refresh(true);
-        return;
-    }
     if (session.mode() == FourTrackSession::Mode::ChoosingBars)
     {
         promptMove(delta > 0 ? 1 : -1);
@@ -855,7 +846,6 @@ void App::startRecording()
         waitScanned = 0;
         waitLevelDb = -60;
         waitingSound = set.waitSound && trackSource[track] != Source::Pads;
-        levelCheck = waitingSound; // first a level test: nothing starts until Rec is pressed again
         waitPeakDb = -60;
         waitPeakAt = 0;
     }
@@ -1813,7 +1803,7 @@ void App::fillView()
         if (L.active && mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
         {
             fmt(L.msg1, sizeof(L.msg1), levelCheck ? "Testing the level: not recording yet" : "Recording starts at the orange line");
-            fmt(L.msg2, sizeof(L.msg2), "Jog moves the line");
+            fmt(L.msg2, sizeof(L.msg2), "Set in Config");
         }
         else if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
         {

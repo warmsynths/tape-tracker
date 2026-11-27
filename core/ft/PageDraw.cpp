@@ -77,6 +77,7 @@ void App::buildPage()
         case Screen::Chords: drawChords(p); break;
         case Screen::Play: drawPlayView(p); break;
         case Screen::Fx: drawFx(p); break;
+        case Screen::ArmLevel: drawArmLevel(p); break;
         case Screen::Role: drawRole(p); break;
         case Screen::RoleSound: drawRoleSound(p); break;
         case Screen::Filter: drawFilter(p); break;
@@ -707,7 +708,7 @@ void App::drawDevice(Pen& p)
     fmt(title, sizeof title, "%s - %s", focusName, groups[dvGroup]);
     p.text(14, 387, title, F17B, pal.text);
     p.text(14, 411, focusHelp, F14, pal.text);
-    const char* l[8] = { dvGroup == 7 && fwCount > 0 ? "Update" : (dvGroup == 5 && dvRow == 4 ? "Calibrate" : ""), "", "", "", "", "", "", "Back" };
+    const char* l[8] = { dvGroup == 7 && fwCount > 0 ? "Update" : (dvGroup == 5 && dvRow == 4 ? "Calibrate" : (dvGroup == 5 && dvRow == 3 ? "Set level" : "")), "", "", "", "", "", "", "Back" };
     p.buttons(l);
 }
 

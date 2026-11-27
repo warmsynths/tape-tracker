@@ -46,7 +46,7 @@ enum Key
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate, Sets, Play, Fx, Filter, Role, RoleSound
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate, Sets, Play, Fx, Filter, Role, RoleSound, ArmLevel
 };
 
 enum class Popup : uint8_t
@@ -227,6 +227,8 @@ class App
     void drawRoleSound(class Pen& p);
     void drawRolePad(class Pen& p, int pad, int px, int py, int pw, int ph);
     TrackRole selectedRole() const { return trackRole[session.selected()]; }
+    void drawArmLevel(class Pen& p);
+    void armLevelOpen();
     void drawFx(class Pen& p);
     void drawFilter(class Pen& p);
     void fxKey(int k);

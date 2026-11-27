@@ -221,3 +221,42 @@ void App::drawFilter(Pen& p)
     p.buttons(l, (uint8_t)((f.held ? 1 : 0) | (f.latched ? 2 : 0) | (1u << (3 + (f.mode < 4 ? f.mode : 0)))));
 }
 } // namespace ft
+
+namespace ft
+{
+// Config, Four-Track, Wait level, B1: the level a waiting take starts at, set against the live input. It is
+// a setting for a new device or a new guitar; arming a take never asks for it.
+void App::drawArmLevel(Pen& p)
+{
+    p.topBar(model);
+    p.text(14, 42, "Level that starts a take", F17B, pal.text);
+    p.text(14, 70, "Play your loudest. Put the orange line above any buzz and below your note.", F14, pal.dim);
+    p.text(14, 90, "With Wait for sound on, a take starts when the input passes this line. It is saved.", F14, pal.dim);
+    float l = 0, r = 0;
+    hal.inputLevels(l, r);
+    const float lin = l > r ? l : r;
+    const int now = lin > 0.0f ? ampToDb(lin) : -60;
+    const uint32_t t = hal.millis();
+    if (now >= waitPeakDb || t - waitPeakAt > 3000) { waitPeakDb = now; waitPeakAt = t; }
+    const int bx = 40, bw = 720, by = 190, bh = 56;
+    auto xOf = [&](int db) { const int v = bx + bw * (db + 48) / 48; return v < bx ? bx : (v > bx + bw ? bx + bw : v); };
+    p.card(bx, by, bw, bh, pal.panel);
+    const int nx = xOf(now);
+    if (nx > bx + 2) p.rect(bx + 2, by + 6, nx - bx - 2, bh - 12, now >= set.waitDb ? pal.warn : pal.meter);
+    p.rect(xOf(waitPeakDb), by + 2, 2, bh - 4, pal.text);
+    p.rect(xOf(set.waitDb) - 1, by - 14, 3, bh + 28, pal.marker);
+    char b[48];
+    fmt(b, sizeof b, "START %d dB", (int)set.waitDb);
+    const int tw = p.width(b, F17B);
+    p.text(xOf(set.waitDb) + tw + 12 > bx + bw ? xOf(set.waitDb) - tw - 8 : xOf(set.waitDb) + 8, by - 40, b, F17B, pal.marker);
+    fmt(b, sizeof b, "input %d dB", now);
+    p.text(bx, by + bh + 12, b, F14, pal.text);
+    fmt(b, sizeof b, "peak %d dB: %s", waitPeakDb, waitPeakDb >= set.waitDb ? "this would start a take" : "stays below the line");
+    p.textRight(bx + bw, by + bh + 12, b, F14, waitPeakDb >= set.waitDb ? pal.warn : pal.text);
+    p.text(bx, by + bh + 38, "-48 dB", F12, pal.dim);
+    p.textRight(bx + bw, by + bh + 38, "0 dB", F12, pal.dim);
+    p.text(14, 412, "Jog moves the line (Shift: bigger steps). Back keeps it.", F14, pal.text);
+    const char* lb[8] = { "", "", "", "", "", "", "", "Back" };
+    p.buttons(lb);
+}
+} // namespace ft

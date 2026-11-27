@@ -284,6 +284,7 @@ void App::keyScreen(int k)
         case Screen::Load: loadKey(k); break;
         case Screen::Resample: resampleKey(k); break;
         case Screen::Device: deviceKey(k); break;
+        case Screen::ArmLevel: if (k == kB8 || k == kConfig) { open(Screen::Device); return; } break;
         case Screen::Glitch: glitchKey(k); break;
         case Screen::Master: masterKey(k); break;
         case Screen::Input:
@@ -431,6 +432,10 @@ void App::jogScreen(int delta)
         case Screen::Load: loadJog(delta); break;
         case Screen::Resample: resampleJog(delta); break;
         case Screen::Device: deviceJog(delta); break;
+        case Screen::ArmLevel:
+            set.waitDb = (int8_t)clampi((int)set.waitDb + (delta > 0 ? 1 : -1) * (shift ? 3 : 1), -60, -12);
+            latencyMark();
+            break;
         case Screen::Master: masterJog(delta); break;
         case Screen::Input:
         {
@@ -1562,7 +1567,7 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             if (r == 0) { n = "Alignment window"; fmt(value, size, "%s", wins[set.windowIdx % 5]); h = "A new Part whose first sound lands this close to the loop start is moved onto it."; }
             else if (r == 1) { n = "Pre-roll"; fmt(value, size, "%s", rolls[set.preRollIdx % 5]); h = "How long before the loop start a Part begins recording, so nothing is missed."; }
             else if (r == 2) { n = "Tempo rounding"; fmt(value, size, "%s", rounds[set.roundIdx % 3]); h = "The tempo worked out from the first take is rounded to this step."; }
-            else if (r == 3) { n = "Wait level"; fmt(value, size, "%d dB", (int)set.waitDb); h = "How loud the input must get before a waiting first take starts."; }
+            else if (r == 3) { n = "Wait level"; fmt(value, size, "%d dB", (int)set.waitDb); h = "How loud the input must get before a waiting first take starts. B1 opens a page with the live input to set it against."; }
             else if (r == 6) { n = "Later Parts"; fmt(value, size, "%s", set.layer ? "Layer" : "Replace"); h = "Layer adds each new take on top of the Part already on the track. Replace records over it. Undo brings the last one back."; }
             else if (r == 7) { n = "Fade"; fmt(value, size, "%d%%", (int)set.fadePct); h = "When layering, the older audio stays at this level under each new pass. 100% is a plain overdub. Shift + jog changes it while recording."; }
             else if (r == 5)
@@ -1688,6 +1693,7 @@ void App::deviceKey(int k)
         case kRight: dvRows = true; break;
         case kB1:
             if (dvGroup == 5 && dvRow == 4) { calibrateOpen(); return; }
+            if (dvGroup == 5 && dvRow == 3) { armLevelOpen(); return; }
             if (dvGroup == 7 && fwCount > 0)
             {
                 if (unsaved) { pendingAction = 3; startSave(); }
@@ -2227,10 +2233,17 @@ void App::latencySave()
     hal.fileWrite("latency.cfg", b, 8, false);
 }
 
+void App::armLevelOpen()
+{
+    waitPeakDb = -60;
+    waitPeakAt = 0;
+    open(Screen::ArmLevel);
+}
+
 void App::loopCfgSave()
 {
     if (!hal.sdPresent()) return;
-    const uint8_t b[8] = { 'F', 'L', '1', '0', (uint8_t)(set.tailWrap ? 1 : 0), (uint8_t)(set.layer ? 1 : 0), set.fadePct, 0 };
+    const uint8_t b[8] = { 'F', 'L', '1', '0', (uint8_t)(set.tailWrap ? 1 : 0), (uint8_t)(set.layer ? 1 : 0), set.fadePct, (uint8_t)(set.waitDb + 100) };
     hal.fileWrite("loop.cfg", b, 8, false);
 }
 void App::loopCfgLoad()
@@ -2241,6 +2254,7 @@ void App::loopCfgLoad()
     set.tailWrap = b[4] != 0;
     set.layer = b[5] != 0;
     set.fadePct = (uint8_t)clampi((int)b[6], 40, 100);
+    if (b[7] != 0) set.waitDb = (int8_t)clampi((int)b[7] - 100, -60, -12);
 }
 void App::latencyLoad()
 {
