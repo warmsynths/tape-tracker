@@ -843,6 +843,7 @@ void App::startRecording()
         applySource(trackSource[track]);
         hal.recordStart(track, trackSource[track]);
         takeOffset = 0;
+        autoSnapped = false;
         waitScanned = 0;
         waitLevelDb = -60;
         waitingSound = set.waitSound && trackSource[track] != Source::Pads;
@@ -1115,7 +1116,7 @@ void App::finishTail(bool all)
     if (tailTrack < 0) return;
     const int t = tailTrack;
     tailTrack = -1;
-    const uint32_t got = hal.recordLength();
+    const uint32_t got = hal.recordLength() > tailBase ? hal.recordLength() - tailBase : 0;
     if (hal.recordActive()) hal.recordStop();
     if (!all || got <= tailAt || !session.hasPart(t) || partData[t] == nullptr) return;
     uint32_t n = got - tailAt;
@@ -1133,18 +1134,28 @@ void App::finishTail(bool all)
 void App::serviceTail()
 {
     if (tailTrack < 0) return;
-    if (!hal.recordActive() || hal.recordLength() >= tailAt + tailWant) finishTail(true);
+    if (!hal.recordActive() || hal.recordLength() >= tailBase + tailAt + tailWant) finishTail(true);
 }
 
 void App::serviceFirstTake()
 {
     const uint32_t want = autoFrames();
-    if (want > 0 && hal.recordActive() && hal.recordLength() >= takeOffset + want)
+    if (want > 0 && hal.recordActive() && !autoSnapped && hal.recordLength() >= takeOffset + want)
+    {
+        // The bars are counted from the first note: move the start of the loop onto it (on a zero crossing). What came
+        // before stays in the memory, so the Part Editor can still move the loop back over it.
+        const int rec0 = session.recordingTrack();
+        const int onset = findFirstOnset(hal.region(rec0) + takeOffset, 0, want, hal.sampleRate());
+        if (onset > 0) takeOffset += (uint32_t)onset;
+        autoSnapped = true;
+    }
+    if (want > 0 && hal.recordActive() && autoSnapped && hal.recordLength() >= takeOffset + want)
     {
         const int rec = session.recordingTrack();
-        const uint32_t room = hal.regionFrames() > want + kPostFrames ? hal.regionFrames() - want - kPostFrames : 0;
+        const uint32_t used = takeOffset + want + kPostFrames;
+        const uint32_t room = hal.regionFrames() > used ? hal.regionFrames() - used : 0;
         tailWant = set.tailWrap ? (hal.sampleRate() * 2 < room ? hal.sampleRate() * 2 : room) : 0;
-        if (tailWant > 0) { tailTrack = rec; tailAt = want; }
+        if (tailWant > 0) { tailTrack = rec; tailAt = want; tailBase = takeOffset; }
         else hal.recordStop();
         session.firstRecordedFrames(want, false);
         if (session.mode() == FourTrackSession::Mode::RecordingFirst) session.pressStop();

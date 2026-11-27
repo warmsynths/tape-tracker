@@ -614,7 +614,9 @@ class App
     void cancelWait();
     bool countingIn = false;
     int tailTrack = -1;          // a first take whose tail is still being recorded
-    uint32_t tailAt = 0;         // frame where the loop ends
+    uint32_t tailAt = 0;         // frame where the loop ends, counted from the loop start
+    uint32_t tailBase = 0;       // where the loop starts in the take
+    bool autoSnapped = false;    // the start of the first take has been moved onto its first note
     uint32_t tailWant = 0;       // how many frames of tail to record
     uint32_t countInStart = 0;
     int countInBeats = 0;
