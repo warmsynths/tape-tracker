@@ -1840,6 +1840,7 @@ void App::chordsKey(int k)
         soundMark();
     }
     else if (k == kB4) { if (chSound >= kSynthPresets) chSound = sndPreset; open(Screen::Sound); return; }
+    else if (k == kB7) { open(Screen::Play); return; }
     else if (k == kB8 || k == kNote) { back(); return; }
 }
 

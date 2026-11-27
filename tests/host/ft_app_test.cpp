@@ -590,10 +590,19 @@ static void pagesAndProjects()
         Row rows[8];
         int n = 0;
         app.key(kNote); hal.advance(app, 2000); rows[n++] = Row{ "Chords 1", bytes() };
-        app.key(kB7); hal.advance(app, 2000); rows[n++] = Row{ "Chords 2", bytes() };
-        app.key(kB7); hal.advance(app, 2000); rows[n++] = Row{ "Chords 3", bytes() };
-        app.pad(0, true); hal.advance(app, 2000); rows[n++] = Row{ "Chords 3, a pad held", bytes() };
+        app.pad(0, true); hal.advance(app, 2000); rows[n++] = Row{ "Chords, a pad held", bytes() };
         app.pad(0, false);
+        app.key(kB7); hal.advance(app, 2000);
+        CHECK(app.screen() == Screen::Play, "B7 on Chords opens the Play view");
+        rows[n++] = Row{ "Play view", bytes() };
+        app.pad(0, true); hal.advance(app, 2000); rows[n++] = Row{ "Play view, a pad held", bytes() };
+        app.pad(0, false);
+        app.key(kPattern);
+        CHECK(app.screen() == Screen::Main, "Pattern leaves the Play view");
+        app.key(kPattern);
+        CHECK(app.screen() == Screen::Play, "Pattern on home opens the Play view when the pads are chords");
+        app.key(kPattern);
+        app.key(kNote);
         app.key(kInstr); hal.advance(app, 2000); rows[n++] = Row{ "Sound", bytes() };
         app.key(kB7); hal.advance(app, 2000); rows[n++] = Row{ "Sound, every setting", bytes() };
         for (int i = 0; i < n; i++)

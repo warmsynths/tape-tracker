@@ -71,6 +71,7 @@ void App::buildPage()
         case Screen::Mixer: drawMixer(p); break;
         case Screen::PadSample: drawPadSample(p); break;
         case Screen::Chords: drawChords(p); break;
+        case Screen::Play: drawPlayView(p); break;
         case Screen::Sound: drawSound(p); break;
         case Screen::Calibrate: drawCalibrate(p); break;
         case Screen::Sets: drawSets(p); break;
@@ -1434,8 +1435,82 @@ void App::drawChords(Pen& p)
     }
     p.rect(534, 136, 1, 250, pal.frame);
     p.text(14, 412, "Hold a modifier on the right (double-tap to latch). Shift + jog: arp rate or strum speed.", F14, pal.text);
-    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Sets", "Reset", "Sound", "", "", "", "Back" };
+    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Sets", "Reset", "Sound", "", "", "Play", "Back" };
     p.buttons(l, padsChords ? 1 : 0);
+}
+
+// 6.4 Play view: the selected Part's lane, the other tracks in one line, and the chord pads
+void App::drawPlayView(Pen& p)
+{
+    static const int px[12] = { 14, 77, 139, 202, 264, 327, 389, 452, 536, 599, 661, 724 };
+    static const int py[4] = { 172, 230, 298, 350 };
+    static const int ph[4] = { 58, 58, 52, 52 };
+    drawLayer(0, 0, model, pal, p.g); // top bar, status and the ruler, as on the home screen
+    p.rect(780, 56, 10, 342, pal.bg);   // the home lane scroll bar does not belong here
+    p.text(362, 7, model.pos, F17B, pal.topText);
+    const int sel = session.selected();
+    const Lane& L = model.lane[sel];
+    const int ly = 58, lh = 80, wx = 170, ww = 600;
+    p.card(14, ly, 772, lh, pal.panel);
+    p.rect(14, ly + 8, 3, lh - 16, pal.text); // the selected track's edge, in text colour (track hues are muted here)
+    char b[16];
+    fmt(b, sizeof b, "%d", sel + 1);
+    p.text(26, ly + 8, b, F17B, pal.dim);
+    p.text(46, ly + 8, L.name, F17B, pal.text);
+    if (L.tag[0] != 0) p.text(26, ly + 34, L.tag, F12, pal.dim);
+    if (L.hasPart && L.waveCount > 0)
+    {
+        if (L.bitmap)
+        {
+            p.g.color(pal.text);
+            p.g.mask(sel * 3, wx, ly, ww, lh);
+        }
+        else
+        {
+            p.g.color(pal.text);
+            for (int i = 0; i < L.waveCount; i++)
+            {
+                const int h = 2 + L.wave[i] * (lh - 14) / 255;
+                p.g.rect(wx + i * ww / L.waveCount, ly + lh / 2 - h / 2, ww / L.waveCount - 1, h);
+            }
+        }
+    }
+    else p.text(wx + 8, ly + 30, L.msg1[0] != 0 ? L.msg1 : "Empty track", F14, pal.dim);
+    const int bars = model.barCount;
+    for (int i = 1; i < bars && i < 16; i++) p.rect(wx + i * ww / bars, ly, 1, lh, pal.frame);
+    if (model.loopFrames > 0)
+    {
+        const int hx = wx + (int)((uint64_t)model.posFrames * ww / model.loopFrames);
+        p.g.color(0x000000);
+        p.g.alpha(110);
+        p.g.rect(hx, ly, wx + ww - hx, lh); // what the playhead has not reached is darker
+        p.g.alpha(255);
+        p.rect(hx, ly, 2, lh, pal.text);
+    }
+    if (L.muted) { p.g.color(0x000000); p.g.alpha(150); p.g.rect(wx, ly, ww, lh); p.g.alpha(255); }
+    // the other tracks in one line, the chord at the right
+    int x = 14;
+    for (int t = 0; t < 4; t++)
+    {
+        if (t == sel) continue;
+        const Lane& O = model.lane[t];
+        p.card(x, 144, 124, 22, pal.panel);
+        fmt(b, sizeof b, "%d", t + 1);
+        p.text(x + 8, 148, b, F12, pal.dim);
+        p.text(x + 24, 148, O.hasPart ? (O.tag[0] != 0 ? O.tag : "Part") : "empty", F12, O.hasPart ? pal.text : pal.dim);
+        if (O.muted) { p.card(x + 98, 147, 20, 16, pal.sel); p.text(x + 103, 148, "M", F12, pal.text); }
+        x += 130;
+    }
+    if (lastChordName[0] != 0 && lastFamily >= 0)
+    {
+        p.text(590, 142, lastChordName, F17B, pal.t[lastFamily]);
+        p.text(670, 148, lastFamily == 2 ? "Tension" : lastFamily == 1 ? "Away" : "Home", F12, pal.dim);
+    }
+    else p.text(590, 148, "Play a chord", F12, pal.dim);
+    p.rect(524, 172, 1, 230, pal.frame);
+    for (int pad = 0; pad < 48; pad++) drawChordPad(p, pad, px[pad % 12], py[pad / 12], 63, ph[pad / 12]);
+    drawLayer(2, 0, model, pal, p.g);
+    drawLayer(2, 1, model, pal, p.g);
 }
 
 void App::drawSets(Pen& p)

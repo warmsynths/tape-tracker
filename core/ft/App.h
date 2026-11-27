@@ -43,7 +43,7 @@ enum Key
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate, Sets
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate, Sets, Play
 };
 
 enum class Popup : uint8_t
@@ -173,6 +173,8 @@ class App
     void drawPadSample(class Pen& p);
     // Chords page and chord pads
     void drawChords(class Pen& p);
+    void drawPlayView(class Pen& p);
+    bool onHome() const { return current == Screen::Main || current == Screen::Play; }
     void chordsKey(int k);
     void chordsJog(int delta);
     void chordPad(int p, bool down, int velocity = 0);

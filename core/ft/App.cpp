@@ -118,7 +118,8 @@ void App::key(int k)
     {
         actionMenu = false;
         if (moveMode) moveKey(kB8);
-        if (current != Screen::Main) back();
+        if (current == Screen::Main && padsChords && job == Job::None && session.mode() != FourTrackSession::Mode::ChoosingBars) open(Screen::Play); // Pattern again: the Play view
+        else if (current != Screen::Main) back();
         else refresh(true);
         return;
     }
@@ -132,13 +133,13 @@ void App::key(int k)
         return;
     }
     if (noteHint[0] != 0) { noteHint[0] = 0; refresh(true); } // a note in the hint line lasts until the next button
-    if ((k == kCopy || k == kDelete) && current != Screen::Main && job == Job::None && !fwUpdating && current != Screen::NameEntry && current != Screen::Tempo)
+    if ((k == kCopy || k == kDelete) && !onHome() && job == Job::None && !fwUpdating && current != Screen::NameEntry && current != Screen::Tempo)
     {
         back();
         key(k);
         return;
     }
-    if (current != Screen::Main && job == Job::None && !fwUpdating && current != Screen::NameEntry && current != Screen::Tempo)
+    if (!onHome() && job == Job::None && !fwUpdating && current != Screen::NameEntry && current != Screen::Tempo)
     {
         // A button that opens a page also works from another page: go home, then open it
         struct Open { int key; Screen page; };
@@ -152,7 +153,7 @@ void App::key(int k)
                 return;
             }
     }
-    if (current != Screen::Main)
+    if (!onHome())
     {
         // Play and Stop work on the pages that sit beside the recorder
         const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
@@ -284,7 +285,7 @@ void App::jog(int delta)
     if (delta == 0) return;
     if (popupKind == Popup::Copy) { popupKey(delta > 0 ? kRight : kLeft); return; }
     if (popupKind != Popup::None) return;
-    if (current != Screen::Main)
+    if (!onHome())
     {
         jogScreen(delta);
         return;
@@ -321,7 +322,7 @@ void App::pad(int p, bool down, int velocity)
     if (padsChords && current != Screen::PadSample)
     {
         chordPad(p, down, velocity);
-        if (current == Screen::Chords) refresh(true);
+        if (current == Screen::Chords || current == Screen::Play) refresh(true);
         return;
     }
     if (current == Screen::PadSample && down) { hal.setCurrentSample(p); refresh(true); } // a pad chooses its sample here
@@ -1753,6 +1754,7 @@ void App::refresh(bool force)
     }
 
     const bool wantPrompt = (session.mode() == FourTrackSession::Mode::ChoosingBars);
+    if (wantPrompt && current == Screen::Play) { current = Screen::Main; dirtyAll(); } // the question is drawn on the home screen
     if (wantPrompt && !promptShown) { promptShown = true; redraw[3] = true; }
     else if (!wantPrompt && promptShown) { promptShown = false; redraw[3] = false; }
     else if (wantPrompt && force) redraw[3] = true;
