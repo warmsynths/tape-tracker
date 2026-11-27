@@ -85,6 +85,7 @@ void App::enter()
     pushBank();
     soundLoad();
     latencyLoad();
+    loopCfgLoad();
     soundApply();
     refresh(true);
 }
@@ -299,6 +300,14 @@ void App::jog(int delta)
     if (moveMode)
     {
         moveStep(session.selected(), delta > 0 ? 1 : -1, shift);
+        return;
+    }
+    if (shift && (session.mode() == FourTrackSession::Mode::Armed || session.mode() == FourTrackSession::Mode::RecordingPart) && layerPass[session.recordingTrack() < 0 ? 0 : session.recordingTrack()])
+    {
+        set.fadePct = (uint8_t)(set.fadePct + (delta > 0 ? 5 : -5) < 40 ? 40 : set.fadePct + (delta > 0 ? 5 : -5) > 100 ? 100 : set.fadePct + (delta > 0 ? 5 : -5));
+        latencyMark();
+        fmt(noteHint, sizeof noteHint, "Fade %d%%: older layers stay at this level under each new pass.", (int)set.fadePct);
+        refresh(true);
         return;
     }
     if (shift && !actionMenu && session.mode() == FourTrackSession::Mode::Idle)
@@ -711,7 +720,8 @@ void App::pressRecord()
         return;
     }
     const int t = session.selected();
-    if (session.loopFrames() > 0 && session.hasPart(t) && !replaceConfirmed)
+    const bool layerNow = set.layer && session.loopFrames() > 0 && session.hasPart(t) && hal.sdPresent() && partData[t] != nullptr;
+    if (session.loopFrames() > 0 && session.hasPart(t) && !replaceConfirmed && !layerNow)
     {
         showPopup(Popup::Replace, t);
         return;
@@ -726,7 +736,8 @@ void App::pressRecord()
         fmt(noteHint, sizeof noteHint, "Track %d records the chord pads (source: Pads).", t + 1);
     }
     // A first take at a set tempo starts with a bar of clicks
-    const bool firstTake = session.loopFrames() == 0 || (session.partCount() == 1 && session.hasPart(t));
+    const bool firstTake = session.loopFrames() == 0 || (session.partCount() == 1 && session.hasPart(t) && !layerNow);
+    layerPass[t] = layerNow;
     if (firstTake && set.countBeats() > 0 && set.tempoTenths < 2400)
     {
         countingIn = true;
@@ -752,8 +763,10 @@ void App::startRecording()
         char path[24];
         fmt(path, sizeof(path), "undo/t%d.raw", t);
         if (hal.fileWrite(path, partData[t], frames * 2, false)) { hal.fileWrite(path, trailer, 8, true); hasUndoTake[t] = true; }
+        else layerPass[t] = false; // the old audio could not be kept, so it cannot be laid under the new pass
     }
-    session.pressRecord();
+    else layerPass[t] = false;
+    session.pressRecord(layerPass[t]);
     const int track = session.recordingTrack();
     if (session.mode() == FourTrackSession::Mode::RecordingFirst)
     {
@@ -1129,6 +1142,12 @@ void App::finishPart(int track, uint32_t firstSample, bool early)
         int16_t* r = hal.region(track);
         for (uint32_t i = recorded; i < needed; i++) r[i] = 0;
     }
+    if (layerPass[track])
+    {
+        layerPass[track] = false;
+        finishLayer(track, firstSample);
+        return;
+    }
     partData[track] = hal.region(track) + firstSample;
     session.partRecorded();
     applyAlignment(track, firstSample);
@@ -1137,6 +1156,45 @@ void App::finishPart(int track, uint32_t firstSample, bool early)
     pushBank();
     if (session.hasPart(track)) hal.playerSetTrack(track, partData[track]);
     else hal.playerSetTrack(track, nullptr);
+    refresh(true);
+}
+
+// A pass laid over the Part that was there: the new take is moved onto the old Part's time, then the old
+// audio (kept on the card for Undo) is added under it at the Fade amount
+void App::finishLayer(int track, uint32_t firstSample)
+{
+    const uint32_t length = session.loopFrames();
+    int16_t* d = hal.region(track) + firstSample;
+    const int32_t lat = trackSource[track] == Source::Pads ? 0 : latencyFrames;
+    const int64_t c = (int64_t)alignShift[track] + userOffset[track] + lat;
+    const uint32_t shift = (uint32_t)(((c % (int64_t)length) + (int64_t)length) % (int64_t)length);
+    if (shift != 0)
+    {
+        // rotate left by `shift`: reverse the two parts, then the whole
+        auto rev = [d](uint32_t a, uint32_t b) { for (b--; a < b; a++, b--) { const int16_t x = d[a]; d[a] = d[b]; d[b] = x; } };
+        rev(0, shift); rev(shift, length); rev(0, length);
+    }
+    char path[24];
+    fmt(path, sizeof(path), "undo/t%d.raw", track);
+    int16_t old[1024];
+    const int fade = set.fadePct < 40 ? 40 : (set.fadePct > 100 ? 100 : set.fadePct);
+    for (uint32_t off = 0; off < length; off += 1024)
+    {
+        const uint32_t n = length - off < 1024 ? length - off : 1024;
+        if (hal.fileRead(path, off * 2, old, n * 2) != n * 2) break;
+        for (uint32_t i = 0; i < n; i++)
+        {
+            const int32_t v = d[off + i] + (int32_t)old[i] * fade / 100;
+            d[off + i] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+        }
+    }
+    partData[track] = d;
+    session.partRecorded();
+    noteAt[track] = -2;
+    waveDirty[track] = true;
+    unsaved = true;
+    pushBank();
+    hal.playerSetTrack(track, partData[track]);
     refresh(true);
 }
 
@@ -1299,7 +1357,7 @@ void App::tick()
     serviceClick();
     serviceChordNotes();
     serviceCalibrate();
-    if (latencyDirty && hal.millis() - latencyDirtyAt > 1500) { latencyDirty = false; latencySave(); }
+    if (latencyDirty && hal.millis() - latencyDirtyAt > 1500) { latencyDirty = false; latencySave(); loopCfgSave(); }
     serviceLights();
     if (soundDirty && hal.millis() - soundDirtyAt > 1500) { soundDirty = false; soundSave(); }
     serviceJob();

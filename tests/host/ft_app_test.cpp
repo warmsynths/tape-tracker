@@ -877,12 +877,30 @@ static void pagesAndProjects()
         App app(hal, palette());
         app.setMeasure(&gfx);
         app.enter();
+        app.settingsForTest().layer = false; // Replace mode
         recordLoop(hal, app);
         app.key(kRec);
         CHECK(app.popup() == Popup::Replace, "recording over a Part asks first");
         app.key(kB8);
         hal.advance(app, 100000); // the count-in
         CHECK(hal.fileSize("undo/t0.raw") > 0, "the old take is kept");
+    }
+    {   // Layer: a new take on a track that has a Part is added to it, and Undo brings the old one back
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        const uint32_t loop = app.view().loopFrames;
+        app.key(kRec);
+        CHECK(app.popup() == Popup::None, "layering does not ask");
+        for (int i = 0; i < 4000 && app.state().mode() != FourTrackSession::Mode::Idle; i++) hal.advance(app, 128);
+        CHECK(app.state().mode() == FourTrackSession::Mode::Idle, "the pass finishes");
+        CHECK(app.view().loopFrames == loop && app.state().partCount() == 1, "the loop and the Part are kept");
+        CHECK(hal.fileSize("undo/t0.raw") > 0, "the old audio is kept for Undo");
+        int peak = 0;
+        for (uint32_t i = 0; i < loop; i++) { const int v = hal.data[0][i] < 0 ? -hal.data[0][i] : hal.data[0][i]; if (v > peak) peak = v; }
+        CHECK(peak > 12000, "the new pass is added to the old audio");
     }
 }
 

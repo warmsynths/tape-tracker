@@ -43,7 +43,8 @@ class FourTrackSession
 
     // Idle with no loop, or re-recording the only Part: a new first take (free length).
     // Idle with a loop: arm the selected track (starts the loop if stopped).
-    void pressRecord();
+    // `layer`: record over a Part that is kept (an overdub), so even the only Part arms instead of starting a new first take
+    void pressRecord(bool layer = false);
     // First take: keeps what was recorded and starts the loop. Armed or recording a Part: cancels,
     // keeping the old Part. Idle: stops the loop.
     void pressStop();

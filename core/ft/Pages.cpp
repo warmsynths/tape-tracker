@@ -1464,7 +1464,7 @@ void App::resampleJog(int delta)
 
 int App::deviceRowCount(int g) const
 {
-    static const int n[9] = { 3, 1, 1, 1, 3, 6, 7, 2, 2 };
+    static const int n[9] = { 3, 1, 1, 1, 3, 8, 7, 2, 2 };
     return n[g < 0 || g > 8 ? 0 : g];
 }
 
@@ -1524,6 +1524,8 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             else if (r == 1) { n = "Pre-roll"; fmt(value, size, "%s", rolls[set.preRollIdx % 5]); h = "How long before the loop start a Part begins recording, so nothing is missed."; }
             else if (r == 2) { n = "Tempo rounding"; fmt(value, size, "%s", rounds[set.roundIdx % 3]); h = "The tempo worked out from the first take is rounded to this step."; }
             else if (r == 3) { n = "Wait level"; fmt(value, size, "%d dB", (int)set.waitDb); h = "How loud the input must get before a waiting first take starts."; }
+            else if (r == 6) { n = "Later Parts"; fmt(value, size, "%s", set.layer ? "Layer" : "Replace"); h = "Layer adds each new take on top of the Part already on the track. Replace records over it. Undo brings the last one back."; }
+            else if (r == 7) { n = "Fade"; fmt(value, size, "%d%%", (int)set.fadePct); h = "When layering, the older audio stays at this level under each new pass. 100% is a plain overdub. Shift + jog changes it while recording."; }
             else if (r == 5)
             {
                 n = "Tail wrap"; fmt(value, size, "%s", set.tailWrap ? "On" : "Off");
@@ -1591,7 +1593,9 @@ void App::deviceChange(int g, int r, int delta)
             else if (r == 1) set.preRollIdx = (uint8_t)clampi(set.preRollIdx + d, 0, 4);
             else if (r == 2) set.roundIdx = (uint8_t)clampi(set.roundIdx + d, 0, 2);
             else if (r == 3) set.waitDb = (int8_t)clampi(set.waitDb + d, -60, -12);
-            else if (r == 5) set.tailWrap = !set.tailWrap;
+            else if (r == 5) { set.tailWrap = !set.tailWrap; latencyMark(); }
+            else if (r == 6) { set.layer = !set.layer; latencyMark(); }
+            else if (r == 7) { set.fadePct = (uint8_t)clampi((int)set.fadePct + d * 5, 40, 100); latencyMark(); }
             else { latencyFrames = clampi(latencyFrames + d * (shift ? 1 : 4), 0, 4000); latencyMark(); }
             break;
         case 6:
@@ -2176,6 +2180,21 @@ void App::latencySave()
     hal.fileWrite("latency.cfg", b, 8, false);
 }
 
+void App::loopCfgSave()
+{
+    if (!hal.sdPresent()) return;
+    const uint8_t b[8] = { 'F', 'L', '1', '0', (uint8_t)(set.tailWrap ? 1 : 0), (uint8_t)(set.layer ? 1 : 0), set.fadePct, 0 };
+    hal.fileWrite("loop.cfg", b, 8, false);
+}
+void App::loopCfgLoad()
+{
+    uint8_t b[8];
+    if (hal.fileSize("loop.cfg") != 8 || hal.fileRead("loop.cfg", 0, b, 8) != 8) return;
+    if (b[0] != 'F' || b[1] != 'L' || b[2] != '1' || b[3] != '0') return;
+    set.tailWrap = b[4] != 0;
+    set.layer = b[5] != 0;
+    set.fadePct = (uint8_t)clampi((int)b[6], 40, 100);
+}
 void App::latencyLoad()
 {
     uint8_t b[8];

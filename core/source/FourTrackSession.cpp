@@ -22,7 +22,7 @@ void FourTrackSession::selectTrack(int track)
     selectedTrack = track;
 }
 
-void FourTrackSession::pressRecord()
+void FourTrackSession::pressRecord(bool layer)
 {
     if (currentMode != Mode::Idle)
     {
@@ -30,7 +30,7 @@ void FourTrackSession::pressRecord()
     }
 
     activeTrack = selectedTrack;
-    const bool onlyPartIsThis = (partCount() == 1 && parts[selectedTrack]);
+    const bool onlyPartIsThis = (partCount() == 1 && parts[selectedTrack]) && !layer;
     if (loop == 0 || onlyPartIsThis)
     {
         currentMode = Mode::RecordingFirst;

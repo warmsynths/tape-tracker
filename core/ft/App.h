@@ -62,6 +62,8 @@ struct Settings
     uint8_t countIdx = 3;      // count-in: 0 Off, 1 beat, 2 beats, 4 beats, 8 beats
     uint8_t bars = 0;          // project: bars of the first take at a set tempo, 0: asked afterwards
     bool tailWrap = true;      // device: a note's tail past the loop end is folded onto the start
+    bool layer = true;         // device: a later take on a track that has a Part is laid over it (false: replaces it)
+    uint8_t fadePct = 100;     // device: how much of the older layers stays under a new pass, 40 to 100
     bool waitSound = false;    // project: the first take waits for the input to get loud
     int8_t waitDb = -36;       // device: how loud, in dB
     int countBeats() const { static const int b[5] = { 0, 1, 2, 4, 8 }; return b[countIdx > 4 ? 4 : countIdx]; }
@@ -112,6 +114,7 @@ class App
     Screen screen() const { return current; }
     Popup popup() const { return popupKind; }
     const Settings& settings() const { return set; }
+    Settings& settingsForTest() { return set; }
     bool waiting() const { return waitingSound; }
     bool pageOverflowed() const { return page.overflowed() || popupPage.overflowed(); }
     int pageStages() const { return page.stageCount(); }
@@ -181,6 +184,10 @@ class App
     uint32_t autoFrames() const;          // length of a first take with the bars set up front, 0 when it is open
     void finishTail(bool all);            // stop recording the tail past the loop end and fold it onto the start
     void serviceTail();
+    void finishLayer(int track, uint32_t firstSample);
+    void loopCfgSave();
+    void loopCfgLoad();
+    bool layerPass[4] = {};     // the take being recorded is laid over the Part that was there
     int barsFit(int tempoTenths) const;   // the most bars that fit one Part at this tempo
     int barsStep(int from, int dir) const;
 
