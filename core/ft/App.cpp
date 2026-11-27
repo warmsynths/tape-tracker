@@ -777,6 +777,12 @@ void App::pressRecord()
         refresh(true);
         return;
     }
+    if (waitingSound && levelCheck && session.mode() == FourTrackSession::Mode::RecordingFirst)
+    {
+        levelCheck = false; // the level is set: now it waits for the first note
+        refresh(true);
+        return;
+    }
     if (session.mode() != FourTrackSession::Mode::Idle)
     {
         if (session.mode() == FourTrackSession::Mode::Armed) { cancelRecording(); syncPlayer(); refresh(true); }
@@ -849,6 +855,9 @@ void App::startRecording()
         waitScanned = 0;
         waitLevelDb = -60;
         waitingSound = set.waitSound && trackSource[track] != Source::Pads;
+        levelCheck = waitingSound; // first a level test: nothing starts until Rec is pressed again
+        waitPeakDb = -60;
+        waitPeakAt = 0;
     }
     else if (session.mode() == FourTrackSession::Mode::Armed)
     {
@@ -974,7 +983,7 @@ void App::serviceWait()
     {
         const int32_t s = r[i] < 0 ? -(int32_t)r[i] : (int32_t)r[i];
         if (s > peak) peak = s;
-        if (s >= thr)
+        if (s >= thr && !levelCheck)
         {
             uint32_t pre = preRollFrames();
             if (pre < rate / 50) pre = rate / 50;
@@ -987,6 +996,11 @@ void App::serviceWait()
     }
     waitScanned = end;
     waitLevelDb = peak > 0 ? ampToDb((float)peak / 32768.0f) : -60;
+    {
+        // the loudest level of the last few seconds, to set the line against
+        const uint32_t now = hal.millis();
+        if (waitLevelDb >= waitPeakDb || now - waitPeakAt > 3000) { waitPeakDb = waitLevelDb; waitPeakAt = now; }
+    }
     // a long wait would fill the memory: start the recording again
     if (got > rate * 20)
     {
@@ -1696,6 +1710,8 @@ void App::fillView()
         v.inR = (uint8_t)(dr < -60 ? 0 : dr + 60);
         v.waitDb = set.waitSound ? set.waitDb : 0;
         v.waitNow = (int8_t)waitLevelDb;
+        v.waitPeak = (int8_t)waitPeakDb;
+        v.levelTest = levelCheck;
         fmt(v.inputName, sizeof(v.inputName), "%s", sourceName(trackSource[recTrack >= 0 ? recTrack : session.selected()]));
     }
 
@@ -1708,7 +1724,7 @@ void App::fillView()
     else if (mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
     {
         v.statusKind = 3;
-        fmt(v.status, sizeof(v.status), "Armed");
+        fmt(v.status, sizeof(v.status), levelCheck ? "Level test" : "Armed");
         fmt(v.statusNote, sizeof(v.statusNote), "No Loop yet");
     }
     else if (mode == FourTrackSession::Mode::RecordingFirst)
@@ -1796,7 +1812,7 @@ void App::fillView()
         fmt(L.tag, sizeof(L.tag), "%s", set.roleFlow && roleChosen[t] ? (trackRole[t] == TrackRole::Audio ? sourceName(trackSource[t]) : roleTag((int)trackRole[t])) : sourceName(trackSource[t])); // every track shows where it records from, or its role
         if (L.active && mode == FourTrackSession::Mode::RecordingFirst && waitingSound)
         {
-            fmt(L.msg1, sizeof(L.msg1), "Recording starts at the orange line");
+            fmt(L.msg1, sizeof(L.msg1), levelCheck ? "Testing the level: not recording yet" : "Recording starts at the orange line");
             fmt(L.msg2, sizeof(L.msg2), "Jog moves the line");
         }
         else if (L.active && mode == FourTrackSession::Mode::RecordingFirst)
@@ -1910,7 +1926,8 @@ void App::fillView()
     if (countingIn) fmt(v.hint, sizeof(v.hint), "Count-in, then the first take starts. Stop cancels.");
     else if (mode == FourTrackSession::Mode::RecordingFirst)
     {
-        if (waitingSound) fmt(v.hint, sizeof(v.hint), "Waiting for your first note. Jog sets the level it starts at (%d dB). Stop cancels.", (int)set.waitDb);
+        if (waitingSound && levelCheck) fmt(v.hint, sizeof(v.hint), "Play your loudest, set the line above the buzz, then press Rec.");
+        else if (waitingSound) fmt(v.hint, sizeof(v.hint), "Waiting for your first note: it starts at %d dB. Stop cancels.", (int)set.waitDb);
         else if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 16 s the take stops by itself and keeps everything.");
         else if (autoFrames() > 0) fmt(v.hint, sizeof(v.hint), "The take stops by itself on the bar line. Stop ends it early.");
         else fmt(v.hint, sizeof(v.hint), "B2 or Stop ends the take. Then: How many bars?");
@@ -1997,6 +2014,8 @@ void App::refresh(bool force)
     sig = hashBytes(sig, &v.focusLane, sizeof(v.focusLane));
     sig = hashBytes(sig, &v.waitDb, sizeof(v.waitDb));
     sig = hashBytes(sig, &v.waitNow, sizeof(v.waitNow));
+    sig = hashBytes(sig, &v.waitPeak, sizeof(v.waitPeak));
+    sig = hashBytes(sig, &v.levelTest, sizeof(v.levelTest));
     sig = hashBytes(sig, v.inputName, sizeof(v.inputName));
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {

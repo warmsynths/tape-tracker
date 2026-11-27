@@ -145,7 +145,7 @@ struct FakeHal : Hal
     int currentSample() override { return curSample; }
     void setCurrentSample(int s) override { curSample = s; }
     void sampleMemory(uint32_t& u, uint32_t& t) override { u = 0; t = 2600000; }
-    PadSample sampleData[48];
+    PadSample sampleData[48] = {};
     bool padSample(int slot, PadSample& out) override { if (slot < 0 || slot > 11) return false; out = sampleData[slot]; std::snprintf(out.name, sizeof out.name, "Sample %d", slot + 1); out.frames = 44100; out.bytes = 88200; return true; }
     void setPadSample(int slot, const PadSample& in) override { if (slot >= 0 && slot < 48) sampleData[slot] = in; }
     int padSampleWave(int, uint8_t* out, int columns) override { for (int i = 0; i < columns; i++) out[i] = (uint8_t)(i % 200); return columns; }
@@ -342,7 +342,11 @@ static void pagesAndProjects()
         hal.advance(app, FakeHal::kRate / 2);
         CHECK(hal.clicks == 0, "waiting for sound replaces the count-in");
         CHECK(app.state().mode() == Mode::RecordingFirst, "it is armed and recording is running");
-        CHECK(app.view().statusKind == 3 && std::strstr(app.view().hint, "Waiting for your first note") != nullptr, "it shows Armed, waiting for sound");
+        CHECK(app.view().levelTest && std::strstr(app.view().hint, "Play your loudest") != nullptr, "first it is a level test");
+        hal.advance(app, FakeHal::kRate * 2);
+        CHECK(app.view().statusKind == 3 && app.view().levelTest, "a loud input does not start the take during the test");
+        app.key(kRec);
+        CHECK(!app.view().levelTest && std::strstr(app.view().hint, "Waiting for your first note") != nullptr, "Rec arms it: now it waits for the sound");
         hal.advance(app, FakeHal::kRate * 2);
         hal.advance(app, FakeHal::kRate * 2);
         CHECK(app.view().statusKind == 2, "the sound starts the take");
@@ -1169,7 +1173,9 @@ int main()
         hal.quiet = 1000000; // silence at first
         app.key(kRec);
         CHECK(app.view().statusKind == 3 || app.view().statusKind == 2, "it arms straight away, without a count-in");
-        CHECK(std::strncmp(app.view().hint, "Waiting for your first note", 27) == 0, "the hint says it is waiting");
+        CHECK(app.view().levelTest, "Rec first shows the level test");
+        app.key(kRec);
+        CHECK(std::strncmp(app.view().hint, "Waiting for your first note", 27) == 0, "a second Rec arms: the hint says it is waiting");
         app.jog(1);
         CHECK(app.settings().waitDb == -35, "the jog raises the level it starts at");
         app.setShift(true); app.jog(-1); app.setShift(false);

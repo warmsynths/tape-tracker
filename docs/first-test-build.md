@@ -335,3 +335,6 @@ While Wait for sound is armed the lane says "Recording starts at the orange line
 
 ## FT61: layering in real time
 FT60 and earlier recorded a layer over the Part's own memory, so the old audio was overwritten while the pass played (a gap), and the mix was done afterwards from the card. Now the pass is recorded in the memory of an **empty track** and added into the playing Part as it comes in, each frame lowered by the Fade level first. The old layers keep playing during the pass, the new one joins the loop as you play it (heard from the next time round), and Stop part-way only changes the part you played. **It needs one empty track** (otherwise a take replaces, with the question as before) and an SD card (the old audio is still saved there for Undo, which happens when you press Rec, so there is a pause of a second or so before it arms).
+
+## FT62: level test before arming
+With Wait for sound on, the first Rec starts a **level test**: it does not record or trigger. The meter shows the input, the orange line is where a take would start, and a white mark plus "peak -20 dB: would start / stays below" shows the loudest level of the last 3 seconds. Jog moves the line. Press Rec again to arm; then the first note past the line starts the take. Stop cancels either.

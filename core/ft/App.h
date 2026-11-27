@@ -605,6 +605,9 @@ class App
     bool waitingSound = false;
     uint32_t takeOffset = 0, waitScanned = 0;
     int waitLevelDb = -60;
+    int waitPeakDb = -60;
+    uint32_t waitPeakAt = 0;
+    bool levelCheck = false;       // waiting for sound, but only showing the level: nothing starts until Rec is pressed
     void serviceWait();
     void cancelWait();
     bool countingIn = false;

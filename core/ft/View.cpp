@@ -407,6 +407,15 @@ void Painter::drawDynamic()
                     char now[24];
                     fmt(now, sizeof now, "input %d dB", (int)v.waitNow);
                     T(750 - textWidth(now, kF14), y + 108, now, kF14, pal.text);
+                    if (v.levelTest)
+                    {
+                        // the loudest of the last seconds, and whether it would have started a take
+                        const int px = 190 + 560 * (v.waitPeak + 48) / 48;
+                        rect(px < 190 ? 190 : (px > 750 ? 750 : px), y + 130, 2, 34, pal.text);
+                        char pk[40];
+                        fmt(pk, sizeof pk, "peak %d dB: %s", (int)v.waitPeak, v.waitPeak >= v.waitDb ? "would start" : "stays below");
+                        T(190, y + 176, pk, kF14, v.waitPeak >= v.waitDb ? pal.warn : pal.text);
+                    }
                 }
             }
             else if (v.loopFrames == 0)

@@ -2,6 +2,7 @@
 # Runs every host test: the shared Four-Track core with a fake machine, the audio maths, and a
 # check of the button registrations. No hardware or toolchain needed (clang++ and python3).
 set -e
+ulimit -s 262144 2>/dev/null || true # the big test functions keep every App they build on the stack
 cd "$(dirname "$0")/.."
 OUT=${TMPDIR:-/tmp}/ft-tests
 mkdir -p "$OUT"
