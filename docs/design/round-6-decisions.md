@@ -10,3 +10,10 @@ The owner added a full new design (`docs/design/Four-Track Recorder Design.zip`:
 Open (next rounds): what "Style" does in the new top line; what a Set contains and where Sets are stored; whether track roles need a chord map stored per Part; the filter's scope (loops only or the whole mix); whether sends are before or after each track's level. Boot logo: researched, small and safe (see the feasibility notes in the session; a 200x120 L8 image fits the existing slot).
 
 Ideas to take from LarkOS: `docs/research/lark-os-comparison.md`.
+
+## Loop mechanics (owner, 2026-11-27)
+Goal: perfect loops, insanely easy to record.
+1. **First take: tempo and bars set up front, one Rec press, a count-in, then it records and stops itself exactly at the bar line (option A).** Free (hand-stopped, loop = what was played) stays for free playing.
+2. **Tail wrap: yes, as a Config option.** A note's tail past the loop end is folded onto the start of the loop (record a little extra, mix it into the beginning, a few ms of fade). Default on, about 2 s of tail, switchable in Config.
+3. **Live playing is quantised (option 2):** note starts snap to a grid with a strength. This means pad parts are stored as recorded notes (an event list), not only audio. Architecture still to settle.
+Still open: the latency cable test (Calibrate latency button), and what has gone wrong in the owner's loops so far.
