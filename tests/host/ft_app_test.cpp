@@ -525,7 +525,7 @@ static void pagesAndProjects()
         app.jog(1);
         CHECK(app.settings().windowIdx == 3, "Four-Track group: the alignment window changes");
         app.key(kLeft);
-        app.key(kDown);
+        app.key(kDown); app.key(kDown);
         for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
         app.key(kB1);
         CHECK(!hal.fwInstalled, "the updater starts after the update screen has been drawn");
@@ -993,29 +993,32 @@ int main()
         app.key(kNote);
         CHECK(app.screen() == Screen::Chords, "Note opens the Chords page");
         CHECK(std::strcmp(app.view().padsMode, "CHORD") == 0, "the pads are in chord mode");
-        app.pad(0, true);
-        CHECK(hal.notesOn == 3 && hal.lastNote == 55, "pad 0 plays the C major triad");
-        app.pad(0, false);
+        app.pad(12, true); // I as a triad
+        CHECK(hal.notesOn == 3 && hal.lastNote == 55, "pad 13 plays the C major triad");
+        app.pad(12, false);
         CHECK(hal.notesOn == 0, "releasing the pad releases the notes");
-        app.pad(40, true);
+        app.pad(0, true); // I as a 7th
+        CHECK(hal.notesOn == 4 && hal.lastNote == 59, "pad 1 plays Cmaj7");
+        app.pad(0, false);
+        app.pad(40, true); // a scale note: the fifth of the lower octave
         CHECK(hal.notesOn == 1 && hal.lastNote == 55, "a scale pad plays one note in key");
         app.pad(40, false);
         app.jog(1); // the Key field
-        app.pad(0, true);
+        app.pad(12, true);
         CHECK(hal.lastNote == 56, "after one step up the key is Db: its fifth is Ab");
-        app.pad(0, false);
-        // sound field: the third value is the sample
-        app.key(kRight); app.key(kRight); app.key(kRight); app.key(kRight); app.key(kRight); app.key(kRight);
-        for (int i = 0; i < kSynthPresets + 1; i++) app.jog(1); // past the last patch: the pad sample
-        app.pad(0, true);
+        app.pad(12, false);
+        // the Sound field is the fourth: past the last patch is the pad sample
+        app.key(kRight); app.key(kRight); app.key(kRight);
+        for (int i = 0; i < kSynthPresets + 1; i++) app.jog(1);
+        app.pad(12, true);
         CHECK(hal.sampleNotes == 3, "with Sound set to Sample the chord plays the sample");
-        app.pad(0, false);
+        app.pad(12, false);
         CHECK(hal.sampleNotes == 0, "and it is released");
         app.key(kB8);
         CHECK(app.screen() == Screen::Main, "Back returns home");
-        app.pad(0, true);
+        app.pad(12, true);
         CHECK(hal.sampleNotes == 3 && hal.padsOn == 0, "the pads still play chords on the home screen");
-        app.pad(0, false);
+        app.pad(12, false);
         app.key(kNote);
         app.key(kB1); // Pads: off
         app.key(kB8);
@@ -1023,94 +1026,143 @@ int main()
         CHECK(hal.padsOn == 1, "with chord pads off, the pads are the normal pads again");
         app.pad(3, false);
     }
-    {   // performance pads, Hold, and the chord types page
+    {   // the right hand: modifiers held and latched, octave, Hold
         FakeHal hal;
         App app(hal, palette());
         app.enter();
         app.key(kNote);
-        app.pad(10, true); // Oct +
-        CHECK(hal.notesOn == 0, "a performance pad makes no sound");
-        app.pad(0, true);
-        CHECK(hal.notesOn == 3 && hal.lastNote == 67, "Oct + held: the chord is an octave up (G5)");
-        app.pad(0, false); app.pad(10, false);
-        app.pad(0, true);
-        CHECK(hal.lastNote == 55, "released: back to normal");
-        app.pad(0, false);
-        CHECK(hal.notesOn == 0, "the chord ends with the pad");
-        app.pad(46, true); app.pad(46, false); // Hold
-        app.pad(0, true); app.pad(0, false);
+        app.pad(20, true); // maj7 held
+        CHECK(hal.notesOn == 0, "a modifier makes no sound");
+        app.pad(13, true); // ii as a triad becomes DmM7
+        CHECK(hal.notesOn == 4 && hal.lastNote == 61, "maj7 held: ii plays DmM7");
+        app.pad(13, false); app.pad(20, false);
+        app.pad(13, true);
+        CHECK(hal.notesOn == 3 && hal.lastNote == 57, "released: back to Dm");
+        app.pad(13, false);
+        // a double tap latches a modifier
+        app.pad(8, true); app.pad(8, false); app.pad(8, true); app.pad(8, false); // sus2
+        app.pad(12, true);
+        CHECK(hal.lastNote == 55 && hal.notesOn == 3, "latched sus2: C D G");
+        app.pad(12, false);
+        app.pad(8, true); app.pad(8, false); // one tap lets it go
+        app.pad(12, true);
+        CHECK(hal.lastNote == 55 && hal.notesOn == 3, "tapped again: the latch is gone");
+        app.pad(12, false);
+        // octave pads
+        app.pad(46, true); app.pad(46, false);
+        app.pad(12, true);
+        CHECK(hal.lastNote == 67, "Oct + once: the chord is an octave up (G5)");
+        app.pad(12, false);
+        app.pad(45, true); app.pad(45, false); app.pad(45, true); app.pad(45, false);
+        app.pad(12, true);
+        CHECK(hal.lastNote == 43, "Oct - twice: an octave below normal (G2)");
+        app.pad(12, false);
+        app.pad(46, true); app.pad(46, false);
+        // Hold
+        app.pad(47, true); app.pad(47, false);
+        app.pad(12, true); app.pad(12, false);
         CHECK(hal.notesOn == 3, "Hold keeps the chord sounding after the pad is let go");
-        app.pad(2, true);
+        app.pad(14, true);
         CHECK(hal.notesOn == 3, "the next chord replaces it");
-        app.pad(2, false);
-        app.pad(46, true); app.pad(46, false); // Hold off
+        app.pad(14, false);
+        app.pad(47, true); app.pad(47, false); // Hold off
         CHECK(hal.notesOn == 0, "Hold off lets it go");
-        // page 2: the type of row 1
-        app.key(kB7);
-        app.jog(1);
-        app.pad(0, true);
-        CHECK(hal.notesOn == 4 && hal.lastNote == 57, "row 1 is now a 6th: C E G A (changed by jog)");
-        app.pad(0, false);
-        app.key(kB7);
-        app.key(kB8);
     }
     {   // strum, arpeggio and humanise
         FakeHal hal;
         App app(hal, palette());
         app.enter();
         app.key(kNote);
-        // Strum down: the notes come one after another, 28 ms apart
-        app.pad(47, true); app.pad(47, false); // Style pad: Strum D
-        app.pad(0, true);
+        // Strum dn: the notes come one after another, 28 ms apart
+        app.pad(33, true); app.pad(33, false);
+        app.pad(12, true);
         CHECK(hal.notesOn == 1 && hal.lastNote == 48, "a strum starts with the lowest note");
         hal.advance(app, 128 * 12); // about 36 ms
         CHECK(hal.notesOn == 2 && hal.lastNote == 52, "the second note follows");
         hal.advance(app, 128 * 12);
         CHECK(hal.notesOn == 3 && hal.lastNote == 55, "and the third");
-        app.pad(0, false);
+        app.pad(12, false);
         CHECK(hal.notesOn == 0, "releasing ends all of it");
-        // a pad let go before the strum finishes plays only what had started, and nothing is left on
-        app.pad(0, true);
-        app.pad(0, false);
+        app.pad(12, true);
+        app.pad(12, false);
         hal.advance(app, 128 * 40);
         CHECK(hal.notesOn == 0, "a short tap leaves no stuck notes");
-        // Strum up goes from the top
-        app.pad(47, true); app.pad(47, false);
-        app.pad(0, true);
+        app.pad(34, true); app.pad(34, false); // Strum up goes from the top
+        app.pad(12, true);
         CHECK(hal.lastNote == 55, "strum up starts with the highest note");
-        app.pad(0, false);
+        app.pad(12, false);
         // Arp up: one note at a time, at the rate, gated
-        app.pad(47, true); app.pad(47, false);
-        app.pad(0, true);
+        app.pad(35, true); app.pad(35, false);
+        CHECK(app.chordSettings().playStyle == StyleArpUp, "the Arp up pad chooses it");
+        app.pad(12, true);
         CHECK(hal.notesOn == 1 && hal.lastNote == 48, "an arpeggio starts on the first note");
         hal.noteEvents = 0;
-        hal.advance(app, 44100 * 3); // 3 s: 1/16 at 120 BPM is 125 ms, about 24 steps
+        hal.advance(app, 44100 * 3);
         CHECK(hal.noteEvents > 40 && hal.noteEvents < 60, "the arpeggio keeps stepping (note-ons and note-offs)");
         CHECK(hal.notesOn <= 1, "never more than one arpeggio note at a time");
-        app.pad(0, false);
+        app.pad(12, false);
         CHECK(hal.notesOn == 0, "releasing the pad stops it");
-        // Hold keeps an arpeggio going
-        app.pad(46, true); app.pad(46, false);
-        app.pad(0, true); app.pad(0, false);
+        app.pad(47, true); app.pad(47, false); // Hold keeps an arpeggio going
+        app.pad(12, true); app.pad(12, false);
         hal.noteEvents = 0;
         hal.advance(app, 44100);
         CHECK(hal.noteEvents > 8, "with Hold the arpeggio goes on after the pad is let go");
-        app.pad(46, true); app.pad(46, false);
+        app.pad(47, true); app.pad(47, false);
         CHECK(hal.notesOn == 0, "Hold off stops it");
         hal.noteEvents = 0;
         hal.advance(app, 44100);
         CHECK(hal.noteEvents == 0, "and it stays stopped");
-        // the style cycles through all of them and comes back to Block
-        for (int i = 0; i < 4; i++) { app.pad(47, true); app.pad(47, false); }
-        CHECK(app.chordSettings().playStyle == 0, "the Style pad cycles back to Block");
-        // humanise changes velocities within bounds and spreads a block
+        app.pad(32, true); app.pad(32, false); // Block
+        CHECK(app.chordSettings().playStyle == 0, "the Block pad goes back to Block");
+        // Shift + jog while playing sets the strum speed
+        app.pad(33, true); app.pad(33, false);
+        app.setShift(true); app.jog(1); app.setShift(false);
+        CHECK(app.chordSettings().strumMs == 30, "Shift + jog changes the strum speed");
+        app.pad(32, true); app.pad(32, false);
+        // humanise (Config, Chords group) changes velocities within bounds
         hal.vmin = 127; hal.vmax = 0;
-        app.key(kB7); app.key(kB7); // page 3
-        app.key(kRight); // Humanise
-        for (int i = 0; i < 20; i++) app.jog(1); // 100%
+        app.key(kConfig); app.key(kLeft);
+        for (int i = 0; i < 6; i++) app.key(kDown); // group Chords
+        app.key(kRight);
+        for (int i = 0; i < 20; i++) app.jog(1); // humanise to 100%
         CHECK(app.chordSettings().humanise == 100, "humanise goes to 100");
-        for (int k = 0; k < 6; k++) { app.pad(0, true); hal.advance(app, 128 * 20); app.pad(0, false); }
+        app.key(kB8);
+        for (int k = 0; k < 6; k++) { app.pad(12, true); hal.advance(app, 128 * 20); app.pad(12, false); }
         CHECK(hal.vmax <= 100 && hal.vmin >= 65 && hal.vmin < hal.vmax, "humanised velocities vary but stay within a third of the base");
+    }
+    {   // a project remembers its chord set
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kNote);
+        for (int i = 0; i < 4; i++) app.jog(1); // key E
+        app.key(kB8);
+        app.key(kFile);
+        app.key(kB3); // Save
+        hal.advance(app, 20000);
+        CHECK(hal.files.size() > 0, "saved");
+        bool chd = false;
+        for (auto& f : hal.files) if (f.first.size() > 4 && f.first.substr(f.first.size() - 4) == ".chd") chd = true;
+        CHECK(chd, "the chord set is saved beside the project");
+    }
+    {   // chord sets: save, change, load
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        app.key(kNote);
+        for (int i = 0; i < 3; i++) app.jog(1); // key: Eb
+        app.key(kB2);
+        CHECK(app.screen() == Screen::Sets, "B2 opens the chord sets");
+        app.key(kB1); // save into slot 1
+        app.key(kB8);
+        CHECK(app.screen() == Screen::Chords, "Back returns to Chords");
+        app.jog(1); app.jog(1); // key moves on
+        CHECK(app.chordSettings().key == 5, "the key changed");
+        app.key(kB2);
+        app.key(kB2); // load slot 1
+        CHECK(app.chordSettings().key == 3, "loading the set brings the key back");
+        CHECK(hal.files.count("sets.cfg") == 1, "the sets are kept on the card");
     }
     {   // calibrating the input latency with a cable (simulated by the fake machine)
         FakeHal hal;

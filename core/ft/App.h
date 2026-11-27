@@ -43,7 +43,7 @@ enum Key
 
 enum class Screen : uint8_t
 {
-    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate
+    Main, Tempo, Editor, Glitch, Master, Input, Project, NameEntry, Settings, Export, Pads, Memory, Mixer, PadSample, Load, Resample, Device, Chords, Sound, SoundAdv, Calibrate, Sets
 };
 
 enum class Popup : uint8_t
@@ -181,7 +181,7 @@ class App
     void chordNote(int pad, int index, int note, int velocity, bool on);
     Chords chords;
     bool padsChords = false;      // the pads play chords and scale notes
-    int chField = 0;              // chords page 1: 0 key, 1 scale, 2 style, 3 chord rows, 4 notes, 5 octave, 6 sound; page 2: 0 to 3 row types, 4 to 9 colour chords
+    int chField = 0;              // chords page: 0 key, 1 scale, 2 style, 3 sound, 4 voicing, 5 octave
     int chSound = 0;              // 0 .. kSynthPresets - 1 the patches, then kSynthPresets: the pad sample
     // Sound page (Instr): a patch, eight tweak knobs on top, and every raw setting on the Advanced page
     // Input latency: how late line and mic recordings arrive, measured with a cable from the output to the line input
@@ -220,6 +220,26 @@ class App
     void soundHear(bool on);
     bool soundEdited() const;     // the raw settings differ from the patch
     void soundMark();             // something changed that is worth saving
+    // Chord sets: 8 slots on the card
+    void drawSets(class Pen& p);
+    void drawChordPad(class Pen& p, int pad, int px, int py, int pw, int ph);
+    void setsKey(int k);
+    void setsJog(int delta);
+    void setsFileRead();
+    void setsFileWrite();
+    void setsSummary(const uint8_t* blob, char* out, int size) const;
+    int setSel = 0;
+    int setLoaded = -1;
+    bool setUsed[8] = {};
+    char setNames[8][14] = {};
+    uint8_t setData[8][138] = {};
+    char lastChordName[16] = {};
+    int lastFamily = -1;
+    int packSet(uint8_t* b) const;
+    void unpackSet(const uint8_t* b);
+    void setsOpen();
+    void projectChordsWrite(const char* name);
+    void projectChordsRead(const char* name);
     void soundSave();
     void soundLoad();
     int sndPreset = 0;
@@ -259,8 +279,10 @@ class App
     uint32_t arpOffAt = 0;
     void releasePad(int p);
     void releaseLatched();
-    int chPage = 0;               // chords page: 0 harmony, 1 chord types
     bool chHold = false;          // the Hold pad: chords keep sounding until the next one
+    uint8_t heldMods = 0, latchedMods = 0; // modifiers held right now, and latched by a double tap
+    uint32_t modTapAt[kMods] = {};
+    void updateMods();
     bool latched[48] = {};
     uint8_t heldCount[48] = {};
     uint8_t heldNote[48][kMaxChordNotes] = {};

@@ -73,6 +73,7 @@ void App::buildPage()
         case Screen::Chords: drawChords(p); break;
         case Screen::Sound: drawSound(p); break;
         case Screen::Calibrate: drawCalibrate(p); break;
+        case Screen::Sets: drawSets(p); break;
         case Screen::SoundAdv: drawSoundAdv(p); break;
         case Screen::Load: drawLoad(p); break;
         case Screen::Resample: drawResample(p); break;
@@ -654,8 +655,8 @@ void App::drawDevice(Pen& p)
 {
     heading(p, model, "Device settings", 39);
     p.textRight(786, 42, "Saved on the device, for every project", F12, pal.dim);
-    static const char* const groups[8] = { "MIDI", "USB audio", "Line input", "Volume", "Display", "Four-Track", "Firmware", "About" };
-    for (int g = 0; g < 8; g++)
+    static const char* const groups[9] = { "MIDI", "USB audio", "Line input", "Volume", "Display", "Four-Track", "Chords", "Firmware", "About" };
+    for (int g = 0; g < 9; g++)
     {
         const int y = 64 + g * 34;
         if (g == dvGroup)
@@ -688,7 +689,7 @@ void App::drawDevice(Pen& p)
     fmt(title, sizeof title, "%s - %s", focusName, groups[dvGroup]);
     p.text(14, 387, title, F17B, pal.text);
     p.text(14, 411, focusHelp, F14, pal.text);
-    const char* l[8] = { dvGroup == 6 && fwCount > 0 ? "Update" : (dvGroup == 5 && dvRow == 4 ? "Calibrate" : ""), "", "", "", "", "", "", "Back" };
+    const char* l[8] = { dvGroup == 7 && fwCount > 0 ? "Update" : (dvGroup == 5 && dvRow == 4 ? "Calibrate" : ""), "", "", "", "", "", "", "Back" };
     p.buttons(l);
 }
 
@@ -1315,108 +1316,161 @@ void App::drawPopup(Pen& p)
 }
 //--------------------------------------------------------------------------------------------
 // C10 Chords (Note button)
+// The chord pad map as the design draws it: left hand columns 1 to 8, right hand 9 to 12
+static int slen(const char* s) { int n = 0; while (s[n] != 0) n++; return n; }
+static const int kPadX[12] = { 84, 141, 197, 254, 311, 367, 424, 481, 559, 616, 673, 729 };
+static const int kPadY[4] = { 136, 200, 274, 330 };
+static const int kPadH[4] = { 64, 64, 56, 56 };
+
+void App::drawChordPad(Pen& p, int pad, int px, int py, int pw, int ph)
+{
+    const PadInfo pi = Chords::info(pad);
+    const bool held = heldCount[pad] != 0;
+    char name[24], out[8];
+    chords.label(pad, name, sizeof name);
+    const int len = slen(name);
+    uint32_t fill = pal.panel, ink = pal.text;
+    int font = F17B;
+    bool stroke = false;
+    uint32_t strokeColour = pal.dim;
+    switch (pi.role)
+    {
+        case Role::Chord:
+        {
+            const uint32_t fam = pal.t[(int)chords.family(pad)];
+            font = len >= 5 ? F14B : F17B;
+            stroke = true;
+            strokeColour = fam;
+            if (held) { fill = fam; ink = pal.bg; stroke = false; }
+            break;
+        }
+        case Role::Note:
+        {
+            const bool tone = chords.isChordTone(pad);
+            font = tone ? F17B : F17;
+            ink = tone ? pal.text : pal.dim;
+            stroke = tone;
+            strokeColour = lastFamily >= 0 ? pal.t[lastFamily] : pal.dim;
+            if (held) { fill = pal.text; ink = pal.bg; stroke = false; }
+            break;
+        }
+        case Role::Mod:
+        {
+            const bool latched = (latchedMods >> pi.index) & 1;
+            const bool on = ((chords.mods >> pi.index) & 1) != 0;
+            font = on ? F17B : F17;
+            if (on) { fill = pal.sel; ink = latched ? pal.marker : pal.text; }
+            break;
+        }
+        case Role::Style:
+            font = chords.styleChosen(pi.index) ? F14B : F14;
+            if (len > 6) font = F12;
+            if (chords.styleChosen(pi.index)) { fill = pal.sel; ink = pal.marker; }
+            break;
+        case Role::Hold:
+            font = F14;
+            if (chHold) { fill = pal.marker; ink = pal.bg; font = F14B; }
+            break;
+        default:
+            font = held ? F14B : F14;
+            if (held) fill = pal.sel;
+            break;
+    }
+    p.card(px, py, pw, ph, fill);
+    int ty = py + ph / 2 - 9;
+    if (stroke) ty = py + ph / 2 - 12;
+    p.textMid(px, pw, ty, name, font, ink);
+    if (pi.role == Role::Chord)
+    {
+        chords.outsideName(pad, out, sizeof out);
+        if (out[0] != 0) p.textMid(px, pw, py + ph - 20, out, F12, pal.dim);
+        else if (stroke) p.rect(px + pw / 2 - 11, py + ph - 14, 22, 4, strokeColour);
+    }
+    else if (stroke) p.rect(px + pw / 2 - 11, py + ph - 12, 22, 4, strokeColour);
+}
+
 void App::drawChords(Pen& p)
 {
-    heading(p, model, "Chords");
+    p.topBar(model);
     const ChordCfg& c = chords.cfg;
-    char b[24];
-    p.textRight(786, 44, chPage == 0 ? "Page 1 of 3: harmony" : chPage == 1 ? "Page 2 of 3: chord types" : "Page 3 of 3: feel", F12, pal.dim);
-    int gy = 140, gstep = 64, gh = 62;
-    if (chPage == 0)
+    char v[6][24];
+    fmt(v[0], 24, "%s", Chords::keyName(c.key));
+    fmt(v[1], 24, "%s", Chords::scaleName(c.scale));
+    fmt(v[2], 24, "%s", Chords::styleName(c.style));
+    fmt(v[3], 24, "%s%s", chSound < kSynthPresets ? synthPreset(chSound).name : "Sample", chSound < kSynthPresets && (sndMacros.any() || soundEdited()) ? " *" : "");
+    fmt(v[4], 24, "%s", Chords::voicingName((int)c.voicing));
+    fmt(v[5], 24, "%s%d", c.octave > 0 ? "+" : "", c.octave);
+    static const char* const names[6] = { "Key", "Scale", "Style", "Sound", "Voicing", "Octave" };
+    static const int widths[6] = { 64, 150, 112, 150, 112, 76 };
+    int x = 14;
+    for (int i = 0; i < 6; i++)
     {
-        char v[7][24];
-        fmt(v[0], 24, "%s", Chords::keyName(c.key));
-        fmt(v[1], 24, "%s", Chords::scaleName(c.scale));
-        if (c.shuffle != 0) fmt(v[2], 24, "%s %u", Chords::styleName(c.style), (unsigned)c.shuffle);
-        else fmt(v[2], 24, "%s", Chords::styleName(c.style));
-        fmt(v[3], 24, "%d chords, %d notes", c.chordRows, 4 - c.chordRows);
-        fmt(v[4], 24, "%s", c.noteMode == NoteMode::Scale ? "Scale" : c.noteMode == NoteMode::Chord ? "Chord" : "Follow");
-        fmt(v[5], 24, "%s%d", c.octave > 0 ? "+" : "", c.octave);
-        fmt(v[6], 24, "%s%s", chSound < kSynthPresets ? synthPreset(chSound).name : "Sample", chSound < kSynthPresets && (sndMacros.any() || soundEdited()) ? " *" : "");
-        static const char* const names[7] = { "Key", "Scale", "Style", "Rows", "Note pads", "Octave", "Sound" };
-        static const int widths[7] = { 60, 140, 112, 152, 88, 70, 128 };
-        int x = 14;
-        for (int i = 0; i < 7; i++)
-        {
-            p.cell(x, 64, widths[i], 60, i == chField, pal.panel);
-            p.text(x + 10, 72, names[i], F12, pal.dim);
-            p.text(x + 10, 92, v[i], F17B, pal.text);
-            x += widths[i] + 4;
-        }
+        p.cell(x, 40, widths[i], 46, i == chField, pal.panel);
+        p.text(x + 10, 45, names[i], F12, pal.dim);
+        p.text(x + 10, 61, v[i], F17B, pal.text);
+        x += widths[i] + 6;
     }
-    else if (chPage == 2)
+    // what is sounding, in a sentence
+    char b[100];
+    if (lastChordName[0] != 0 && lastFamily >= 0)
     {
-        char v[8][24];
-        fmt(v[0], 24, "%s", Chords::playStyleName(c.playStyle));
-        fmt(v[1], 24, "%d%%", c.humanise);
-        fmt(v[2], 24, "%d ms", c.strumMs);
-        fmt(v[3], 24, "%s", Chords::arpRateName(c.arpRate));
-        fmt(v[4], 24, "%d oct", c.arpRange);
-        fmt(v[5], 24, "%d%%", c.gate);
-        fmt(v[6], 24, "%s", c.padVelocity ? "From the pads" : "Fixed");
-        fmt(v[7], 24, "%s%d dB", synthDb10 < 0 ? "-" : "+", (synthDb10 < 0 ? -synthDb10 : synthDb10) / 10);
-        static const char* const names[8] = { "Play style", "Humanise", "Strum speed", "Arp rate", "Arp range", "Arp gate", "Velocity", "Synth level" };
-        for (int i = 0; i < 8; i++)
-        {
-            const int x = 14 + (i % 4) * 193, y = i < 4 ? 62 : 120;
-            p.cell(x, y, 189, 52, i == chField, pal.panel);
-            p.text(x + 10, y + 6, names[i], F12, pal.dim);
-            p.text(x + 10, y + 24, v[i], F17B, pal.text);
-        }
-        gy = 182; gstep = 52; gh = 50;
+        const char* tonic = Chords::keyName(c.key);
+        if (lastFamily == 2) fmt(b, sizeof b, "%s is a Tension chord: it wants to go home to %s.", lastChordName, tonic);
+        else if (lastFamily == 1) fmt(b, sizeof b, "%s is an Away chord: it moves away from home (%s).", lastChordName, tonic);
+        else fmt(b, sizeof b, "%s is a Home chord: it sits in %s.", lastChordName, tonic);
     }
-    else
-    {
-        // the type of each chord row, and the three colour chords
-        for (int i = 0; i < 4; i++)
-        {
-            const int x = 14 + i * 154;
-            p.cell(x, 62, 150, 52, i == chField, pal.panel);
-            fmt(b, sizeof b, "Row %d%s", i + 1, i < c.chordRows ? "" : " (off)");
-            p.text(x + 10, 68, b, F12, pal.dim);
-            p.text(x + 10, 86, Chords::typeName(c.rowType[i]), F17B, i < c.chordRows ? pal.text : pal.dim);
-        }
-        for (int i = 0; i < kColourChords * 2; i++)
-        {
-            const int x = 14 + i * 128, ci = i / 2;
-            p.cell(x, 120, 124, 52, 4 + i == chField, pal.panel);
-            fmt(b, sizeof b, "Colour %d %s", ci + 1, i % 2 == 0 ? "root" : "kind");
-            p.text(x + 10, 126, b, F12, pal.dim);
-            if (i % 2 == 0) fmt(b, sizeof b, "%s", Chords::keyName(c.key + c.colSemi[ci]));
-            else fmt(b, sizeof b, "%s", Chords::kindName(c.colKind[ci]));
-            p.text(x + 10, 144, b, F17B, pal.text);
-        }
-        gy = 182; gstep = 52; gh = 50;
-    }
-    // the 48 pads as they are laid out on the Tracker
+    else fmt(b, sizeof b, "Colours: Home, Away and Tension chords. Hold a modifier on the right to change every chord.");
+    p.text(14, 96, b, F14, pal.dim);
+    // the numerals over the chord columns, in the chord family colours
+    static const char* const roman[8] = { "I", "ii", "iii", "IV", "V", "vi", "vii", "I" };
+    static const int famOf[7] = { 0, 1, 0, 1, 2, 0, 2 };
+    for (int col = 0; col < 8; col++) p.textMid(kPadX[col], 57, 122, roman[col], F12, pal.t[famOf[col % 7]]);
+    static const char* const rowName[4] = { "7ths", "Triads", "Notes", "Notes" };
+    for (int r = 0; r < 4; r++) p.text(14, kPadY[r] + kPadH[r] / 2 - 6, rowName[r], F12, pal.dim);
     for (int pad = 0; pad < 48; pad++)
     {
-        const int px = 16 + (pad % 12) * 64, py = gy + (pad / 12) * gstep;
-        const Perf perf = Chords::perfOf(pad);
-        const bool held = heldCount[pad] != 0 || (perf == Perf::Hold && chHold);
-        const Tier t = chords.tier(pad);
-        uint32_t fill = pal.panel;
-        uint32_t ink = pal.text;
-        if (t == Tier::Tonic) fill = pal.sel;
-        else if (t == Tier::Colour) fill = pal.cell;
-        else if (t == Tier::ChordTone) fill = pal.sel;
-        else if (t == Tier::Control) fill = pal.cell;
-        if (t == Tier::Outside || t == Tier::Off) ink = pal.dim;
-        if (held) { fill = pal.text; ink = pal.bg; }
-        p.card(px, py, 62, gh, fill);
-        if (!held && t == Tier::Tonic) p.rect(px, py, 62, 3, pal.marker);
-        if (!held && t == Tier::ChordTone) p.rect(px, py + gh - 3, 62, 3, pal.meter);
-        if (!held && t == Tier::Colour) p.rect(px, py, 62, 3, pal.dim);
-        if (!held && t == Tier::Control) p.rect(px, py, 3, gh, pal.meter);
-        chords.label(pad, b, sizeof b);
-        p.textMid(px, 62, py + gh / 2 - 8, b, b[0] != 0 && p.width(b, F17B) <= 58 ? F17B : F12, ink);
+        const int col = pad % 12, row = pad / 12;
+        drawChordPad(p, pad, kPadX[col], kPadY[row], 57, kPadH[row] - 4);
     }
-    if (chPage == 0)
-        p.text(14, 412, c.chordRows == 0 ? "All left pads play scale notes. The right two columns are performance pads." : "Left: chords by type, then scale notes. Right: Oct, Invert, Open, Sus, 7th (hold), Hold (latch).", F14, pal.text);
-    else
-        p.text(14, 412, chPage == 1 ? "Dim chords are outside the key. Jog changes the selected setting." : "The Style pad (bottom right) steps the play style. Humanise loosens velocity and timing.", F14, pal.text);
-    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Shuffle", "Reset", "Sound", "", "", chPage == 0 ? "Page 2" : chPage == 1 ? "Page 3" : "Page 1", "Back" };
+    p.rect(534, 136, 1, 250, pal.frame);
+    p.text(14, 412, "Hold a modifier on the right (double-tap to latch). Shift + jog: arp rate or strum speed.", F14, pal.text);
+    const char* l[8] = { padsChords ? "Pads: on" : "Pads: off", "Sets", "Reset", "Sound", "", "", "", "Back" };
     p.buttons(l, padsChords ? 1 : 0);
+}
+
+void App::drawSets(Pen& p)
+{
+    heading(p, model, "Chord sets");
+    for (int i = 0; i < 8; i++)
+    {
+        const int y = 66 + i * 41;
+        const bool focus = i == setSel;
+        p.rect(14, y, 372, 38, focus ? pal.sel : pal.panel);
+        if (focus) p.rect(14, y, 372, 2, pal.text);
+        char b[48];
+        fmt(b, sizeof b, "%d", i + 1);
+        p.text(24, y + 10, b, F14B, setLoaded == i ? pal.marker : pal.text);
+        if (setUsed[i])
+        {
+            p.text(54, y + 5, setNames[i], F14B, setLoaded == i ? pal.marker : pal.text);
+            char sm[64];
+            setsSummary(setData[i], sm, sizeof sm);
+            p.text(54, y + 22, sm, F12, pal.dim);
+        }
+        else p.text(54, y + 10, "Empty", F14, pal.dim);
+    }
+    p.text(414, 70, "Save stores", F12, pal.dim);
+    char cur[64];
+    uint8_t blob[138];
+    packSet(blob);
+    setsSummary(blob, cur, sizeof cur);
+    p.text(414, 90, cur, F14B, pal.text);
+    p.text(414, 120, "Key, scale, style, sound with its tweaks,", F14, pal.dim);
+    p.text(414, 140, "voicing, octave, latched modifiers and play style.", F14, pal.dim);
+    p.text(414, 170, "Recorded Parts are not stored.", F14, pal.dim);
+    p.text(14, 412, "Jog or Up and Down choose a slot. B1 saves the pads' settings there, B2 loads it.", F14, pal.text);
+    const char* l[8] = { "Save", "Load", "Name", "", "", "Clear", "", "Back" };
+    p.buttons(l, 0, -1, (uint8_t)(setUsed[setSel] ? 0 : ((1u << 1) | (1u << 2) | (1u << 5))));
 }
 
 //--------------------------------------------------------------------------------------------

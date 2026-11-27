@@ -18,7 +18,7 @@ const Shape kShapes[qCount] = {
     { "maj7", 4, { 0, 4, 7, 11 } },   { "dim7", 4, { 0, 3, 6, 9 } },    { "sus4", 3, { 0, 5, 7 } },
     { "sus2", 3, { 0, 2, 7 } },       { "9", 5, { 0, 4, 7, 10, 14 } },  { "maj9", 5, { 0, 4, 7, 11, 14 } },
     { "m9", 5, { 0, 3, 7, 10, 14 } }, { "6", 4, { 0, 4, 7, 9 } },       { "m6", 4, { 0, 3, 7, 9 } },
-    { "mMaj7", 4, { 0, 3, 7, 11 } },  { "7sus4", 4, { 0, 5, 7, 10 } }, { "9sus4", 5, { 0, 5, 7, 10, 14 } },
+    { "mM7", 4, { 0, 3, 7, 11 } },  { "7sus4", 4, { 0, 5, 7, 10 } }, { "9sus4", 5, { 0, 5, 7, 10, 14 } },
     { "m7b5", 4, { 0, 3, 6, 10 } }
 };
 
@@ -34,34 +34,21 @@ const ScaleDef kScales[kScaleCount] = {
 
 const char* const kKeys[12] = { "C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B" };
 
-// Colour chord kinds: the triad and the seventh they come with
-struct KindDef { const char* name; uint8_t third, fifth, seventh; };
-const KindDef kKinds[kColourKinds] = {
-    { "7", 4, 7, 10 }, { "maj7", 4, 7, 11 }, { "m7", 3, 7, 10 }, { "dim", 3, 6, 9 }
-};
+const char* const kSharpKeys[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
 
-// Styles: three colour chords each (semitones above the tonic, kind), and which of 7th and 9th the
-// second chord row starts as (0: 7ths, 1: 9ths).
-struct Col { uint8_t semi, kind; };
-struct StyleDef { const char* name; uint8_t rich; Col c[kColourChords]; };
+// Styles: feel presets
+struct StyleDef { const char* name; Voicing voicing; uint8_t humanise, strumMs, arpRate, arpRange, gate; bool nineths; };
 const StyleDef kStyles[kStyleCount] = {
-    { "Lo-fi", 1, { { 1, 1 }, { 3, 1 }, { 5, 2 } } },
-    { "Pop", 0, { { 4, 0 }, { 10, 0 }, { 5, 2 } } },
-    { "Jazz-ish", 1, { { 2, 0 }, { 9, 0 }, { 1, 0 } } },
-    { "Synthwave", 0, { { 8, 1 }, { 10, 0 }, { 3, 1 } } },
-    { "Soul", 0, { { 10, 0 }, { 5, 2 }, { 3, 1 } } }
+    { "Lo-fi", Voicing::Open, 30, 40, 1, 1, 90, true },
+    { "Pop", Voicing::Close, 0, 28, 3, 1, 80, false },
+    { "Jazz-ish", Voicing::Drop2, 25, 35, 1, 2, 85, true },
+    { "Synthwave", Voicing::Open, 0, 22, 3, 2, 70, false },
+    { "Soul", Voicing::Close, 20, 45, 1, 1, 85, false }
 };
 
-// What Shuffle picks the three colour chords from
-const Col kPool[10] = {
-    { 1, 1 }, { 2, 0 }, { 3, 1 }, { 4, 0 }, { 5, 2}, { 6, 3 }, { 8, 1 }, { 9, 0 }, { 10, 0 }, { 11, 3 }
-};
-
-struct TypeDef { const char* name; const char* suffix; };
-const TypeDef kTypes[kChordTypes] = {
-    { "Triad", "" }, { "6th", "6" }, { "7th", "7" }, { "Maj7", "maj7" }, { "9th", "9" }, { "Add9", "add9" },
-    { "Add4", "add4" }, { "Sus2", "sus2" }, { "Sus4", "sus4" }, { "6/9", "6/9" }, { "7sus4", "7sus4" }, { "Power", "5" }
-};
+const char* const kModNames[kMods] = { "sus2", "sus4", "6", "7", "maj7", "add9", "9", "flip" };
+const char* const kStyleNames[kPlayStyles] = { "Block", "Strum dn", "Strum up", "Arp up", "Arp dn", "Arp u/d", "Arp rnd" };
+const char* const kVoicingNames[kVoicings] = { "Close", "Open", "Drop 2" };
 
 int findShape(const uint8_t* iv, int n)
 {
@@ -75,64 +62,26 @@ int findShape(const uint8_t* iv, int n)
     return 255;
 }
 
+
 void sortAscending(uint8_t* a, int n)
 {
     for (int i = 1; i < n; i++)
         for (int j = i; j > 0 && a[j] < a[j - 1]; j--) { const uint8_t t = a[j]; a[j] = a[j - 1]; a[j - 1] = t; }
+}
+
+void sortAscending(int8_t* a, int n)
+{
+    for (int i = 1; i < n; i++)
+        for (int j = i; j > 0 && a[j] < a[j - 1]; j--) { const int8_t t = a[j]; a[j] = a[j - 1]; a[j - 1] = t; }
 }
 } // namespace
 
 const char* Chords::scaleName(int s) { return kScales[s < 0 || s >= kScaleCount ? 0 : s].name; }
 const char* Chords::styleName(int s) { return kStyles[s < 0 || s >= kStyleCount ? 0 : s].name; }
 const char* Chords::keyName(int k) { return kKeys[((k % 12) + 12) % 12]; }
-const char* Chords::typeName(int t) { return kTypes[t < 0 || t >= kChordTypes ? 0 : t].name; }
-const char* Chords::kindName(int k) { return kKinds[k < 0 || k >= kColourKinds ? 0 : k].name; }
-
-const char* Chords::perfName(Perf p)
-{
-    switch (p)
-    {
-        case Perf::OctUp: return "Oct +";
-        case Perf::OctDown: return "Oct -";
-        case Perf::Inversion: return "Invert";
-        case Perf::Open: return "Open";
-        case Perf::Sus: return "Sus";
-        case Perf::Seventh: return "7th";
-        case Perf::Hold: return "Hold";
-        case Perf::Style: return "Style";
-        default: return "";
-    }
-}
-
-// Column 10: octave up, inversion, sus, hold. Column 11: octave down, open, 7th, spare.
-Perf Chords::perfOf(int pad)
-{
-    if (!isPerf(pad)) return Perf::None;
-    static const Perf map[4][2] = {
-        { Perf::OctUp, Perf::OctDown }, { Perf::Inversion, Perf::Open }, { Perf::Sus, Perf::Seventh }, { Perf::Hold, Perf::Style }
-    };
-    return map[pad / 12][pad % 12 - kPlayColumns];
-}
-
-uint8_t Chords::modFor(Perf p)
-{
-    switch (p)
-    {
-        case Perf::OctUp: return ModOctUp;
-        case Perf::OctDown: return ModOctDown;
-        case Perf::Inversion: return ModInversion;
-        case Perf::Open: return ModOpen;
-        case Perf::Sus: return ModSus;
-        case Perf::Seventh: return ModSeventh;
-        default: return 0;
-    }
-}
-
-const char* Chords::playStyleName(int s)
-{
-    static const char* const n[kPlayStyles] = { "Block", "Strum D", "Strum U", "Arp Up", "Arp Dn", "Arp U/D", "Arp Rnd" };
-    return n[s < 0 || s >= kPlayStyles ? 0 : s];
-}
+const char* Chords::voicingName(int v) { return kVoicingNames[v < 0 || v >= kVoicings ? 0 : v]; }
+const char* Chords::modName(int m) { return kModNames[m < 0 || m >= kMods ? 0 : m]; }
+const char* Chords::playStyleName(int s) { return kStyleNames[s < 0 || s >= kPlayStyles ? 0 : s]; }
 
 const char* Chords::arpRateName(int r)
 {
@@ -171,50 +120,37 @@ int Chords::arpSequence(const uint8_t* chord, int count, int style, int range, u
     return m;
 }
 
+uint8_t Chords::groupOf(uint8_t bit)
+{
+    if (bit == ModSus2 || bit == ModSus4) return ModSus2 | ModSus4;
+    if (bit == ModSix || bit == ModSeven || bit == ModMaj7) return ModSix | ModSeven | ModMaj7;
+    if (bit == ModAdd9 || bit == ModNine) return ModAdd9 | ModNine;
+    return ModFlip;
+}
+
 void Chords::init()
 {
     cfg = ChordCfg();
     mods = 0;
     lastCount = 0;
-    lastHas = false;
-    for (int i = 0; i < 12; i++) lastPc[i] = 0;
+    lastPcMask = 0;
+    lastFamily = Family::Home;
     for (int i = 0; i < kMaxChordNotes; i++) lastNotes[i] = 0;
     applyStyle();
     rebuild();
 }
 
-void Chords::applyStyle(bool rows)
+void Chords::applyStyle()
 {
     if (cfg.style >= kStyleCount) cfg.style = 0;
     const StyleDef& st = kStyles[cfg.style];
-    if (rows)
-    {
-        cfg.rowType[0] = (uint8_t)ChordType::Triad;
-        cfg.rowType[1] = (uint8_t)(st.rich ? ChordType::Ninth : ChordType::Seventh);
-        cfg.rowType[2] = (uint8_t)(st.rich ? ChordType::Seventh : ChordType::Ninth);
-        cfg.rowType[3] = (uint8_t)ChordType::Sus4;
-    }
-    if (cfg.shuffle == 0)
-    {
-        for (int i = 0; i < kColourChords; i++) { cfg.colSemi[i] = st.c[i].semi; cfg.colKind[i] = st.c[i].kind; }
-        return;
-    }
-    // a seeded shuffle of the pool: pick three, keep them in order of pitch
-    uint8_t order[10];
-    for (int i = 0; i < 10; i++) order[i] = (uint8_t)i;
-    uint32_t s = 2463534242u ^ ((uint32_t)cfg.shuffle * 2654435761u) ^ ((uint32_t)cfg.style << 20);
-    for (int i = 9; i > 0; i--)
-    {
-        s ^= s << 13; s ^= s >> 17; s ^= s << 5;
-        const int j = (int)(s % (uint32_t)(i + 1));
-        const uint8_t t = order[i]; order[i] = order[j]; order[j] = t;
-    }
-    uint8_t pick[kColourChords];
-    for (int i = 0; i < kColourChords; i++) pick[i] = order[i];
-    for (int i = 1; i < kColourChords; i++)
-        for (int j = i; j > 0 && kPool[pick[j]].semi < kPool[pick[j - 1]].semi; j--)
-        { const uint8_t t = pick[j]; pick[j] = pick[j - 1]; pick[j - 1] = t; }
-    for (int i = 0; i < kColourChords; i++) { cfg.colSemi[i] = kPool[pick[i]].semi; cfg.colKind[i] = kPool[pick[i]].kind; }
+    cfg.voicing = st.voicing;
+    cfg.humanise = st.humanise;
+    cfg.strumMs = st.strumMs;
+    cfg.arpRate = st.arpRate;
+    cfg.arpRange = st.arpRange;
+    cfg.gate = st.gate;
+    cfg.nineths = st.nineths;
 }
 
 void Chords::rebuild()
@@ -222,10 +158,9 @@ void Chords::rebuild()
     if (cfg.scale >= kScaleCount) cfg.scale = 0;
     if (cfg.style >= kStyleCount) cfg.style = 0;
     if (cfg.key >= 12) cfg.key = 0;
-    if (cfg.chordRows > 4) cfg.chordRows = 4;
     if (cfg.octave < -2) cfg.octave = -2;
     if (cfg.octave > 2) cfg.octave = 2;
-    for (int i = 0; i < 4; i++) if (cfg.rowType[i] >= kChordTypes) cfg.rowType[i] = 0;
+    if ((int)cfg.voicing >= kVoicings) cfg.voicing = Voicing::Close;
     if (cfg.playStyle >= kPlayStyles) cfg.playStyle = 0;
     if (cfg.humanise > 100) cfg.humanise = 100;
     if (cfg.strumMs < 10) cfg.strumMs = 10;
@@ -236,224 +171,237 @@ void Chords::rebuild()
     if (cfg.gate < 10) cfg.gate = 10;
     if (cfg.gate > 100) cfg.gate = 100;
     if (cfg.padVelocity > 1) cfg.padVelocity = 0;
-    for (int i = 0; i < kColourChords; i++)
-    {
-        if (cfg.colSemi[i] < 1 || cfg.colSemi[i] > 11) cfg.colSemi[i] = 1;
-        if (cfg.colKind[i] >= kColourKinds) cfg.colKind[i] = 0;
-    }
-    // the chord the notes follow starts as the tonic chord
-    const uint8_t saved = mods;
-    mods = 0;
-    uint8_t tmp[kMaxChordNotes];
-    const int n = degreeChord(0, 0, tmp);
-    mods = saved;
-    lastCount = n;
-    for (int i = 0; i < n; i++) lastNotes[i] = tmp[i];
-    for (int i = 0; i < 12; i++) lastPc[i] = 0;
-    for (int i = 0; i < n; i++) lastPc[tmp[i] % 12] = 1;
-    lastHas = true;
 }
 
-Chords::Chord Chords::makeChord(int rootPc, const Tones& tn, int type) const
+PadInfo Chords::info(int pad)
 {
+    PadInfo p;
+    if (pad < 0 || pad >= 48) return p;
+    const int row = pad / 12, col = pad % 12;
+    p.row = (uint8_t)row;
+    if (col < kLeftColumns)
+    {
+        p.role = row < 2 ? Role::Chord : Role::Note;
+        p.index = (uint8_t)col;
+        return p;
+    }
+    const int rc = col - kLeftColumns; // 0 to 3 across the right hand
+    if (row < 2) { p.role = Role::Mod; p.index = (uint8_t)(row * 4 + rc); }
+    else if (row == 2) { p.role = Role::Style; p.index = (uint8_t)rc; }
+    else if (rc == 0) { p.role = Role::Style; p.index = 4; }
+    else if (rc == 1) p.role = Role::OctDown;
+    else if (rc == 2) p.role = Role::OctUp;
+    else p.role = Role::Hold;
+    return p;
+}
+
+uint16_t Chords::scaleMask() const
+{
+    uint16_t m = 0;
+    for (int i = 0; i < 7; i++) m |= (uint16_t)(1u << ((cfg.key + kScales[cfg.scale].semi[i]) % 12));
+    return m;
+}
+
+int Chords::tonicNote() const { return 48 + cfg.key + 12 * cfg.octave; }
+
+int Chords::scaleNoteAt(int index) const
+{
+    const int note = tonicNote() + 12 * (index / 7) + kScales[cfg.scale].semi[index % 7];
+    return note >= 0 && note <= 127 ? note : 0;
+}
+
+Chords::Chord Chords::build(int col, int row) const
+{
+    const int d = col % 7; // the eighth column is the first chord again
+    const uint8_t* sc = kScales[cfg.scale].semi;
+    const int rootSemi = sc[d];
+    auto up = [&](int step) { return (int)((sc[(d + step) % 7] - rootSemi + 12) % 12); };
+    const int third = up(2), fifth = up(4), seventh = up(6), ninth = up(1);
     Chord c;
-    c.root = (uint8_t)rootPc;
-    c.type = (uint8_t)type;
-    c.third = (uint8_t)tn.t;
-    c.fifth = (uint8_t)tn.f;
-    c.tones = tn;
+    c.root = (uint8_t)((cfg.key + rootSemi) % 12);
     for (int i = 0; i < kMaxChordNotes; i++) c.offset[i] = 0;
-    uint8_t iv[kMaxChordNotes];
+    // the row's own colour: row 1 sevenths (or 9ths), row 2 triads; a held 6, 7, maj7, add9 or 9 changes both rows
+    const bool topRow = row == 0;
+    int8_t iv[kMaxChordNotes + 2];
     int n = 0;
     iv[n++] = 0;
-    const int t = tn.t, f = tn.f;
-    switch ((ChordType)type)
+    iv[n++] = (int8_t)((mods & ModSus2) && !(mods & ModSus4) ? 2 : (mods & ModSus4) ? 5 : third);
+    iv[n++] = (int8_t)fifth;
+    const bool groupB = (mods & (ModSix | ModSeven | ModMaj7)) != 0;
+    const bool groupC = (mods & (ModAdd9 | ModNine)) != 0;
+    bool wantSeventh = false;
+    int seventhValue = seventh;
+    if (mods & ModSix) { iv[n++] = 9; }
+    else if (mods & ModMaj7) { wantSeventh = true; seventhValue = 11; }
+    else if (mods & ModSeven) wantSeventh = true;
+    else if (!groupB && topRow && !groupC) wantSeventh = true; // the top row is sevenths
+    if ((mods & ModNine) && !(mods & ModSix) && !(mods & ModMaj7)) wantSeventh = true;
+    if (wantSeventh) iv[n++] = (int8_t)seventhValue;
+    const bool style9 = !groupB && !groupC && topRow && cfg.nineths;
+    if ((mods & (ModAdd9 | ModNine)) || style9)
     {
-        case ChordType::Triad: iv[n++] = (uint8_t)t; iv[n++] = (uint8_t)f; break;
-        case ChordType::Sixth: iv[n++] = (uint8_t)t; iv[n++] = (uint8_t)f; iv[n++] = 9; break;
-        case ChordType::Seventh: iv[n++] = (uint8_t)t; iv[n++] = (uint8_t)f; iv[n++] = (uint8_t)tn.s; break;
-        case ChordType::MajSeventh: iv[n++] = (uint8_t)t; iv[n++] = (uint8_t)f; iv[n++] = 11; break;
-        case ChordType::Ninth:
-            iv[n++] = (uint8_t)t; iv[n++] = (uint8_t)f; iv[n++] = (uint8_t)tn.s;
-            if (tn.n == 2) iv[n++] = 14; // a flat 9th clashes: leave it out
-            break;
-        case ChordType::Add9: iv[n++] = (uint8_t)t; iv[n++] = (uint8_t)f; iv[n++] = 14; break;
-        case ChordType::Add4: iv[n++] = (uint8_t)t; iv[n++] = (uint8_t)f; iv[n++] = 17; break;
-        case ChordType::Sus2: iv[n++] = 2; iv[n++] = 7; break;
-        case ChordType::Sus4: iv[n++] = 5; iv[n++] = 7; break;
-        case ChordType::SixNine: iv[n++] = (uint8_t)t; iv[n++] = (uint8_t)f; iv[n++] = 9; iv[n++] = 14; break;
-        case ChordType::SevenSus4: iv[n++] = 5; iv[n++] = 7; iv[n++] = 10; break;
-        case ChordType::Power: iv[n++] = 7; iv[n++] = 12; break;
+        // the ninth is the scale's own second step, a major ninth, and left out when it would be flat
+        if (ninth == 2) iv[n++] = 14;
+        else if (mods & ModAdd9) iv[n++] = 14; // asked for explicitly
     }
+    // order ascending
+    sortAscending(iv, n);
+    // flip: the lowest note goes up an octave
+    if ((mods & ModFlip) && n > 1) { iv[0] = (int8_t)(iv[0] + 12); sortAscending(iv, n); }
+    // voicing
+    if (cfg.voicing == Voicing::Open && n > 2) { iv[1] = (int8_t)(iv[1] + 12); sortAscending(iv, n); }
+    else if (cfg.voicing == Voicing::Drop2 && n > 3)
+    {
+        // the second note from the top drops an octave and becomes the lowest
+        iv[n - 2] = (int8_t)(iv[n - 2] - 12);
+        sortAscending(iv, n);
+    }
+    if (n > kMaxChordNotes) n = kMaxChordNotes;
     c.count = (uint8_t)n;
     for (int i = 0; i < n; i++) c.offset[i] = iv[i];
-    c.quality = (uint8_t)findShape(iv, n);
+    // the name uses the notes as stacked from the root (before flip and voicing move them)
+    uint8_t nm[kMaxChordNotes + 2];
+    int nn = 0;
+    nm[nn++] = 0;
+    nm[nn++] = (uint8_t)((mods & ModSus2) && !(mods & ModSus4) ? 2 : (mods & ModSus4) ? 5 : third);
+    nm[nn++] = (uint8_t)fifth;
+    if (mods & ModSix) nm[nn++] = 9;
+    else if (wantSeventh) nm[nn++] = (uint8_t)seventhValue;
+    if (((mods & (ModAdd9 | ModNine)) || style9) && (ninth == 2 || (mods & ModAdd9))) nm[nn++] = 14;
+    sortAscending(nm, nn);
+    c.quality = (uint8_t)findShape(nm, nn);
     return c;
 }
 
-Chords::Chord Chords::columnChord(int col, int type) const
+void Chords::place(const Chord& c, uint8_t* out, int& n) const
 {
-    Tones tn;
-    int rootSemi;
-    if (col < 7)
-    {
-        const uint8_t* sc = kScales[cfg.scale].semi;
-        rootSemi = sc[col];
-        auto up = [&](int step) { return (int)((sc[(col + step) % 7] - rootSemi + 12) % 12); };
-        tn = Tones{ up(2), up(4), up(6), up(1) };
-    }
-    else
-    {
-        const int i = col - 7 < kColourChords ? col - 7 : kColourChords - 1;
-        const KindDef& k = kKinds[cfg.colKind[i]];
-        rootSemi = cfg.colSemi[i];
-        tn = Tones{ k.third, k.fifth, k.seventh, 2 };
-    }
-    return makeChord((cfg.key + rootSemi) % 12, tn, type);
-}
-
-int Chords::degreeChord(int col, int type, uint8_t* out) const
-{
-    int n = 0;
-    placeChord(columnChord(col, type), true, out, n);
-    return n;
-}
-
-int Chords::octaveShift() const
-{
-    return 12 * cfg.octave + ((mods & ModOctUp) ? 12 : 0) - ((mods & ModOctDown) ? 12 : 0);
-}
-
-void Chords::placeChord(const Chord& c, bool withMods, uint8_t* out, int& n) const
-{
-    uint8_t off[kMaxChordNotes + 1];
-    int count = c.count;
-    for (int i = 0; i < count; i++) off[i] = c.offset[i];
-    if (withMods)
-    {
-        const ChordType t = (ChordType)c.type;
-        const bool hasThird = t != ChordType::Sus2 && t != ChordType::Sus4 && t != ChordType::SevenSus4 && t != ChordType::Power;
-        if ((mods & ModSus) && hasThird) off[1] = (uint8_t)(c.third == 3 ? 2 : 5);
-        if ((mods & ModSeventh) && (t == ChordType::Triad || t == ChordType::Add9 || t == ChordType::Add4 || t == ChordType::Sus2 || t == ChordType::Sus4) && count < kMaxChordNotes)
-        {
-            off[count++] = (uint8_t)c.tones.s;
-            sortAscending(off, count);
-        }
-        if ((mods & ModInversion) && count > 1)
-        {
-            off[0] = (uint8_t)(off[0] + 12);
-            sortAscending(off, count);
-        }
-        if ((mods & ModOpen) && count > 2)
-        {
-            off[1] = (uint8_t)(off[1] + 12);
-            sortAscending(off, count);
-        }
-    }
-    const int pc = c.root;
-    const int base = 48 + (withMods ? octaveShift() : 12 * cfg.octave) + (pc >= 6 ? pc - 12 : pc);
+    const int base = 48 + c.root + 12 * cfg.octave;
     n = 0;
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < c.count; i++)
     {
-        const int note = base + off[i];
+        const int note = base + c.offset[i];
         if (note >= 0 && note <= 127) out[n++] = (uint8_t)note;
     }
 }
 
-bool Chords::inKey(const Chord& c) const
-{
-    uint16_t scaleMask = 0;
-    for (int i = 0; i < 7; i++) scaleMask |= (uint16_t)(1u << ((cfg.key + kScales[cfg.scale].semi[i]) % 12));
-    for (int i = 0; i < c.count; i++)
-        if (!((scaleMask >> ((c.root + c.offset[i]) % 12)) & 1)) return false;
-    return true;
-}
-
-int Chords::scaleNote(int index) const
-{
-    const int k = cfg.key >= 6 ? cfg.key - 12 : cfg.key;
-    const int note = 48 + octaveShift() + k + 12 * (index / 7) + kScales[cfg.scale].semi[index % 7];
-    return note >= 0 && note <= 127 ? note : 0;
-}
-
-int Chords::noteRowIndex(int pad) const { return (3 - pad / 12) * kPlayColumns + pad % 12; }
-
 int Chords::notes(int pad, uint8_t* out) const
 {
-    if (pad < 0 || pad >= 48 || isPerf(pad)) return 0;
-    const int row = pad / 12, col = pad % 12;
-    if (row < cfg.chordRows)
+    const PadInfo pi = info(pad);
+    if (pi.role == Role::Chord)
     {
         int n = 0;
-        placeChord(columnChord(col, cfg.rowType[row]), true, out, n);
+        place(build(pi.index, pi.row), out, n);
         return n;
     }
-    const int i = noteRowIndex(pad);
-    int note;
-    if (cfg.noteMode == NoteMode::Chord && lastCount > 0)
-        note = lastNotes[i % lastCount] - 12 + 12 * (i / lastCount) + (octaveShift() - 12 * cfg.octave);
-    else
-        note = scaleNote(i);
-    if (note <= 0 || note > 127) return 0;
-    out[0] = (uint8_t)note;
-    return 1;
+    if (pi.role == Role::Note)
+    {
+        const int idx = (pi.row == 3 ? 0 : 7) + pi.index; // the lower row is the first octave
+        const int note = scaleNoteAt(idx);
+        if (note <= 0) return 0;
+        out[0] = (uint8_t)note;
+        return 1;
+    }
+    return 0;
 }
 
 void Chords::played(int pad)
 {
-    if (pad < 0 || pad >= 48 || !isChordPad(pad)) return;
+    const PadInfo pi = info(pad);
+    if (pi.role != Role::Chord) return;
     uint8_t tmp[kMaxChordNotes];
     const int n = notes(pad, tmp);
     if (n == 0) return;
     lastCount = n;
-    for (int i = 0; i < n; i++) lastNotes[i] = tmp[i];
-    for (int i = 0; i < 12; i++) lastPc[i] = 0;
-    for (int i = 0; i < n; i++) lastPc[tmp[i] % 12] = 1;
-    lastHas = true;
+    lastPcMask = 0;
+    for (int i = 0; i < n; i++) { lastNotes[i] = tmp[i]; lastPcMask |= (uint16_t)(1u << (tmp[i] % 12)); }
+    lastFamily = family(pad);
 }
 
-Tier Chords::tier(int pad) const
+Family Chords::family(int pad) const
 {
-    if (pad < 0 || pad >= 48) return Tier::Off;
-    if (isPerf(pad)) return Tier::Control;
-    const int row = pad / 12, col = pad % 12;
-    if (row < cfg.chordRows)
-    {
-        if (col >= 7) return Tier::Colour;
-        if (col == 0) return Tier::Tonic;
-        return inKey(columnChord(col, cfg.rowType[row])) ? Tier::Other : Tier::Outside;
-    }
-    const int i = noteRowIndex(pad);
-    if (cfg.noteMode == NoteMode::Chord)
-        return lastCount > 0 && i % lastCount == 0 ? Tier::Tonic : Tier::ChordTone;
-    if (i % 7 == 0) return Tier::Tonic;
-    if (cfg.noteMode == NoteMode::Follow)
-    {
-        const int pc = (cfg.key + kScales[cfg.scale].semi[i % 7]) % 12;
-        if (lastPc[pc]) return Tier::ChordTone;
-    }
-    return Tier::Other;
+    const PadInfo pi = info(pad);
+    if (pi.role == Role::Note) return lastFamily;
+    const int d = pi.index % 7;
+    if (d == 0 || d == 2 || d == 5) return Family::Home;
+    if (d == 1 || d == 3) return Family::Away;
+    return Family::Tension;
+}
+
+bool Chords::isChordTone(int pad) const
+{
+    const PadInfo pi = info(pad);
+    if (pi.role != Role::Note) return false;
+    uint8_t n[1];
+    if (notes(pad, n) == 0) return false;
+    return (lastPcMask >> (n[0] % 12)) & 1;
+}
+
+bool Chords::inKey(int pad) const
+{
+    const PadInfo pi = info(pad);
+    if (pi.role != Role::Chord) return true;
+    uint8_t n[kMaxChordNotes];
+    const int count = notes(pad, n);
+    const uint16_t mask = scaleMask();
+    for (int i = 0; i < count; i++) if (!((mask >> (n[i] % 12)) & 1)) return false;
+    return true;
+}
+
+bool Chords::isTonic(int pad) const
+{
+    const PadInfo pi = info(pad);
+    if (pi.role == Role::Chord) return pi.index % 7 == 0;
+    if (pi.role == Role::Note) return (pi.index % 7) == 0;
+    return false;
+}
+
+void Chords::outsideName(int pad, char* out, int size) const
+{
+    out[0] = 0;
+    const PadInfo pi = info(pad);
+    if (pi.role != Role::Chord) return;
+    uint8_t n[kMaxChordNotes];
+    const int count = notes(pad, n);
+    const uint16_t mask = scaleMask();
+    for (int i = 0; i < count; i++)
+        if (!((mask >> (n[i] % 12)) & 1)) { fmt(out, size, "%s", kSharpKeys[n[i] % 12]); return; }
 }
 
 void Chords::label(int pad, char* out, int size) const
 {
     out[0] = 0;
-    if (pad < 0 || pad >= 48) return;
-    if (isPerf(pad)) { fmt(out, size, "%s", perfOf(pad) == Perf::Style ? playStyleName(cfg.playStyle) : perfName(perfOf(pad))); return; }
-    const int row = pad / 12, col = pad % 12;
-    if (row < cfg.chordRows)
+    const PadInfo pi = info(pad);
+    switch (pi.role)
     {
-        const Chord c = columnChord(col, cfg.rowType[row]);
-        if (c.quality != 255) { fmt(out, size, "%s%s", kKeys[c.root], kShapes[c.quality].name); return; }
-        // not in the shape table: the root, the triad's mark, then the type
-        const char* mark = c.third == 3 ? (c.fifth == 6 ? "dim" : "m") : (c.fifth == 8 ? "aug" : "");
-        const ChordType t = (ChordType)c.type;
-        const bool replacesThird = t == ChordType::Sus2 || t == ChordType::Sus4 || t == ChordType::SevenSus4 || t == ChordType::Power;
-        fmt(out, size, "%s%s%s", kKeys[c.root], replacesThird ? "" : mark, kTypes[c.type].suffix);
-        return;
+        case Role::Chord:
+        {
+            const Chord c = build(pi.index, pi.row);
+            if (c.quality != 255) { fmt(out, size, "%s%s", kKeys[c.root], kShapes[c.quality].name); return; }
+            // not in the shape table: the root, then what was asked
+            const uint8_t* sc = kScales[cfg.scale].semi;
+            const int d = pi.index % 7;
+            const int third = (sc[(d + 2) % 7] - sc[d] + 12) % 12, fifth = (sc[(d + 4) % 7] - sc[d] + 12) % 12;
+            const char* mark = third == 3 ? (fifth == 6 ? "dim" : "m") : (fifth == 8 ? "aug" : "");
+            const char* sus = (mods & ModSus4) ? "sus4" : (mods & ModSus2) ? "sus2" : "";
+            const char* ext = (mods & ModSix) ? "6" : (mods & ModMaj7) ? "M7" : (mods & ModNine) ? "9" : (mods & ModAdd9) ? "add9" : (mods & ModSeven) ? "7" : "";
+            fmt(out, size, "%s%s%s%s", kKeys[c.root], sus[0] ? "" : mark, sus, ext);
+            return;
+        }
+        case Role::Note:
+        {
+            uint8_t n[1];
+            if (notes(pad, n) == 0) return;
+            const int idx = (pi.row == 3 ? 0 : 7) + pi.index;
+            if (idx % 7 == 0) fmt(out, size, "%s%d", kSharpKeys[n[0] % 12], n[0] / 12 - 1); // the tonic shows its octave
+            else fmt(out, size, "%s", kSharpKeys[n[0] % 12]);
+            return;
+        }
+        case Role::Mod: fmt(out, size, "%s", modName(pi.index)); return;
+        case Role::Style: fmt(out, size, "%s", playStyleName(pi.index)); return;
+        case Role::OctDown: fmt(out, size, "Oct -"); return;
+        case Role::OctUp: fmt(out, size, "Oct +"); return;
+        case Role::Hold: fmt(out, size, "Hold"); return;
+        default: return;
     }
-    uint8_t n[1];
-    if (notes(pad, n) == 0) return;
-    fmt(out, size, "%s", kKeys[n[0] % 12]);
 }
 } // namespace ft

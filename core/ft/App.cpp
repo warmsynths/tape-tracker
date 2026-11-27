@@ -157,7 +157,7 @@ void App::key(int k)
         // Play and Stop work on the pages that sit beside the recorder
         const bool transport = current == Screen::Glitch || current == Screen::Master || current == Screen::Editor ||
                                current == Screen::Input || current == Screen::Pads || current == Screen::Memory || current == Screen::Mixer || current == Screen::PadSample || current == Screen::Load || current == Screen::Resample ||
-                               current == Screen::Settings || current == Screen::Chords || current == Screen::Sound || current == Screen::SoundAdv;
+                               current == Screen::Settings || current == Screen::Chords || current == Screen::Sound || current == Screen::SoundAdv || current == Screen::Sets;
         if (transport && k == kPlay) { togglePlay(); refresh(true); return; }
         if (transport && k == kStop) { pressStop(); refresh(true); return; }
         keyScreen(k);
@@ -458,33 +458,59 @@ void App::releaseLatched()
     for (int p = 0; p < 48; p++) if (latched[p]) releasePad(p);
 }
 
+void App::updateMods()
+{
+    uint8_t groupsHeld = 0;
+    for (int b = 0; b < kMods; b++)
+        if ((heldMods >> b) & 1) groupsHeld |= Chords::groupOf((uint8_t)(1u << b));
+    chords.mods = (uint8_t)(heldMods | (latchedMods & ~groupsHeld));
+}
+
 void App::chordPad(int p, bool down, int velocity)
 {
-    const Perf perf = Chords::perfOf(p);
+    const PadInfo pi = Chords::info(p);
     ChordCfg& c = chords.cfg;
-    if (perf != Perf::None)
+    if (pi.role == Role::None) return;
+    if (pi.role != Role::Chord && pi.role != Role::Note)
     {
-        // the performance pads: held modifiers, Hold which latches, and Style which steps the play style
+        // the right hand: modifiers (hold, or double-tap to latch), play styles, octave and Hold
+        const uint32_t now = hal.millis();
         if (down)
         {
             heldCount[p] = 1;
-            hitAt[p] = hal.millis();
-            if (perf == Perf::Hold)
+            hitAt[p] = now;
+            if (pi.role == Role::Mod)
+            {
+                const uint8_t bit = (uint8_t)(1u << pi.index);
+                const uint8_t group = Chords::groupOf(bit);
+                if (latchedMods & bit) latchedMods &= (uint8_t)~bit;                    // tapping a latched one lets it go
+                else if (modTapAt[pi.index] != 0 && now - modTapAt[pi.index] < 350)       // a double tap latches it
+                {
+                    latchedMods = (uint8_t)((latchedMods & ~group) | bit);
+                    heldMods &= (uint8_t)~group;
+                }
+                else { heldMods = (uint8_t)((heldMods & ~group) | bit); latchedMods &= (uint8_t)~group; }
+                modTapAt[pi.index] = now;
+                updateMods();
+            }
+            else if (pi.role == Role::Style) { c.playStyle = pi.index; soundMark(); }
+            else if (pi.role == Role::OctDown) { c.octave = (int8_t)(c.octave > -2 ? c.octave - 1 : c.octave); soundMark(); }
+            else if (pi.role == Role::OctUp) { c.octave = (int8_t)(c.octave < 2 ? c.octave + 1 : c.octave); soundMark(); }
+            else if (pi.role == Role::Hold)
             {
                 chHold = !chHold;
                 if (!chHold) releaseLatched();
             }
-            else if (perf == Perf::Style)
-            {
-                c.playStyle = (uint8_t)((c.playStyle + 1) % kPlayStyles);
-                soundMark();
-            }
-            else chords.mods |= Chords::modFor(perf);
         }
         else
         {
             heldCount[p] = 0;
-            chords.mods &= (uint8_t)~Chords::modFor(perf);
+            if (pi.role == Role::Mod)
+            {
+                const uint8_t bit = (uint8_t)(1u << pi.index);
+                heldMods &= (uint8_t)~bit;
+                updateMods();
+            }
         }
         return;
     }
@@ -496,7 +522,8 @@ void App::chordPad(int p, bool down, int velocity)
         const int count = chords.notes(p, n);
         chords.played(p);
         if (count == 0) return;
-        const bool chord = chords.isChordPad(p);
+        if (pi.role == Role::Chord) { chords.label(p, lastChordName, sizeof lastChordName); lastFamily = (int)chords.family(p); }
+        const bool chord = pi.role == Role::Chord;
         const int base = c.padVelocity && velocity >= 1 ? (velocity > 127 ? 127 : velocity) : 100;
         for (int i = 0; i < count; i++) heldNote[p][i] = n[i];
         heldCount[p] = (uint8_t)count;
@@ -505,7 +532,7 @@ void App::chordPad(int p, bool down, int velocity)
         const int h = c.humanise;
         for (int i = 0; i < count; i++)
         {
-            // a strum plays the notes in turn, low to high (D) or high to low (U); a block gets a few
+            // a strum plays the notes in turn, low to high (dn) or high to low (up); a block gets a few
             // milliseconds of looseness when humanise is up
             const int order = style == StyleStrumUp ? count - 1 - i : i;
             uint32_t delay = 0;
@@ -532,10 +559,12 @@ void App::chordsReleaseAll()
     pendCount = 0;
     for (int p = 0; p < 48; p++)
     {
-        if (Chords::isPerf(p)) heldCount[p] = 0;
-        else releasePad(p);
+        const Role r = Chords::info(p).role;
+        if (r == Role::Chord || r == Role::Note) releasePad(p);
+        else heldCount[p] = 0;
     }
-    chords.mods = 0;
+    heldMods = 0;
+    updateMods();
     hal.synthAllOff();
 }
 
@@ -1110,15 +1139,18 @@ void App::serviceLights()
     const int pulse = sinceBeat < 110 ? (lightBeat % 4 == 0 ? 10 : 5) * (int)(110 - sinceBeat) / 110 : 0;
     for (int p = 0; p < 48; p++)
     {
+        // brightness: held, latched or chosen 100%; in-key chords 40%; chord tones of the sounding chord 70%;
+        // other modifiers and styles 25%; free pads off
         int base = 0;
-        switch (chords.tier(p))
+        const PadInfo pi = Chords::info(p);
+        switch (pi.role)
         {
-            case Tier::Tonic: base = 14 + pulse; break;
-            case Tier::Colour: base = 5; break;
-            case Tier::ChordTone: base = 10; break;
-            case Tier::Other: base = 3; break;
-            case Tier::Outside: base = 2; break;
-            case Tier::Control: base = (Chords::perfOf(p) == Perf::Hold && chHold) ? 24 : (Chords::perfOf(p) == Perf::Style && chords.cfg.playStyle != StyleBlock) ? 10 : 4; break;
+            case Role::Chord: base = chords.inKey(p) ? 12 : 6; if (chords.isTonic(p)) base += pulse; break;
+            case Role::Note: base = chords.isChordTone(p) ? 22 : 4; break;
+            case Role::Mod: base = (chords.mods >> pi.index) & 1 ? 31 : 8; break;
+            case Role::Style: base = chords.styleChosen(pi.index) ? 31 : 8; break;
+            case Role::Hold: base = chHold ? 31 : 8; break;
+            case Role::OctDown: case Role::OctUp: base = 8; break;
             default: break;
         }
         int level = base;
