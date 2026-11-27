@@ -65,6 +65,7 @@ struct FakeHal : Hal
     void playerSetTrack(int t, const int16_t* d) override { data[t] = d; }
     void playerStart(uint32_t f) override { playing = f > 0; loop = f; pos = 0; }
     void playerStop() override { playing = false; }
+    void playerSeek(uint32_t f) override { if (loop > 0) pos = f % loop; }
     bool playerPlaying() override { return playing; }
     uint32_t playerPosition() override { return pos; }
     uint16_t playerTakePeak(int) override { return 8000; }
@@ -272,8 +273,8 @@ static void pagesAndProjects()
             for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
             app.key(kB8);
         }
-        app.setShift(true); app.key(kDown); app.setShift(false);
-        CHECK(app.screen() == Screen::Settings, "Shift+Down opens Settings");
+        app.key(kFile); app.key(kB7);
+        CHECK(app.screen() == Screen::Settings, "Settings is a button on the Project page");
         for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
         app.key(kB8);
         app.key(kFile);
@@ -734,18 +735,34 @@ static void pagesAndProjects()
         CHECK(bits2 > bits, "and it grows as the take goes on");
         for (int l = 0; l < 2; l++) for (int st = 0; st < app.stagesOf(l); st++) app.draw(l, st, gfx);
     }
-    {   // tracks start at -6 dB, and Shift + Left or Right sets the output volume from home
+    {   // tracks start at -6 dB; Shift + Up or Down is the track level, the output volume is in Config
         FakeHal hal;
         App app(hal, palette());
         app.setMeasure(&gfx);
         app.enter();
         CHECK(hal.trackBank.cfg[0].levelDb10 == -60, "tracks start at -6 dB");
-        const int before = hal.devVal[(int)Dev::Volume];
-        app.setShift(true); app.key(kLeft); app.setShift(false);
-        CHECK(hal.devVal[(int)Dev::Volume] == before - 2, "Shift + Left lowers the volume");
-        app.setShift(true); app.key(kRight); app.key(kRight); app.setShift(false);
-        CHECK(hal.devVal[(int)Dev::Volume] == before + 2, "Shift + Right raises it");
-        CHECK(std::strncmp(app.view().hint, "Volume", 6) == 0, "the hint line says what it is now");
+        app.setShift(true); app.key(kUp); app.key(kUp); app.key(kDown); app.setShift(false);
+        CHECK(hal.trackBank.cfg[0].levelDb10 == -50, "Shift + Up raises the track level 1 dB a press");
+        CHECK(std::strncmp(app.view().hint, "Track 1 level", 13) == 0, "the hint line says what it is now");
+    }
+    {   // the jog scrubs the position and Left and Right step a beat
+        FakeHal hal;
+        hal.setDefaults = true;
+        App app(hal, palette());
+        app.enter();
+        recordLoop(hal, app);
+        app.key(kStop);
+        CHECK(app.view().posFrames == 0, "stopped at the start");
+        app.jog(1); app.jog(1);
+        const uint32_t sixteenth = app.view().loopFrames / app.view().barCount / 16;
+        CHECK(app.view().posFrames == 2 * sixteenth, "the jog moves a sixteenth a click");
+        app.key(kRight);
+        CHECK(app.view().posFrames % (app.view().loopFrames / app.view().barCount / 4) == 0, "Right lands on the next beat");
+        const uint32_t before = app.view().posFrames;
+        app.setShift(true); app.jog(1); app.setShift(false);
+        CHECK(app.view().barCount == 1 && app.view().posFrames == before, "Shift + jog moves a bar (this loop is one bar, so it comes round)");
+        app.key(kPlay);
+        CHECK(hal.pos > 0, "Play starts from the playhead");
     }
     {   // the Pattern button is home
         FakeHal hal;
@@ -1259,12 +1276,12 @@ int main()
         app.enter();
         CHECK(hal.lofi().cfg.bypass, "the lo-fi master starts bypassed");
         const int before = hal.bank().cfg[0].levelDb10;
-        app.setShift(true); app.jog(1); app.jog(1); app.jog(-1); app.setShift(false);
-        CHECK(hal.bank().cfg[0].levelDb10 == before + 10, "Shift + Jog changes the selected track's level by 1 dB a click");
-        app.key(kRight); app.key(kRight); app.key(kRight);
-        CHECK(hal.synthLevel == 30, "Right raises the synth level by 1 dB");
-        app.key(kLeft);
-        CHECK(hal.synthLevel == 20, "Left lowers it");
+        app.setShift(true); app.key(kUp); app.key(kUp); app.key(kDown); app.setShift(false);
+        CHECK(hal.bank().cfg[0].levelDb10 == before + 10, "Shift + Up changes the selected track's level by 1 dB a press");
+        app.setShift(true); app.key(kRight); app.key(kRight); app.key(kRight); app.setShift(false);
+        CHECK(hal.synthLevel == 30, "Shift + Right raises the synth level by 1 dB");
+        app.setShift(true); app.key(kLeft); app.setShift(false);
+        CHECK(hal.synthLevel == 20, "Shift + Left lowers it");
         hal.advance(app, 100000);
         FakeHal hal2;
         hal2.files = hal.files;

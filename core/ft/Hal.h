@@ -86,6 +86,7 @@ class Hal
     virtual void playerSetTrack(int track, const int16_t* data) = 0;
     virtual void playerStart(uint32_t frames) = 0;
     virtual void playerStop() = 0;
+    virtual void playerSeek(uint32_t /*frames*/) {} // move the playhead (scrubbing)
     virtual bool playerPlaying() = 0;
     virtual uint32_t playerPosition() = 0;
     virtual uint16_t playerTakePeak(int track) = 0; // largest sample since last call, 0 to 32767

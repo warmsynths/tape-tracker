@@ -138,6 +138,7 @@ bool FourTrackHal::recordActive() { return recorder.isRecordingActive(); }
 void FourTrackHal::playerSetTrack(int track, const int16_t* data) { engine.getLoopPlayer()->setTrack(track, data); }
 void FourTrackHal::playerStart(uint32_t frames) { engine.getLoopPlayer()->start(frames); }
 void FourTrackHal::playerStop() { engine.getLoopPlayer()->stop(); }
+void FourTrackHal::playerSeek(uint32_t frames) { engine.getLoopPlayer()->seek(frames); }
 bool FourTrackHal::playerPlaying() { return engine.getLoopPlayer()->isPlaying(); }
 uint32_t FourTrackHal::playerPosition() { return engine.getLoopPlayer()->position(); }
 uint16_t FourTrackHal::playerTakePeak(int track) { return engine.getLoopPlayer()->takePeak(track); }

@@ -184,6 +184,9 @@ class App
     uint32_t autoFrames() const;          // length of a first take with the bars set up front, 0 when it is open
     void finishTail(bool all);            // stop recording the tail past the loop end and fold it onto the start
     void serviceTail();
+    void scrub(int steps, bool bars);   // move the playhead: a sixteenth a step, or a bar
+    void stepBeat(int dir);
+    uint32_t scrubPos = 0;              // the playhead while stopped
     void finishLayer(int track, uint32_t firstSample);
     void loopCfgSave();
     void loopCfgLoad();

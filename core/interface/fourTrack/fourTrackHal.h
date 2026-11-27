@@ -39,6 +39,7 @@ class FourTrackHal : public ft::Hal
     void playerSetTrack(int track, const int16_t* data) override;
     void playerStart(uint32_t frames) override;
     void playerStop() override;
+    void playerSeek(uint32_t frames) override;
     bool playerPlaying() override;
     uint32_t playerPosition() override;
     uint16_t playerTakePeak(int track) override;

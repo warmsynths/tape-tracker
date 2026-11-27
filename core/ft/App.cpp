@@ -203,16 +203,28 @@ void App::key(int k)
             case kB6: muteTrack(1); return;
             case kB7: muteTrack(2); return;
             case kB8: muteTrack(3); return;
-            case kUp: undoTake(); return;
-            case kDown: open(Screen::Settings); return;
+            case kStop: if (session.mode() == FourTrackSession::Mode::Idle) { undoTake(); return; } break;
+            case kUp:
+            case kDown:
+            {
+                // Shift + Up or Down: the level of the selected track, 1 dB a click
+                if (session.mode() != FourTrackSession::Mode::Idle) return;
+                const int t = session.selected();
+                TrackCfg& c = hal.bank().cfg[t];
+                { int v = c.levelDb10 + (k == kUp ? 10 : -10); c.levelDb10 = (int16_t)(v < -600 ? -600 : v > 60 ? 60 : v); }
+                unsaved = true;
+                const int a = c.levelDb10 < 0 ? -c.levelDb10 : c.levelDb10;
+                if (c.levelDb10 <= -600) fmt(noteHint, sizeof noteHint, "Track %d level off. Shift + Up or Down changes it.", t + 1);
+                else fmt(noteHint, sizeof noteHint, "Track %d level %s%d dB. Shift + Up or Down changes it.", t + 1, c.levelDb10 < 0 ? "-" : "+", a / 10);
+                refresh(true);
+                return;
+            }
             case kLeft:
             case kRight:
             {
-                // Shift + Left or Right: the output volume, from any home screen state
-                int v = hal.deviceValue(Dev::Volume) + (k == kRight ? 2 : -2);
-                v = v < 0 ? 0 : (v > 100 ? 100 : v);
-                hal.setDeviceValue(Dev::Volume, v);
-                fmt(noteHint, sizeof noteHint, "Volume %d. Shift + Left or Right changes it.", v);
+                // Shift + Left or Right: the level of the synth (the chord pads)
+                synthLevelStep(k == kRight ? 1 : -1);
+                fmt(noteHint, sizeof noteHint, "Synth level %s%d dB. Shift + Left or Right changes it.", synthDb10 < 0 ? "-" : "+", (synthDb10 < 0 ? -synthDb10 : synthDb10) / 10);
                 refresh(true);
                 return;
             }
@@ -242,10 +254,8 @@ void App::key(int k)
         case kLeft:
         case kRight:
         {
-            // the level of the synth (the chord pads), from the home screen
-            synthLevelStep(k == kRight ? 1 : -1);
-            fmt(noteHint, sizeof noteHint, "Synth level %s%d dB. Left or Right changes it. Shift + Jog: track level.", synthDb10 < 0 ? "-" : "+", (synthDb10 < 0 ? -synthDb10 : synthDb10) / 10);
-            refresh(true);
+            // one beat back or forward
+            stepBeat(k == kRight ? 1 : -1);
             break;
         }
         case kB5: selectTrack(0); break;
@@ -310,20 +320,12 @@ void App::jog(int delta)
         refresh(true);
         return;
     }
-    if (shift && !actionMenu && session.mode() == FourTrackSession::Mode::Idle)
+    // the jog scrubs the position, stopped or playing; with Shift a bar at a time
+    if (!actionMenu && session.mode() == FourTrackSession::Mode::Idle)
     {
-        // Shift + Jog on the home screen: the level of the selected track, 1 dB a click
-        const int t = session.selected();
-        TrackCfg& c = hal.bank().cfg[t];
-        { int v = c.levelDb10 + (delta > 0 ? 10 : -10); c.levelDb10 = (int16_t)(v < -600 ? -600 : v > 60 ? 60 : v); }
-        unsaved = true;
-        const int a = c.levelDb10 < 0 ? -c.levelDb10 : c.levelDb10;
-        if (c.levelDb10 <= -600) fmt(noteHint, sizeof noteHint, "Track %d level off. Shift + Jog changes it.", t + 1);
-        else fmt(noteHint, sizeof noteHint, "Track %d level %s%d dB. Shift + Jog changes it.", t + 1, c.levelDb10 < 0 ? "-" : "+", a / 10);
-        refresh(true);
+        scrub(delta > 0 ? 1 : -1, shift);
         return;
     }
-    moveSelection(delta > 0 ? 1 : -1);
 }
 
 void App::pad(int p, bool down, int velocity)
@@ -681,6 +683,40 @@ void App::promptCancel()
     refresh(true);
 }
 
+void App::scrub(int steps, bool bars)
+{
+    const uint32_t loop = session.loopFrames();
+    if (loop == 0 || session.mode() != FourTrackSession::Mode::Idle) return;
+    const uint32_t beat = session.bars() > 0 ? loop / ((uint32_t)session.bars() * 4) : loop / 16;
+    const uint32_t unit = bars ? beat * 4 : (beat >= 4 ? beat / 4 : 1);
+    const bool live = hal.playerPlaying();
+    int64_t pos = live ? hal.playerPosition() : scrubPos;
+    pos += (int64_t)steps * unit;
+    pos = ((pos % (int64_t)loop) + (int64_t)loop) % (int64_t)loop;
+    if (live) hal.playerSeek((uint32_t)pos);
+    else scrubPos = (uint32_t)pos;
+    lastClickBeat = -1;
+    refresh(true);
+}
+
+void App::stepBeat(int dir)
+{
+    const uint32_t loop = session.loopFrames();
+    if (loop == 0 || session.mode() != FourTrackSession::Mode::Idle) return;
+    const uint32_t beat = session.bars() > 0 ? loop / ((uint32_t)session.bars() * 4) : loop / 16;
+    if (beat == 0) return;
+    const uint32_t cur = hal.playerPlaying() ? hal.playerPosition() : scrubPos;
+    // land on a beat: the next one on, or the one before
+    int64_t idx = dir > 0 ? (int64_t)(cur / beat) + 1 : (int64_t)((cur + beat - 1) / beat) - 1;
+    const int64_t beats = (int64_t)(loop / beat);
+    idx = ((idx % beats) + beats) % beats;
+    const uint32_t pos = (uint32_t)(idx * (int64_t)beat);
+    if (hal.playerPlaying()) hal.playerSeek(pos);
+    else scrubPos = pos;
+    lastClickBeat = -1;
+    refresh(true);
+}
+
 void App::moveSelection(int delta)
 {
     const int track = session.selected() + delta;
@@ -830,6 +866,7 @@ void App::pressStop()
     else
     {
         session.pressStop();
+        scrubPos = 0;
     }
     syncPlayer();
     refresh(true);
@@ -951,6 +988,7 @@ void App::startPlayer()
     pushBank();
     for (int t = 0; t < FourTrackSession::kTracks; t++) hal.playerSetTrack(t, session.hasPart(t) ? partData[t] : nullptr);
     hal.playerStart(session.loopFrames());
+    if (scrubPos > 0 && scrubPos < session.loopFrames() && session.mode() == FourTrackSession::Mode::Idle) hal.playerSeek(scrubPos); // Play starts where the playhead was left
     lastClickBeat = -1;
 }
 
@@ -1655,7 +1693,7 @@ void App::fillView()
     }
     else if (loop > 0)
     {
-        v.posFrames = hal.playerPosition();
+        v.posFrames = hal.playerPlaying() ? hal.playerPosition() : scrubPos;
         if (session.bars() > 0)
         {
             const uint32_t sixteenths = (uint32_t)(((uint64_t)v.posFrames * session.bars() * 16) / loop);

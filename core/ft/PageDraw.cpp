@@ -955,7 +955,7 @@ void App::drawProject(Pen& p)
     const int pages = listCount > 0 ? (listCount + perPage - 1) / perPage : 1;
     fmt(b, sizeof b, "Page %d of %d. Up/Down choose, jog scrolls.", first / perPage + 1, pages);
     p.text(24, 400, b, F12, pal.dim);
-    const char* l[8] = { "New", "Open", "Save", "Save as", "Rename", "Export", "", "Back" };
+    const char* l[8] = { "New", "Open", "Save", "Save as", "Rename", "Export", "Settings", "Back" };
     p.buttons(l);
 }
 
@@ -1192,7 +1192,7 @@ void App::drawPopup(Pen& p)
     {
         case Popup::Replace:
             fmt(l1, sizeof l1, "Track %d already has a Part.", session.selected() + 1);
-            head = "Replace Part?"; line1 = l1; line2 = "Recording replaces it from the next loop start. Shift+Up brings it back.";
+            head = "Replace Part?"; line1 = l1; line2 = "Recording replaces it from the next loop start. Shift + Stop brings it back.";
             b7 = "Cancel"; b8 = "Replace"; red = true; break;
         case Popup::NoSound:
             fmt(l1, sizeof l1, "The take on Track %d was silent.", popupArg > 0 ? popupArg : session.selected() + 1);

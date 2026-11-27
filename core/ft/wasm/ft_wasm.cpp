@@ -178,6 +178,7 @@ class EmuHal : public Hal
     void playerSetTrack(int t, const int16_t* d) override { trackBank.data[t] = d; }
     void playerStart(uint32_t f) override { loop = f; trackBank.loop = f; pos = 0; playing = f > 0; }
     void playerStop() override { playing = false; }
+    void playerSeek(uint32_t f) override { if (loop > 0) pos = f % loop; }
     bool playerPlaying() override { return playing; }
     uint32_t playerPosition() override { return pos; }
     uint16_t playerTakePeak(int t) override { const uint16_t p = trackBank.peak[t]; trackBank.peak[t] = 0; return p; }

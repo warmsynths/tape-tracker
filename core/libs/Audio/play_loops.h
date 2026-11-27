@@ -28,6 +28,7 @@ class AudioPlayLoops : public AudioStream
     // Starts all tracks from the beginning, each `lengthFrames` long.
     void start(uint32_t lengthFrames);
     void stop();
+    void seek(uint32_t frame) { if (loopLength > 0) currentPosition = frame % loopLength; }
     bool isPlaying() const { return playing; }
 
     // Frame position where the next block starts, and the loop length.

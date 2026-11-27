@@ -768,6 +768,7 @@ void App::projectKey(int k)
         case kB4: nameForSaveAs = true; fmt(nameEdit, sizeof(nameEdit), "%s", projectName); nameCursor = 0; nameChar = 0; open(Screen::NameEntry); break;
         case kB5: nameForSaveAs = false; fmt(nameEdit, sizeof(nameEdit), "%s", projectName); nameCursor = 0; nameChar = 0; open(Screen::NameEntry); break;
         case kB6: exportRepeats = 1; job = Job::None; open(Screen::Export); break;
+        case kB7: sRow = 0; open(Screen::Settings); break;
         case kB8: back(); return;
         default: break;
     }

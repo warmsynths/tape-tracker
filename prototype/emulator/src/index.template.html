@@ -108,19 +108,20 @@
   <p class="small">What to press on the Tracker. B1 to B8 are the eight buttons under the screen.</p>
   <details open><summary>Recording</summary>
   <table class="keys">
-    <tr><td>B1 or Rec</td><td>Record. A count-in, then the first take. Stop ends it and asks how many bars.</td></tr>
+    <tr><td>B1 or Rec</td><td>Record. A one-bar count-in, then the first take records the bars you set (4 at 80 BPM to start) and stops on the bar line. On a track that has a Part, Rec layers a new pass over it (Config can switch to Replace).</td></tr>
     <tr><td>B2 Tempo</td><td>Before the first take: starting tempo. Once there is a loop, B2 is Stop.</td></tr>
     <tr><td>B3 or Play</td><td>Play the loop</td></tr>
     <tr><td>B4</td><td>Monitor the input on or off</td></tr>
     <tr><td>B5 to B8</td><td>Select Track 1 to 4. Press the selected one again to open it large.</td></tr>
-    <tr><td>Shift + Up</td><td>Undo the last take</td></tr>
+    <tr><td>Shift + Stop</td><td>Undo the last take (brings back the previous layer)</td></tr>
+    <tr><td>Shift + Jog</td><td>While a layer is armed or recording: Fade, how much of the older audio stays</td></tr>
   </table></details>
   <details><summary>Setting the BPM (B2 Tempo)</summary>
   <table class="keys">
     <tr><td>B1 Free</td><td>No set tempo: the first take sets the loop and the tempo is worked out from its length</td></tr>
     <tr><td>B2 Set</td><td>Takes land on a grid at the tempo you choose</td></tr>
     <tr><td>Jog</td><td>Change the BPM by 0.1 (Shift: by 1), 40 to 240</td></tr>
-    <tr><td>Left, Right</td><td>Choose Tempo, Count-in or Wait for sound; Jog changes it, Insert switches it</td></tr>
+    <tr><td>Left, Right</td><td>Choose Tempo, Count-in, Wait for sound or Bars; Jog changes it, Insert switches it. Bars: only lengths that fit 16 s.</td></tr>
     <tr><td>B7 OK, B8</td><td>B7 keeps it, B8 cancels</td></tr>
     <tr><td>Shift + Play</td><td>Click (metronome) on or off. A CLICK tag shows in the top bar.</td></tr>
   </table></details>
@@ -131,10 +132,14 @@
     <tr><td>Shift + B3</td><td>Memory (recording time left)</td></tr>
     <tr><td>Shift + B4</td><td>Input: choose a track's source (Line, mics, Pads)</td></tr>
     <tr><td>Shift + B5 to B8</td><td>Mute Track 1 to 4</td></tr>
-    <tr><td>Shift + Down</td><td>Settings (project: click, grid, snap, count-in)</td></tr>
-    <tr><td>Shift + Left, Right</td><td>Output volume</td></tr>
-    <tr><td>Shift + Jog</td><td>Level of the selected track (1 dB a click)</td></tr>
-    <tr><td>Left, Right</td><td>Level of the synth (chord pads), 1 dB a click</td></tr>
+    <tr><td>Shift + Up, Down</td><td>Level of the selected track (1 dB a press)</td></tr>
+    <tr><td>Shift + Left, Right</td><td>Level of the synth (chord pads), 1 dB a press</td></tr>
+    <tr><td>Jog</td><td>Scrub the position, stopped or playing (a sixteenth a click; Shift: a bar)</td></tr>
+    <tr><td>Left, Right</td><td>Move the playhead one beat</td></tr>
+    <tr><td>Up, Down</td><td>Choose the track</td></tr>
+    <tr><td>Shift + Stop</td><td>Undo the last take</td></tr>
+    <tr><td>Pattern</td><td>With the chord pads on: the Play view, and back</td></tr>
+    <tr><td>File, B7</td><td>Settings (project: click, grid, snap, count-in). The output volume is in Config.</td></tr>
     <tr><td>Insert</td><td>Actions for the selected Part (move, edit, glitch, mute, undo)</td></tr>
     <tr><td>Shift + Insert</td><td>Move the Part (Jog steps by the grid, Shift by 1 ms)</td></tr>
   </table></details>
@@ -156,8 +161,9 @@
   <details><summary>Chords and sound</summary>
   <table class="keys">
     <tr><td>Note</td><td>Chords page. The pads play chords and scale notes. With them on, Rec records them (the track's source becomes Pads).</td></tr>
-    <tr><td>Chords page</td><td>Left, Right: choose a setting; Jog changes it. B1 pads on or off, B2 Shuffle, B3 Reset, B4 Sound, B7 next page (harmony, chord types, feel), B8 back.</td></tr>
-    <tr><td>Right two pad columns</td><td>Oct +, Oct -, Invert, Open, Sus, 7th: hold while you play a chord. Hold keeps the chord going. The last pad steps the play style (Block, Strum, Arp).</td></tr>
+    <tr><td>Chords page</td><td>Left, Right: choose Key, Scale, Style, Sound, Voicing or Octave; Jog changes it. B1 pads on or off, B2 Sets (8 saved chord sets), B3 Reset, B4 Sound, B7 Play view, B8 back.</td></tr>
+    <tr><td>Left hand (columns 1 to 8)</td><td>Row 1 seventh chords I to vii, row 2 triads, rows 3 and 4 the scale notes (two octaves). Colours: Home, Away, Tension.</td></tr>
+    <tr><td>Right hand (columns 9 to 12)</td><td>Row 1 sus2 sus4 6 7, row 2 maj7 add9 9 flip: hold while you press a chord (double-tap to latch). Rows 3 and 4: Block, Strum dn, Strum up, Arp up, Arp dn, Oct -, Oct +, Hold. Shift + Jog: arp rate or strum speed.</td></tr>
     <tr><td>Instr</td><td>Sound page: pick a patch, tweak the eight knobs, hold B1 to hear it, B7 for every setting</td></tr>
   </table></details>
 </aside>
