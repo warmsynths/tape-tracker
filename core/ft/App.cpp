@@ -789,7 +789,7 @@ void App::pressRecord()
         if (shift) applyRole(t, lastRole);
         else { roleList = 0; open(Screen::Role); return; }
     }
-    const bool layerNow = set.layer && session.loopFrames() > 0 && session.hasPart(t) && hal.sdPresent() && partData[t] != nullptr;
+    const bool layerNow = set.layer && session.loopFrames() > 0 && session.hasPart(t) && hal.sdPresent() && partData[t] != nullptr && layerScratchTrack(t) >= 0;
     if (session.loopFrames() > 0 && session.hasPart(t) && !replaceConfirmed && !layerNow)
     {
         showPopup(Popup::Replace, t);
@@ -836,6 +836,8 @@ void App::startRecording()
     }
     else layerPass[t] = false;
     if (padsChords && trackRole[t] == TrackRole::Chords && !layerPass[t]) chordEvCount = 0; // a new Chords take writes a new chord track
+    layerScratch[t] = layerPass[t] ? layerScratchTrack(t) : -1;
+    if (layerScratch[t] < 0) layerPass[t] = false;
     session.pressRecord(layerPass[t]);
     const int track = session.recordingTrack();
     if (session.mode() == FourTrackSession::Mode::RecordingFirst)
@@ -1175,7 +1177,7 @@ void App::serviceArmed()
     if (position + lead >= length && position + minLead <= length)
     {
         applySource(trackSource[session.recordingTrack()]);
-        hal.recordStart(session.recordingTrack(), trackSource[session.recordingTrack()]);
+        { const int rt = session.recordingTrack(); layerMixed = 0; hal.recordStart(layerPass[rt] && layerScratch[rt] >= 0 ? layerScratch[rt] : rt, trackSource[rt]); }
         session.armWindowReached();
     }
 }
@@ -1205,6 +1207,12 @@ void App::applyAlignment(int track, uint32_t firstSample)
 
 void App::finishPart(int track, uint32_t firstSample, bool early)
 {
+    if (layerPass[track])
+    {
+        layerPass[track] = false;
+        finishLayer(track, firstSample);
+        return;
+    }
     const uint32_t length = session.loopFrames();
     uint32_t needed = firstSample + length + kPostFrames;
     if (needed > hal.regionFrames()) needed = hal.regionFrames();
@@ -1214,12 +1222,6 @@ void App::finishPart(int track, uint32_t firstSample, bool early)
         // Everything after the stop point stays silent, not left over from an older take
         int16_t* r = hal.region(track);
         for (uint32_t i = recorded; i < needed; i++) r[i] = 0;
-    }
-    if (layerPass[track])
-    {
-        layerPass[track] = false;
-        finishLayer(track, firstSample);
-        return;
     }
     partData[track] = hal.region(track) + firstSample;
     session.partRecorded();
@@ -1232,42 +1234,47 @@ void App::finishPart(int track, uint32_t firstSample, bool early)
     refresh(true);
 }
 
-// A pass laid over the Part that was there: the new take is moved onto the old Part's time, then the old
-// audio (kept on the card for Undo) is added under it at the Fade amount
-void App::finishLayer(int track, uint32_t firstSample)
+// A pass laid over the Part that was there. The take is recorded in the memory of an empty track while the old
+// Part keeps playing; as it comes in, each frame is added into the old Part (which is first lowered to the Fade
+// level), so the loop grows layer by layer while it plays and nothing is lost or silent during the pass.
+int App::layerScratchTrack(int track) const
+{
+    for (int s = 0; s < FourTrackSession::kTracks; s++)
+        if (s != track && !session.hasPart(s)) return s;
+    return -1;
+}
+
+void App::mixLayer(int track, uint32_t firstSample, uint32_t recorded)
 {
     const uint32_t length = session.loopFrames();
-    int16_t* d = hal.region(track) + firstSample;
+    if (length == 0 || layerScratch[track] < 0 || partData[track] == nullptr) return;
+    const int16_t* src = hal.region(layerScratch[track]);
+    int16_t* dst = const_cast<int16_t*>(partData[track]);
     const int32_t lat = trackSource[track] == Source::Pads ? 0 : latencyFrames;
-    const int64_t c = (int64_t)alignShift[track] + userOffset[track] + lat;
-    const uint32_t shift = (uint32_t)(((c % (int64_t)length) + (int64_t)length) % (int64_t)length);
-    if (shift != 0)
-    {
-        // rotate left by `shift`: reverse the two parts, then the whole
-        auto rev = [d](uint32_t a, uint32_t b) { for (b--; a < b; a++, b--) { const int16_t x = d[a]; d[a] = d[b]; d[b] = x; } };
-        rev(0, shift); rev(shift, length); rev(0, length);
-    }
-    char path[24];
-    fmt(path, sizeof(path), "undo/t%d.raw", track);
-    int16_t old[1024];
+    const int64_t shift = (int64_t)alignShift[track] + userOffset[track];
     const int fade = set.fadePct < 40 ? 40 : (set.fadePct > 100 ? 100 : set.fadePct);
-    for (uint32_t off = 0; off < length; off += 1024)
+    uint32_t end = recorded < firstSample + length ? recorded : firstSample + length;
+    uint32_t k = layerMixed > firstSample ? layerMixed : firstSample;
+    for (; k < end; k++)
     {
-        const uint32_t n = length - off < 1024 ? length - off : 1024;
-        if (hal.fileRead(path, off * 2, old, n * 2) != n * 2) break;
-        for (uint32_t i = 0; i < n; i++)
-        {
-            const int32_t v = d[off + i] + (int32_t)old[i] * fade / 100;
-            d[off + i] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
-        }
+        int64_t j = ((int64_t)(k - firstSample) - lat - shift) % (int64_t)length;
+        if (j < 0) j += (int64_t)length;
+        const int32_t v = (int32_t)dst[j] * fade / 100 + (int32_t)src[k];
+        dst[j] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
     }
-    partData[track] = d;
+    layerMixed = k;
+}
+
+void App::finishLayer(int track, uint32_t firstSample)
+{
+    mixLayer(track, firstSample, hal.recordLength());
     session.partRecorded();
     noteAt[track] = -2;
     waveDirty[track] = true;
     unsaved = true;
     pushBank();
     hal.playerSetTrack(track, partData[track]);
+    layerScratch[track] = -1;
     refresh(true);
 }
 
@@ -1277,6 +1284,7 @@ void App::servicePartRecording()
     const uint32_t length = session.loopFrames();
     const uint32_t firstSample = (length - (hal.recordStartPosition() % length)) % length;
     const uint32_t needed = firstSample + length + kPostFrames;
+    if (layerPass[session.recordingTrack()]) mixLayer(session.recordingTrack(), firstSample, hal.recordLength());
     if (needed > hal.regionFrames() || !hal.recordActive())
     {
         hal.recordStop();

@@ -244,6 +244,10 @@ class App
     void stepBeat(int dir);
     uint32_t scrubPos = 0;              // the playhead while stopped
     void finishLayer(int track, uint32_t firstSample);
+    void mixLayer(int track, uint32_t firstSample, uint32_t recorded);
+    int layerScratchTrack(int track) const;
+    int layerScratch[4] = { -1, -1, -1, -1 }; // the empty track whose memory a layer is recorded into
+    uint32_t layerMixed = 0;                  // frames of the take already added to the Part
     void loopCfgSave();
     void loopCfgLoad();
     bool layerPass[4] = {};     // the take being recorded is laid over the Part that was there

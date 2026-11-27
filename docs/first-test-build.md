@@ -332,3 +332,6 @@ FT57 crashed on the first synth note (stuck chord, scratchy sound, then a crash)
 
 ## FT60: the start line on the arming screen
 While Wait for sound is armed the lane says "Recording starts at the orange line", draws a thick orange line on the input meter labelled "START -36 dB", and shows the input level now at the right. The jog moves the line; no trip to Config is needed.
+
+## FT61: layering in real time
+FT60 and earlier recorded a layer over the Part's own memory, so the old audio was overwritten while the pass played (a gap), and the mix was done afterwards from the card. Now the pass is recorded in the memory of an **empty track** and added into the playing Part as it comes in, each frame lowered by the Fade level first. The old layers keep playing during the pass, the new one joins the loop as you play it (heard from the next time round), and Stop part-way only changes the part you played. **It needs one empty track** (otherwise a take replaces, with the question as before) and an SD card (the old audio is still saved there for Undo, which happens when you press Rec, so there is a pause of a second or so before it arms).
