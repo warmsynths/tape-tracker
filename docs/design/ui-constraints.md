@@ -21,7 +21,7 @@ Hard limits for anyone designing screens for this firmware. Each one comes from 
 - The only built-in icons are glyphs in the 17 Bold font: **Pause, Stop, Play, Rec, Folder, Up-dir, Loop, Arrow** (`docs/developer_guide.md`, section 4). Any other icon must be drawn from simple shapes or written as text.
 
 ## 3. Color
-- Flat, opaque `#RRGGBB` colors only. **No alpha, gradients, shadows or blur** (the theme format rejects alpha values, `docs/custom_themes_and_fonts.md`).
+- Flat `#RRGGBB` colors. **No gradients, shadows or blur.** A theme cannot carry alpha values (`docs/custom_themes_and_fonts.md`), but a screen may draw a fill see-through (a transparency change costs 4 bytes): the home screen's track tints do. Use it for tints, not for layered effects.
 - Use color **roles**, not free colors, so every theme can recolor the screen: background; top bar (`text`, `background`, `frame`); labels (`active`, `inactive`, button states, `redButton`); lists; bars (`active`, `inactive`); waveform (`audio`, `background`, `progress`, `sliceMarker`, `points`); accents (`white`, `red`, `orange`, `yellow`, `green`, `cyan`, `grey`).
 - Three built-in themes exist (Original, Monochrome, Anniversary); a design should still read in the Monochrome one.
 
@@ -29,7 +29,15 @@ Hard limits for anyone designing screens for this firmware. Each one comes from 
 The firmware builds screens from a fixed set of controls (`core/libs/NewDisplay`): text labels, frames and filled boxes, lists, horizontal and vertical bars (meters), progress cursors and line indicators (playhead), point markers, and a waveform control.
 
 - **Waveforms** are a min/max envelope of at most **600 points** across the width (`strTrackerSpectrum`: 600 upper and 600 lower values). Plan each lane's waveform as no more than 600 columns wide.
-- No rounded corners, curves, icons-as-bitmaps or large images. Custom bitmaps cost scarce memory and are out unless a screen truly needs one.
+- **Shapes are not limited to right angles** (corrected after round 5; the earlier text came from the stock firmware's control set, not from the display chip). Our screens draw straight on the display chip, which can do:
+  - filled rectangles, lines at any angle and line strips, filled circles (the record dot is one);
+  - **rounded rectangles** (the chip does it natively; the corner radius is one setting, so a screen that keeps one radius pays for it once: about 4 bytes);
+  - rings (two circles, the inner one in the background colour), dial arcs (a row of small dots along a curve, about 20 for a smooth one) and needles (a line);
+  - one-bit bitmaps (the waveforms) and see-through fills.
+  What the drawing layer exposes today: rectangle, line, circle, text, bars, one-bit bitmap and transparency. Rounded rectangles, rings and arcs are cheap for the firmware side to add: ask, and say which you need.
+- Still out: gradients, shadows, blur, anti-aliased vector icons, large images. Custom bitmaps cost scarce memory and are out unless a screen truly needs one.
+- **Cost is the real limit, not geometry.** About 8,172 bytes of commands per screen: rectangle 20, line 20, circle 24, colour change 4, transparency change 4, text 16 + 4 to 8 per character, bar 12 + 8 per column. A screen full of outlined, rounded cells adds up, so keep a rough count of shapes.
+- The web emulator draws shapes exactly; the chip's edges can differ a little. Anything curved should be checked on the Tracker before it becomes the whole language of the design (the firmware side can add a one-screen shape test).
 - Keep the element count per screen low; the display list is built by the CPU.
 
 ## 5. Speed and memory

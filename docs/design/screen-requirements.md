@@ -43,7 +43,7 @@ Icons: only Pause, Play, Loop and Perf exist as glyphs, each two cells wide. The
 
 Colour: flat opaque colours only, named by role so the screen can be re-themed, and it must still read in a one-colour Monochrome theme.
 
-Drawing: text, filled and outlined rectangles, level meters, a thin playhead line, point markers, and a waveform shown as a min/max envelope. No images, no rounded corners.
+Drawing: text, filled and outlined rectangles, level meters, a thin playhead line, point markers, and a waveform shown as a min/max envelope. No large images. (Rounded corners and circles are allowed: see ui-constraints.md.)
 
 Drawing budget: the whole screen has a small budget. **Waveforms: plan about 100 to 150 columns per track**, not more. Keep the number of separate elements low. If the budget runs out, the top bar and button labels are what disappear, so keep everything else simple.
 
