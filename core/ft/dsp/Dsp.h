@@ -74,6 +74,8 @@ struct TrackCfg
     int8_t pan = 0;                 // -100 left to +100 right
     int8_t tone = 0;                // -100 low-pass (darker) to +100 high-pass (thinner), 0 flat
     bool solo = false;
+    int8_t eqLo = 0;                // low shelf (about 120 Hz) in dB, -12 to +12
+    int8_t eqHi = 0;                // high shelf (about 5 kHz) in dB, -12 to +12
     uint8_t sendReverb = 0;         // how much of the track goes to the reverb, 0..100 (after level, mute and tone)
     uint8_t sendDelay = 0;          // and to the delay
     bool granular = false;          // pitch style: granular (same length) or tape (speed follows)
@@ -100,6 +102,9 @@ class TrackBank
 
     // Renders `n` frames starting at loop position `pos` into stereo float buffers (-1..1).
     void render(uint32_t pos, int n, float* left, float* right);
+    // The same at tape speed `speed` (1.0 normal, 0.8 to 1.2): the pitch follows the speed. `pos` moves on by the
+    // frames that were used, wrapping at `loop`.
+    void renderSpeed(uint32_t& pos, uint32_t loop, float speed, int n, float* left, float* right);
     void resetState();
 
   private:
@@ -108,6 +113,8 @@ class TrackBank
     float sendRev[kMaxBlock] = {}, sendDel[kMaxBlock] = {};
     float lp[4] = {}, hp[4] = {}, hpPrev[4] = {};
     float toneLp[4] = {}, toneHp[4] = {};
+    float eqLoLp[4] = {}, eqHiLp[4] = {};
+    float speedAcc = 0.0f;
     float crushHold[4] = {};
     uint8_t crushCount[4] = {};
 };

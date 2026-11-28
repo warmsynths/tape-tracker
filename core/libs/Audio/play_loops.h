@@ -28,6 +28,7 @@ class AudioPlayLoops : public AudioStream
     // Starts all tracks from the beginning, each `lengthFrames` long.
     void start(uint32_t lengthFrames);
     void stop();
+    void setSpeed(float s) { speed = s; }
     void seek(uint32_t frame) { if (loopLength > 0) currentPosition = frame % loopLength; }
     bool isPlaying() const { return playing; }
 
@@ -52,6 +53,7 @@ class AudioPlayLoops : public AudioStream
     ft::LiveFilterState liveState; // the live filter (core/ft/dsp/SendFx.h)
     volatile uint32_t loopLength = 0;
     volatile uint32_t currentPosition = 0;
+    volatile float speed = 1.0f;
     volatile bool playing = false;
 };
 

@@ -141,6 +141,45 @@ void FourTrackHal::playerStart(uint32_t frames) { engine.getLoopPlayer()->start(
 __NOINIT(EXTERNAL_RAM) static ft::SendFxMemory fxMemoryStore;
 ft::SendFxMemory* FourTrackHal::fxMemory() { return &fxMemoryStore; }
 void FourTrackHal::playerStop() { engine.getLoopPlayer()->stop(); }
+static AudioRecordQueue* mixQueue(int side)
+{
+    return engine.getExportQueues()->getQueue(side == 0 ? ExportQueues::ExportChannels::kLeft : ExportQueues::ExportChannels::kRight,
+                                              mtAudioExport::enStem::stem_master);
+}
+bool FourTrackHal::mixRecStart()
+{
+    mixQueue(0)->begin();
+    mixQueue(1)->begin();
+    return true;
+}
+int FourTrackHal::mixRecRead(int16_t* stereo, int maxFrames)
+{
+    int done = 0;
+    AudioRecordQueue* l = mixQueue(0);
+    AudioRecordQueue* r = mixQueue(1);
+    while (done + AUDIO_BLOCK_SAMPLES <= maxFrames && l->available() > 0 && r->available() > 0)
+    {
+        const int16_t* a = l->readBuffer();
+        const int16_t* b = r->readBuffer();
+        for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++)
+        {
+            stereo[(done + i) * 2] = a[i];
+            stereo[(done + i) * 2 + 1] = b[i];
+        }
+        l->freeBuffer();
+        r->freeBuffer();
+        done += AUDIO_BLOCK_SAMPLES;
+    }
+    return done;
+}
+void FourTrackHal::mixRecStop()
+{
+    mixQueue(0)->end();
+    mixQueue(1)->end();
+    mixQueue(0)->clear();
+    mixQueue(1)->clear();
+}
+void FourTrackHal::playerSpeed(float s) { engine.getLoopPlayer()->setSpeed(s); }
 void FourTrackHal::playerSeek(uint32_t frames) { engine.getLoopPlayer()->seek(frames); }
 bool FourTrackHal::playerPlaying() { return engine.getLoopPlayer()->isPlaying(); }
 uint32_t FourTrackHal::playerPosition() { return engine.getLoopPlayer()->position(); }

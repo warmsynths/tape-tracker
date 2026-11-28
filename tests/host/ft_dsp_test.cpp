@@ -62,6 +62,35 @@ int main()
         b.render(0, 2, L, R);
         CHECK(std::fabs(L[0] * 32768.0f - 100.0f) < 1.0f, "an earlier offset reads ahead");
     }
+    {   // EQ: a low shelf boost lifts a low tone and leaves a high one
+        auto tone = [](float hz, int n) { std::vector<int16_t> v(n); for (int i = 0; i < n; i++) v[i] = (int16_t)(8000.0f * std::sin(6.2832f * hz * (float)i / 44100.0f)); return v; };
+        auto level = [&](float hz, int lo, int hi) {
+            auto d = tone(hz, 44100);
+            TrackBank b; for (auto& c : b.cfg) c.levelDb10 = 0;
+            b.data[0] = d.data(); b.loop = 44100; b.cfg[0].eqLo = (int8_t)lo; b.cfg[0].eqHi = (int8_t)hi;
+            float L[1024], R[1024], pk = 0;
+            for (int blk = 10; blk < 40; blk++) { b.render(blk * 1024, 1024, L, R); for (int i = 0; i < 1024; i++) if (std::fabs(L[i]) > pk) pk = std::fabs(L[i]); }
+            return pk;
+        };
+        const float flat = level(60.0f, 0, 0);
+        CHECK(level(60.0f, 12, 0) > flat * 2.5f, "low EQ +12 dB lifts a 60 Hz tone");
+        CHECK(level(60.0f, -12, 0) < flat * 0.6f, "low EQ -12 dB cuts it");
+        CHECK(std::fabs(level(8000.0f, 12, 0) - level(8000.0f, 0, 0)) < 0.05f, "the low shelf leaves 8 kHz alone");
+        CHECK(level(8000.0f, 0, 12) > level(8000.0f, 0, 0) * 2.5f, "high EQ +12 dB lifts 8 kHz");
+    }
+    {   // varispeed: faster reads more of the loop per block, and the position follows
+        auto d = ramp(10000);
+        TrackBank b; for (auto& c : b.cfg) c.levelDb10 = 0;
+        b.data[0] = d.data(); b.loop = 10000;
+        float L[128], R[128];
+        uint32_t pos = 0;
+        for (int i = 0; i < 10; i++) b.renderSpeed(pos, 10000, 1.0f, 128, L, R);
+        CHECK(pos == 1280, "normal speed moves 128 frames a block");
+        pos = 0; TrackBank c2; for (auto& c : c2.cfg) c.levelDb10 = 0; c2.data[0] = d.data(); c2.loop = 10000;
+        for (int i = 0; i < 10; i++) c2.renderSpeed(pos, 10000, 1.1f, 128, L, R);
+        CHECK(pos >= 1405 && pos <= 1410, "10% faster moves about 141 frames a block");
+        CHECK(std::fabs((L[127] - L[0]) * 32768.0f - 127.0f * 1.1f) < 2.0f, "and the audio inside a block is stretched the same way");
+    }
     {   // mute and trim
         auto d = ramp(1000);
         TrackBank b; for (auto& c : b.cfg) c.levelDb10 = 0; // these tests measure the effects at unity level

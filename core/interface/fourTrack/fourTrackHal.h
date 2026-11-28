@@ -40,6 +40,10 @@ class FourTrackHal : public ft::Hal
     void playerStart(uint32_t frames) override;
     void playerStop() override;
     ft::SendFxMemory* fxMemory() override;
+    bool mixRecStart() override;
+    int mixRecRead(int16_t* stereo, int maxFrames) override;
+    void mixRecStop() override;
+    void playerSpeed(float s) override;
     void playerSeek(uint32_t frames) override;
     bool playerPlaying() override;
     uint32_t playerPosition() override;

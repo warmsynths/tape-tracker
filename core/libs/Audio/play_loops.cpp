@@ -50,7 +50,8 @@ void AudioPlayLoops::update(void)
 
     float l[AUDIO_BLOCK_SAMPLES], r[AUDIO_BLOCK_SAMPLES];
     const uint32_t length = loopLength;
-    bank.render(currentPosition, AUDIO_BLOCK_SAMPLES, l, r);
+    uint32_t at = currentPosition;
+    bank.renderSpeed(at, length, speed, AUDIO_BLOCK_SAMPLES, l, r);
     lofi.process(l, r, AUDIO_BLOCK_SAMPLES, 44100);
     ft::liveFilterProcess(ft::liveFilter(), liveState, l, r, AUDIO_BLOCK_SAMPLES);
     for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++)
@@ -66,7 +67,7 @@ void AudioPlayLoops::update(void)
 
     if (length > 0)
     {
-        currentPosition = (currentPosition + AUDIO_BLOCK_SAMPLES) % length;
+        currentPosition = at;
     }
 
     transmit(left, 0);

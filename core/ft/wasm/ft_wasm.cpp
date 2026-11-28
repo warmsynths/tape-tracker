@@ -161,6 +161,7 @@ class EmuHal : public Hal
     // player
     bool playing = false;
     uint32_t loop = 0, pos = 0;
+    float speed = 1.0f;
     // input level
     float levelL = 0, levelR = 0;
     // click
@@ -191,6 +192,18 @@ class EmuHal : public Hal
     void playerStart(uint32_t f) override { loop = f; trackBank.loop = f; pos = 0; playing = f > 0; }
     SendFxMemory* fxMemory() override { static SendFxMemory mem; return &mem; }
     void playerStop() override { playing = false; }
+    bool mixOn = false;
+    uint32_t mixW = 0, mixR = 0;
+    int16_t mixRing[8192][2];
+    bool mixRecStart() override { mixOn = true; mixW = mixR = 0; return true; }
+    void mixRecStop() override { mixOn = false; }
+    int mixRecRead(int16_t* st, int maxFrames) override
+    {
+        int n = 0;
+        while (n < maxFrames && mixR != mixW) { st[n * 2] = mixRing[mixR & 8191][0]; st[n * 2 + 1] = mixRing[mixR & 8191][1]; mixR++; n++; }
+        return n;
+    }
+    void playerSpeed(float s) override { speed = s; }
     void playerSeek(uint32_t f) override { if (loop > 0) pos = f % loop; }
     bool playerPlaying() override { return playing; }
     uint32_t playerPosition() override { return pos; }
@@ -552,8 +565,7 @@ class EmuHal : public Hal
         for (int i = 0; i < n; i++) pl[i] = pr[i] = 0;
         if (playing && loop > 0)
         {
-            trackBank.render(pos, n, pl, pr);
-            pos = (pos + n) % loop;
+            trackBank.renderSpeed(pos, loop, speed, n, pl, pr);
         }
         lofiMaster.process(pl, pr, n, rate);
 
@@ -576,6 +588,16 @@ class EmuHal : public Hal
             loopRing[(loopFrames + (uint32_t)i) & 4095] = (g_outL[i] + g_outR[i]) * 0.5f;
         }
         liveFilterProcess(liveFilter(), liveState, g_outL, g_outR, n); // the live filter sweeps the whole mix
+        if (mixOn)
+            for (int i = 0; i < n; i++)
+            {
+                float a = g_outL[i], b2 = g_outR[i];
+                a = a > 1.0f ? 1.0f : (a < -1.0f ? -1.0f : a);
+                b2 = b2 > 1.0f ? 1.0f : (b2 < -1.0f ? -1.0f : b2);
+                mixRing[mixW & 8191][0] = (int16_t)(a * 32767.0f);
+                mixRing[mixW & 8191][1] = (int16_t)(b2 * 32767.0f);
+                mixW++;
+            }
         loopFrames += (uint32_t)n;
     }
 };

@@ -386,6 +386,7 @@ class App
     void updateMods();
     bool latched[48] = {};
     uint8_t heldCount[48] = {};
+    int8_t tapeSpeed = 0;         // varispeed in percent, -20 to +20 (Config > Four-Track)
     uint8_t liveWave[120] = {};   // the level heard so far in this take, by place in the loop (Play view)
     uint64_t usedPads[4] = {};   // per track: the pads played while that track was recording (shown as dots)
     void markUsed(int pad)
@@ -549,7 +550,12 @@ class App
     char pendingName[24] = {};
 
     // jobs: saving and loading a project, writing a WAV
-    enum class Job : uint8_t { None, Save, Load, Export, Done, Resample, Backup };
+    enum class Job : uint8_t { None, Save, Load, Export, Done, Resample, Backup, MixRec, MixFinish };
+    // Record mix: the live output goes to the card as it plays (a raw file first, then wrapped as a stereo WAV)
+    uint32_t mixFrames = 0, mixCopied = 0;
+    char mixWav[56] = {};
+    void startMixRec();
+    void stopMixRec();
     Job job = Job::None;
     char jobPath[48] = {};
     uint32_t jobDone = 0, jobTotal = 0, jobStage = 0;

@@ -93,7 +93,8 @@ void App::enter()
 
 void App::leave()
 {
-    if (job != Job::None) job = Job::None;
+    if (job == Job::MixRec) stopMixRec(); // leaving the screen ends the recording and keeps what was heard
+    if (job != Job::None && job != Job::MixFinish) job = Job::None;
     countingIn = false;
     moveMode = false;
     actionMenu = false;
@@ -855,6 +856,7 @@ void App::startRecording()
     else layerPass[t] = false;
     if (!layerPass[t]) usedPads[t & 3] = 0;
     for (int i = 0; i < 120; i++) liveWave[i] = 0;
+    if (tapeSpeed != 0) { tapeSpeed = 0; hal.playerSpeed(1.0f); } // recording is always at normal speed
     if (padsChords && trackRole[t] == TrackRole::Chords && !layerPass[t]) chordEvCount = 0; // a new Chords take writes a new chord track
     layerScratch[t] = layerPass[t] ? layerScratchTrack(t) : -1;
     if (layerScratch[t] < 0) layerPass[t] = false;

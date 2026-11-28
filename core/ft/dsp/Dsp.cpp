@@ -243,6 +243,9 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
         const float revSend = (float)c.sendReverb / 100.0f, delSend = (float)c.sendDelay / 100.0f;
         const int toneHz = toneCutoffHz(c.tone);
         const float toneA = toneHz > 0 ? clampf(6.2832f * (float)toneHz / (float)kRate, 0.0f, 1.0f) : 0.0f;
+        const bool eqOn = c.eqLo != 0 || c.eqHi != 0;
+        const float eqLoGain = exp2Approx((float)c.eqLo / 6.0206f), eqHiGain = exp2Approx((float)c.eqHi / 6.0206f);
+        const float eqLoA = 1.0f - exp2Approx(-6.2832f * 120.0f / (float)kRate * 1.4427f), eqHiA = 1.0f - exp2Approx(-6.2832f * 5000.0f / (float)kRate * 1.4427f);
         bool act[4];
         bool any = false;
         for (int s = 0; s < 4; s++)
@@ -423,6 +426,13 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
             sample *= volume * levelAmp;
             if (c.tone < 0) { toneLp[t] += toneA * (sample - toneLp[t]); sample = toneLp[t]; }
             else if (c.tone > 0) { toneHp[t] += toneA * (sample - toneHp[t]); sample = sample - toneHp[t]; }
+            if (eqOn)
+            {
+                // two shelves: the low part and the high part of the sound are turned up or down
+                eqLoLp[t] += eqLoA * (sample - eqLoLp[t]);
+                eqHiLp[t] += eqHiA * (sample - eqHiLp[t]);
+                sample += (eqLoGain - 1.0f) * eqLoLp[t] + (eqHiGain - 1.0f) * (sample - eqHiLp[t]);
+            }
 
             const float aa = absf(sample);
             const uint16_t p16 = (uint16_t)(aa >= 1.0f ? 32767 : (int)(aa * 32767.0f));
@@ -440,6 +450,35 @@ void TrackBank::render(uint32_t pos, int n, float* left, float* right)
         peak[t] = pk;
     }
     fx.process(sendRev, sendDel, left, right, n);
+}
+
+void TrackBank::renderSpeed(uint32_t& pos, uint32_t loop, float speed, int n, float* left, float* right)
+{
+    if (loop == 0) { for (int i = 0; i < n; i++) left[i] = right[i] = 0.0f; return; }
+    if (speed > 0.995f && speed < 1.005f && speedAcc == 0.0f)
+    {
+        render(pos, n, left, right);
+        pos = (pos + (uint32_t)n) % loop;
+        return;
+    }
+    speed = speed < 0.5f ? 0.5f : (speed > 1.5f ? 1.5f : speed);
+    const float total = speedAcc + (float)n * speed;
+    const int used = (int)total;                 // whole input frames this block moves on by
+    float tl[400], tr[400];
+    int need = used + 2;
+    if (need > 400) need = 400;
+    render(pos, need, tl, tr);
+    for (int i = 0; i < n; i++)
+    {
+        const float ph = speedAcc + (float)i * speed;
+        int k = (int)ph;
+        if (k > need - 2) k = need - 2;
+        const float f = ph - (float)k;
+        left[i] = tl[k] + (tl[k + 1] - tl[k]) * f;
+        right[i] = tr[k] + (tr[k + 1] - tr[k]) * f;
+    }
+    speedAcc = total - (float)used;
+    pos = (pos + (uint32_t)used) % loop;
 }
 
 //------------------------------------------------------------------------------------------

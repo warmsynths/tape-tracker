@@ -86,6 +86,11 @@ class Hal
     virtual void playerSetTrack(int track, const int16_t* data) = 0;
     virtual void playerStart(uint32_t frames) = 0;
     virtual void playerStop() = 0;
+    // Record mix: what comes out of the Tracker (tracks, synth, effects), read as 16-bit stereo pairs
+    virtual bool mixRecStart() { return false; }
+    virtual int mixRecRead(int16_t* /*stereo*/, int /*maxFrames*/) { return 0; } // frames read; call often
+    virtual void mixRecStop() {}
+    virtual void playerSpeed(float /*speed*/) {} // tape speed of the loop playback, 1.0 normal
     virtual void playerSeek(uint32_t /*frames*/) {} // move the playhead (scrubbing)
     virtual bool playerPlaying() = 0;
     virtual uint32_t playerPosition() = 0;

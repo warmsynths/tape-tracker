@@ -260,11 +260,11 @@ void App::keyScreen(int k)
             TrackCfg& c = hal.bank().cfg[mxTrack];
             if (k == kLeft) mxTrack = clampi(mxTrack - 1, 0, 3);
             else if (k == kRight) mxTrack = clampi(mxTrack + 1, 0, 3);
-            else if (k == kUp) mxField = clampi(mxField - 1, 0, 2);
-            else if (k == kDown) mxField = clampi(mxField + 1, 0, 2);
+            else if (k == kUp) mxField = clampi(mxField - 1, 0, 4);
+            else if (k == kDown) mxField = clampi(mxField + 1, 0, 4);
             else if (k == kB1) c.mute = !c.mute;
             else if (k == kB2) c.solo = !c.solo;
-            else if (k == kB3) { c.levelDb10 = kDefaultLevelDb10; c.pan = 0; c.tone = 0; }
+            else if (k == kB3) { c.levelDb10 = kDefaultLevelDb10; c.pan = 0; c.tone = 0; c.eqLo = 0; c.eqHi = 0; }
             else if (k == kB8 || k == kParams) { back(); return; }
             if (k >= kB1 && k <= kB3) unsaved = true;
             break;
@@ -318,9 +318,12 @@ void App::keyScreen(int k)
             else if (k == kB8) back();
             break;
         case Screen::Export:
-            if (job == Job::Export) { if (k == kB8) { job = Job::None; back(); } }
+            if (job == Job::MixRec) { if (k == kB8) stopMixRec(); }
+            else if (job == Job::MixFinish) {}
+            else if (job == Job::Export) { if (k == kB8) { job = Job::None; back(); } }
             else if (job == Job::Done) { if (k == kB8) { job = Job::None; back(); } }
             else if (k == kB1) startExport();
+            else if (k == kB2) startMixRec();
             else if (k == kB8) back();
             else if (k == kLeft) exportRepeats = clampi(exportRepeats - 1, 1, 16);
             else if (k == kRight) exportRepeats = clampi(exportRepeats + 1, 1, 16);
@@ -425,7 +428,9 @@ void App::jogScreen(int delta)
             const int d = delta > 0 ? 1 : -1;
             if (mxField == 0) c.levelDb10 = (int16_t)clampi(c.levelDb10 + d * (shift ? 1 : 5), -600, 60);
             else if (mxField == 1) c.pan = (int8_t)clampi(c.pan + d * (shift ? 1 : 5), -100, 100);
-            else c.tone = (int8_t)clampi(c.tone + d * (shift ? 1 : 5), -100, 100);
+            else if (mxField == 2) c.tone = (int8_t)clampi(c.tone + d * (shift ? 1 : 5), -100, 100);
+            else if (mxField == 3) c.eqLo = (int8_t)clampi(c.eqLo + d, -12, 12);
+            else c.eqHi = (int8_t)clampi(c.eqHi + d, -12, 12);
             unsaved = true;
             break;
         }
@@ -959,6 +964,8 @@ void App::startSave()
     w.u8(1); // track roles, version 1
     for (int t = 0; t < 4; t++) w.u8((uint32_t)trackRole[t] | (roleChosen[t] ? 0x80u : 0u));
     for (int i = 0; i < kRoleCount; i++) w.u8(roleSound[i]);
+    w.u8(1); // track EQ, version 1
+    for (int t = 0; t < 4; t++) { w.u8((uint8_t)hal.bank().cfg[t].eqLo); w.u8((uint8_t)hal.bank().cfg[t].eqHi); }
     if (!hal.fileWrite(jobPath, h, kHeader, false)) { showPopup(Popup::SdMissing); return; }
     projectChordsWrite(projectName);
     chordEventsWrite(projectName);
@@ -1027,6 +1034,9 @@ void App::startLoad(const char* name)
         for (int i = 0; i < kRoleCount; i++) roleSound[i] = (uint8_t)clampi((int)r.u8(), 0, i == (int)TrackRole::Drums ? DrumKit::kKits - 1 : kSynthPresets - 1);
     }
     else for (int t = 0; t < 4; t++) { trackRole[t] = trackSource[t] == Source::Pads ? TrackRole::Chords : TrackRole::Audio; roleChosen[t] = ((mask >> t) & 1) != 0; }
+    for (int t = 0; t < 4; t++) { hal.bank().cfg[t].eqLo = 0; hal.bank().cfg[t].eqHi = 0; }
+    if (r.u8() == 1)
+        for (int t = 0; t < 4; t++) { hal.bank().cfg[t].eqLo = (int8_t)clampi((int)(int8_t)r.u8(), -12, 12); hal.bank().cfg[t].eqHi = (int8_t)clampi((int)(int8_t)r.u8(), -12, 12); }
     session.restore(loop, bars, mask);
     fmt(projectName, sizeof(projectName), "%s", name);
     for (int t = 0; t < 4; t++) hasUndoTake[t] = false;
@@ -1040,10 +1050,43 @@ void App::startLoad(const char* name)
     redraw[4] = true;
 }
 
+void App::startMixRec()
+{
+    if (!hal.sdPresent()) { showPopup(Popup::SdMissing); return; }
+    int n = 1;
+    for (; n < 100; n++)
+    {
+        fmt(mixWav, sizeof mixWav, "Exports/%s mix %d.wav", projectName, n);
+        if (hal.fileSize(mixWav) == 0) break;
+    }
+    hal.fileRemove("Exports/mixrec.tmp");
+    if (!hal.fileWrite("Exports/mixrec.tmp", "", 0, false) || !hal.mixRecStart()) { showPopup(Popup::SdMissing); return; }
+    mixFrames = 0;
+    mixCopied = 0;
+    job = Job::MixRec;
+    exportPercent = 0;
+}
+
+void App::stopMixRec()
+{
+    hal.mixRecStop();
+    if (mixFrames == 0) { hal.fileRemove("Exports/mixrec.tmp"); job = Job::None; return; }
+    uint8_t wh[44];
+    wavHeader(wh, mixFrames * 4, hal.sampleRate());
+    // stereo: two channels, four bytes a frame
+    wh[22] = 2; wh[23] = 0;
+    const uint32_t br = hal.sampleRate() * 4;
+    wh[28] = (uint8_t)br; wh[29] = (uint8_t)(br >> 8); wh[30] = (uint8_t)(br >> 16); wh[31] = (uint8_t)(br >> 24);
+    wh[32] = 4; wh[33] = 0;
+    if (!hal.fileWrite(mixWav, wh, 44, false)) { showPopup(Popup::SdMissing); job = Job::None; return; }
+    job = Job::MixFinish;
+}
+
 void App::startExport()
 {
     if (!hal.sdPresent()) { showPopup(Popup::SdMissing); return; }
     if (session.loopFrames() == 0) { showPopup(Popup::Message, 4); return; }
+    mixFrames = 0; mixCopied = 0;
     fmt(exportFile, sizeof(exportFile), "Exports/%s.wav", projectName);
     exportBank = hal.bank();
     exportLofi.cfg = hal.lofi().cfg;
@@ -1070,6 +1113,35 @@ uint32_t App::partOffset(int track) const
 void App::serviceJob()
 {
     if (job == Job::None || job == Job::Done) return;
+    if (job == Job::MixRec)
+    {
+        int16_t buf[2048 * 2];
+        for (int round = 0; round < 3; round++)
+        {
+            const int n = hal.mixRecRead(buf, 2048);
+            if (n <= 0) break;
+            if (!hal.fileWrite("Exports/mixrec.tmp", buf, (uint32_t)n * 4, true)) { stopMixRec(); showPopup(Popup::SdMissing); return; }
+            mixFrames += (uint32_t)n;
+        }
+        redraw[4] = true;
+        return;
+    }
+    if (job == Job::MixFinish)
+    {
+        // wrap the raw file as a WAV, 8 KB a pass
+        uint8_t buf[8192];
+        const uint32_t total = mixFrames * 4;
+        const uint32_t n = (total - mixCopied) < sizeof buf ? (total - mixCopied) : (uint32_t)sizeof buf;
+        if (n > 0)
+        {
+            if (hal.fileRead("Exports/mixrec.tmp", mixCopied, buf, n) != n || !hal.fileWrite(mixWav, buf, n, true)) { showPopup(Popup::SdMissing); job = Job::None; return; }
+            mixCopied += n;
+        }
+        exportPercent = (int)((uint64_t)mixCopied * 100 / (total ? total : 1));
+        if (mixCopied >= total) { hal.fileRemove("Exports/mixrec.tmp"); job = Job::Done; }
+        redraw[4] = true;
+        return;
+    }
     if (job == Job::Backup)
     {
         // keep the Part that is about to be replaced on the card, 16,384 frames a pass
@@ -1515,7 +1587,7 @@ void App::resampleJog(int delta)
 
 int App::deviceRowCount(int g) const
 {
-    static const int n[9] = { 3, 1, 1, 1, 3, 8, 7, 2, 3 };
+    static const int n[9] = { 3, 1, 1, 1, 3, 9, 7, 2, 3 };
     if (g == 7) return 1 + (fwCount > 0 ? fwCount : 1);
     return n[g < 0 || g > 8 ? 0 : g];
 }
@@ -1587,6 +1659,7 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             else if (r == 3) { n = "Wait level"; fmt(value, size, "%d dB", (int)set.waitDb); h = "How loud the input must get before a waiting first take starts. B1 opens a page with the live input to set it against."; }
             else if (r == 6) { n = "Later Parts"; fmt(value, size, "%s", set.layer ? "Layer" : "Replace"); h = "Layer adds each new take on top of the Part already on the track. Replace records over it. Undo brings the last one back."; }
             else if (r == 7) { n = "Fade"; fmt(value, size, "%d%%", (int)set.fadePct); h = "When layering, the older audio stays at this level under each new pass. 100% is a plain overdub. Shift + jog changes it while recording."; }
+            else if (r == 8) { n = "Tape speed"; fmt(value, size, "%s%d%%", tapeSpeed < 0 ? "-" : (tapeSpeed > 0 ? "+" : ""), tapeSpeed < 0 ? -tapeSpeed : tapeSpeed); h = "Plays all four tracks faster or slower, and the pitch follows, like the speed knob of a tape machine. Resets to 0 when you record."; }
             else if (r == 5)
             {
                 n = "Tail wrap"; fmt(value, size, "%s", set.tailWrap ? "On" : "Off");
@@ -1681,6 +1754,7 @@ void App::deviceChange(int g, int r, int delta)
             else if (r == 5) { set.tailWrap = !set.tailWrap; latencyMark(); }
             else if (r == 6) { set.layer = !set.layer; latencyMark(); }
             else if (r == 7) { set.fadePct = (uint8_t)clampi((int)set.fadePct + d * 5, 40, 100); latencyMark(); }
+            else if (r == 8) { tapeSpeed = (int8_t)clampi(tapeSpeed + d * (shift ? 1 : 5), -20, 20); hal.playerSpeed(1.0f + (float)tapeSpeed / 100.0f); }
             else { latencyFrames = clampi(latencyFrames + d * (shift ? 1 : 4), 0, 4000); latencyMark(); }
             break;
         case 6:

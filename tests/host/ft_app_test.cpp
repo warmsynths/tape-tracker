@@ -64,6 +64,17 @@ struct FakeHal : Hal
     uint32_t recordStartPosition() override { return startPos; }
     void playerSetTrack(int t, const int16_t* d) override { data[t] = d; }
     void playerStart(uint32_t f) override { playing = f > 0; loop = f; pos = 0; }
+    int mixLeft = 0;
+    bool mixOpen = false;
+    bool mixRecStart() override { mixOpen = true; mixLeft = 128 * 40; return true; }
+    int mixRecRead(int16_t* st, int maxFrames) override
+    {
+        int n = mixLeft < maxFrames ? mixLeft : maxFrames;
+        for (int i = 0; i < n * 2; i++) st[i] = (int16_t)(i & 1 ? 200 : -200);
+        mixLeft -= n;
+        return n;
+    }
+    void mixRecStop() override { mixOpen = false; }
     void playerStop() override { playing = false; }
     void playerSeek(uint32_t f) override { if (loop > 0) pos = f % loop; }
     bool playerPlaying() override { return playing; }
@@ -939,6 +950,27 @@ static void pagesAndProjects()
         app.key(kB1);
         for (int i = 0; i < 2000 && hal.fileSize("Exports/Untitled.wav") < 44 + loop * 4; i++) hal.advance(app, 128);
         CHECK(hal.fileSize("Exports/Untitled.wav") == 44 + loop * 4, "two repeats make a WAV twice the loop long");
+    }
+    {   // Record mix: the live output goes to a stereo WAV on the card
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        app.key(kFile);
+        app.key(kB6);
+        app.key(kB2);
+        CHECK(hal.mixOpen, "B2 on the Export screen starts Record mix");
+        for (int i = 0; i < 20; i++) hal.advance(app, 128);
+        for (int st = 0; st < app.stagesOf(4); st++) app.draw(4, st, gfx);
+        CHECK(!app.pageOverflowed(), "the recording page fits");
+        app.key(kB8);
+        CHECK(!hal.mixOpen, "Stop ends it");
+        for (int i = 0; i < 100; i++) hal.advance(app, 128);
+        CHECK(hal.fileSize("Exports/Untitled mix 1.wav") == 44 + 128 * 40 * 4, "the file is a WAV with every frame in it");
+        CHECK(hal.fileSize("Exports/mixrec.tmp") == 0, "the raw file is gone");
+        uint8_t hd[44];
+        hal.fileRead("Exports/Untitled mix 1.wav", 0, hd, 44);
+        CHECK(hd[22] == 2 && hd[32] == 4, "it is stereo");
     }
     {   // a take replaced can be brought back with undo
         FakeHal hal;

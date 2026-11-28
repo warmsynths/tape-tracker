@@ -760,18 +760,21 @@ void App::drawMixer(Pen& p)
         if (c.solo) { p.rect(x + 168, 46, 20, 20, pal.text); p.text(x + 173, 48, "S", F14, pal.bg); }
         else { p.frame(x + 168, 46, 20, 20, pal.dim); p.text(x + 173, 48, "S", F14, pal.dim); }
         // focus cells
-        if (sel && mxField == 0) { p.rect(x + 1, 84, 199, 178, pal.sel); p.rect(x + 1, 84, 199, 2, pal.text); }
-        if (sel && mxField == 1) { p.rect(x + 1, 266, 199, 64, pal.sel); p.rect(x + 1, 266, 199, 2, pal.text); }
-        if (sel && mxField == 2) { p.rect(x + 1, 334, 199, 64, pal.sel); p.rect(x + 1, 334, 199, 2, pal.text); }
+        if (sel && mxField == 0) { p.rect(x + 1, 84, 199, 96, pal.sel); p.rect(x + 1, 84, 199, 2, pal.text); }
+        if (sel && mxField == 1) { p.rect(x + 1, 182, 199, 56, pal.sel); p.rect(x + 1, 182, 199, 2, pal.text); }
+        if (sel && mxField == 2) { p.rect(x + 1, 240, 199, 56, pal.sel); p.rect(x + 1, 240, 199, 2, pal.text); }
+        if (sel && mxField == 3) { p.rect(x + 1, 298, 199, 48, pal.sel); p.rect(x + 1, 298, 199, 2, pal.text); }
+        if (sel && mxField == 4) { p.rect(x + 1, 348, 199, 50, pal.sel); p.rect(x + 1, 348, 199, 2, pal.text); }
         // level fader, zero mark and live meter
-        p.rect(x + 20, 100, 16, 146, pal.track);
+        p.rect(x + 20, 100, 16, 70, pal.track);
         int h = 117 + (int)c.levelDb10 * 3 / 10;
         h = h < 0 ? 0 : (h > 146 ? 146 : h);
-        p.rect(x + 20, 100 + 146 - h, 16, h, fill);
-        p.rect(x + 14, 129, 40, 1, pal.dim);
-        p.rect(x + 42, 100, 6, 146, pal.track);
-        const int mh = has ? model.lane[t].meter * 146 / 100 : 0;
-        p.rect(x + 42, 100 + 146 - mh, 6, mh, pal.meter);
+        h = h * 70 / 146;
+        p.rect(x + 20, 100 + 70 - h, 16, h, fill);
+        p.rect(x + 14, 114, 40, 1, pal.dim);
+        p.rect(x + 42, 100, 6, 70, pal.track);
+        const int mh = has ? model.lane[t].meter * 70 / 100 : 0;
+        p.rect(x + 42, 100 + 70 - mh, 6, mh, pal.meter);
         const int db = (int)c.levelDb10;
         const int adb = db < 0 ? -db : db;
         if (db <= -600) fmt(b, sizeof b, "-inf dB"); else fmt(b, sizeof b, "%s%d.%d dB", db < 0 ? "-" : "", adb / 10, adb % 10);
@@ -781,25 +784,37 @@ void App::drawMixer(Pen& p)
         else if (anySolo && !c.solo) p.text(x + 64, 124, "Off by solo", F12, pal.dim);
         // pan
         if (c.pan == 0) fmt(b, sizeof b, "Centre"); else fmt(b, sizeof b, "%s %d", c.pan < 0 ? "L" : "R", c.pan < 0 ? -c.pan : c.pan);
-        p.text(x + 14, 276, b, F17B, tc);
-        p.textRight(x + 188, 279, "Pan", F12, pal.dim);
-        p.rect(x + 14, 310, 174, 4, pal.track);
-        p.rect(x + 100, 304, 1, 16, pal.dim);
-        p.rect(x + 99 + (int)c.pan * 9 / 10, 304, 3, 16, fill);
+        p.text(x + 14, 190, b, F17B, tc);
+        p.textRight(x + 188, 193, "Pan", F12, pal.dim);
+        p.rect(x + 14, 222, 174, 4, pal.track);
+        p.rect(x + 100, 216, 1, 16, pal.dim);
+        p.rect(x + 99 + (int)c.pan * 9 / 10, 216, 3, 16, fill);
         // tone
         const int hz = toneCutoffHz(c.tone);
         if (c.tone == 0) fmt(b, sizeof b, "Flat");
         else if (hz >= 1000) fmt(b, sizeof b, "%s %d.%d kHz", c.tone < 0 ? "LP" : "HP", hz / 1000, (hz % 1000) / 100);
         else fmt(b, sizeof b, "%s %d Hz", c.tone < 0 ? "LP" : "HP", hz);
-        p.text(x + 14, 344, b, F17B, tc);
-        p.textRight(x + 188, 347, "Tone", F12, pal.dim);
-        p.rect(x + 14, 378, 174, 4, pal.track);
-        p.rect(x + 100, 372, 1, 16, pal.dim);
-        p.rect(x + 99 + (int)c.tone * 9 / 10, 372, 3, 16, fill);
+        p.text(x + 14, 248, b, F17B, tc);
+        p.textRight(x + 188, 251, "Tone", F12, pal.dim);
+        p.rect(x + 14, 280, 174, 4, pal.track);
+        p.rect(x + 100, 274, 1, 16, pal.dim);
+        p.rect(x + 99 + (int)c.tone * 9 / 10, 274, 3, 16, fill);
+        // EQ: low and high shelves
+        for (int e = 0; e < 2; e++)
+        {
+            const int v = e == 0 ? c.eqLo : c.eqHi;
+            const int ty = e == 0 ? 306 : 356;
+            fmt(b, sizeof b, "%s%d dB", v > 0 ? "+" : "", v);
+            p.text(x + 14, ty, b, F14B, tc);
+            p.textRight(x + 188, ty + 2, e == 0 ? "Low" : "High", F12, pal.dim);
+            p.rect(x + 14, ty + 26, 174, 3, pal.track);
+            p.rect(x + 100, ty + 22, 1, 11, pal.dim);
+            p.rect(x + 99 + v * 7, ty + 22, 3, 11, fill);
+        }
     }
     char hint[96];
-    static const char* const fieldName[3] = { "Level", "Pan", "Tone" };
-    static const char* const fieldHelp[3] = { "Jog: 0.5 dB steps. Shift + jog: 0.1 dB.", "Jog: steps of 5. Shift + jog: 1.", "Left of centre darkens, right of centre thins the sound." };
+    static const char* const fieldName[5] = { "Level", "Pan", "Tone", "Low EQ", "High EQ" };
+    static const char* const fieldHelp[5] = { "Jog: 0.5 dB steps. Shift + jog: 0.1 dB.", "Jog: steps of 5. Shift + jog: 1.", "Left of centre darkens, right of centre thins the sound.", "Jog: 1 dB. Boosts or cuts the bass (about 120 Hz and below).", "Jog: 1 dB. Boosts or cuts the treble (about 5 kHz and above)." };
     fmt(hint, sizeof hint, "Track %d - %s. %s", mxTrack + 1, fieldName[mxField], fieldHelp[mxField]);
     p.hint(hint);
     const TrackCfg& sc = hal.bank().cfg[mxTrack];
@@ -1098,14 +1113,49 @@ void App::drawExport(Pen& p)
         fmt(b, sizeof b, "SD / FourTrack / Exports / %s.wav", projectName);
         p.text(14, 228, b, F14, pal.text);
         p.text(14, 270, "Jog chooses the repeats. B1 starts.", F12, pal.dim);
-        const char* l[8] = { "Start", "", "", "", "", "", "", "Cancel" };
+        p.text(14, 292, "Record mix (B2) records everything you hear, live, until you stop it. No length limit.", F12, pal.dim);
+        const char* l[8] = { "Start", "Record mix", "", "", "", "", "", "Cancel" };
         p.buttons(l);
+        return;
+    }
+    if (job == Job::MixRec || job == Job::MixFinish)
+    {
+        const uint32_t secs = rate ? mixFrames / rate : 0;
+        if (job == Job::MixRec)
+        {
+            p.rect(14, 80, 10, 10, pal.rec);
+            p.text(32, 76, "Recording the mix", F17B, pal.text);
+            fmt(b, sizeof b, "%u:%02u", secs / 60, secs % 60);
+            p.text(14, 112, b, F17B, pal.text);
+            p.text(14, 150, "Play, jam and change things. Everything you hear is recorded.", F14, pal.dim);
+            p.text(14, 172, "Stop ends it and saves the file.", F12, pal.dim);
+            const char* l[8] = { "", "", "", "", "", "", "", "Stop" };
+            p.buttons(l);
+        }
+        else
+        {
+            p.text(14, 80, "Saving the file", F17B, pal.text);
+            fmt(b, sizeof b, "%d%%", exportPercent);
+            p.text(14, 112, b, F14, pal.text);
+            const char* l[8] = {};
+            p.buttons(l);
+        }
         return;
     }
     if (job == Job::Done)
     {
         p.rect(14, 80, 10, 10, pal.meter);
         p.text(32, 76, "Done", F17B, pal.text);
+        if (mixFrames > 0 && mixCopied >= mixFrames * 4)
+        {
+            const uint32_t secs = rate ? mixFrames / rate : 0;
+            p.text(14, 106, mixWav + 8, F14, pal.text);
+            fmt(b, sizeof b, "SD / FourTrack / Exports - %u:%02u, stereo", secs / 60, secs % 60);
+            p.text(14, 128, b, F12, pal.dim);
+            const char* l2[8] = { "", "", "", "", "", "", "", "Close" };
+            p.buttons(l2);
+            return;
+        }
         fmt(b, sizeof b, "%s.wav", projectName);
         p.text(14, 106, b, F14, pal.text);
         const uint32_t tot = (uint32_t)((uint64_t)loop * exportRepeats * 10 / (rate ? rate : 1));

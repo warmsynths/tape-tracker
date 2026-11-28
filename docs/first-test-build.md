@@ -389,3 +389,14 @@ Juno Pad is now **Juno Clean** (clean wide saw pad with a bright chorus, for syn
 - Level, mute, trims, fades, Offset and normalize are baked in. The result is mono. Sends, tone and the live filter are not baked in.
 - B5 in the panel chooses whether the mixed tracks are cleared afterwards (on by default). Shift + Copy undoes the whole thing.
 - It needs an empty track. With none free it says so.
+
+## FT77 (source only – not built yet) – the rest of the four-track list
+
+Built and committed in source. No firmware has been built for this yet, so the firmware side has only been
+checked in the emulator and by the host tests. It will be compiled for the first time at the next build.
+
+- **Track EQ** (Params mixer): two more rows under Tone, Low and High (a shelf at about 120 Hz and one at about 5 kHz, plus/minus 12 dB). Up/Down move between the five rows, jog changes. Reset clears them. Saved in the project.
+- **Tape speed** (Config > Four-Track, last row): plus/minus 20% for all four tracks, pitch follows. Resets to 0 when you record.
+- **Record mix** (Project > Export, B2): records everything you hear, live, as a stereo WAV in Exports, no length limit. Stop (B8) ends it. The file is first written raw, then wrapped as a WAV. It uses the stock master export queue, so a slow SD write could drop a few blocks; that needs the real device to judge.
+- Input monitoring already exists (Input screen, Monitor).
+- Bounce was FT76.
