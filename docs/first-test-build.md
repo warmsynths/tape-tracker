@@ -472,3 +472,8 @@ Three new kinds of sound, written for this synth (the Plaits engines of the same
 - Cost (model, 6 voices, 1 s): Music Box 42 M, FM Rhodes 57 M, Harp 45 M instructions, all below the 69 M of the heaviest patch before.
 - Extra memory: 9.6 KB of RAM for the string loops.
 - Not added: Cloud Pad (swarm) and the Weird FM Bell. Tell me what to swap for them.
+
+## String Machine (source only, not built)
+
+- Warm Pad (slot 1, the default Chords patch) is now **String Machine**: two detuned saws plus a square an octave down, a slow swell (0.45 s attack), a light slow pitch drift and a moderate chorus (0.6 amount, 0.5 depth). The Solina-style strings sound.
+- Cost (model, 6 voices, 1 s): 51 M instructions. Peak of a six-note chord about 0.7.
