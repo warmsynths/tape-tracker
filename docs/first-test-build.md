@@ -357,3 +357,8 @@ With the bars set, a take that waited for your first note now starts 20 ms befor
 - **Double:** Shift + Insert, B7 **Double**: the loop and every Part repeat once (4 bars become 8) so you can play something different on the second half. Not past 16 s, not undoable.
 - **Where the first sound is:** in move mode the hint line shows it as bar.beat.16th.
 - **Replacing mutes the old Part** while it is written over, and puts the mute back afterwards.
+
+## FT71: synth too loud and glitchy on Strings, change the bars, Play view while recording
+- **Strings (and Organ) clipped and glitched:** a full chord on those patches summed to more than the output could hold (peaks up to 1.55) and the thick-pulse oscillator was twice as heavy as it needed to be. Now there is a gentle limiter on the synth sum (no more hard clipping; peaks stay under 1), the Strings oscillator is a single detuned pair (about half the cost), and the filter cutoff glides between its steps instead of jumping. The sound is a little different.
+- **Change how many bars the loop is:** Shift + Insert, B5 **Bars**. Jog or B1 / B2 change it by a bar and the hint says what it will become; OK applies it. Fewer bars cuts the end off (the audio stays in memory); more bars repeats the loop. All tracks change together.
+- **Recording chords, bass, melody or drums now opens the Play view** (the pad map) as soon as the count-in or arming begins, as in the design. Pattern goes back to the lanes.

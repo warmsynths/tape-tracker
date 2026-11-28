@@ -167,6 +167,11 @@ void App::key(int k)
         keyScreen(k);
         return;
     }
+    if (barsMode)
+    {
+        barsKey(k);
+        return;
+    }
     if (moveMode)
     {
         moveKey(k);
@@ -308,6 +313,13 @@ void App::jog(int delta)
     if (session.mode() == FourTrackSession::Mode::ChoosingBars)
     {
         promptMove(delta > 0 ? 1 : -1);
+        return;
+    }
+    if (barsMode)
+    {
+        barsPending += delta > 0 ? 1 : -1;
+        if (barsPending < 1) barsPending = 1;
+        refresh(true);
         return;
     }
     if (moveMode)
@@ -814,6 +826,7 @@ void App::pressRecord()
     if (firstTake && set.countBeats() > 0 && set.tempoTenths < 2400 && !set.waitSound) // waiting for the first note replaces the count-in
     {
         countingIn = true;
+        if (padsChords && trackRole[t] != TrackRole::Audio && current == Screen::Main && set.roleFlow) open(Screen::Play);
         countInStart = hal.millis();
         countInBeats = 0;
         refresh(true);
@@ -850,6 +863,7 @@ void App::startRecording()
         hal.bank().cfg[t].mute = true;
     }
     session.pressRecord(layerPass[t]);
+    if (padsChords && trackRole[t] != TrackRole::Audio && current == Screen::Main && set.roleFlow) open(Screen::Play); // the pad map while you play (design 6.4, 6.5)
     const int track = session.recordingTrack();
     if (session.mode() == FourTrackSession::Mode::RecordingFirst)
     {
@@ -2015,7 +2029,8 @@ void App::fillView()
     if (mode == FourTrackSession::Mode::Idle && loop > 0 && session.hasPart(session.selected()))
         fmt(v.hint, sizeof(v.hint), "Track %d: Insert for actions. Shift+Insert move. Shift+B%d mute.", session.selected() + 1, session.selected() + 5);
     if (actionMenu) fmt(v.hint, sizeof(v.hint), "Track %d: choose an action. Insert or B8 closes.", session.selected() + 1);
-    if (moveMode)
+    if (barsMode) fmt(v.hint, sizeof(v.hint), "The loop is %d bars. Jog or B1 and B2 change it to %d (fewer cuts the end off, more repeats the loop). OK applies it.", session.bars(), barsPending);
+    else if (moveMode)
     {
         const int32_t L = (int32_t)session.loopFrames();
         const int tr = session.selected();
@@ -2053,13 +2068,20 @@ void App::fillView()
     }
     if (actionMenu)
     {
-        static const char* const am[8] = { "Move", "Edit", "Glitch", "Mute", "Source", "Undo take", "Double", "Close" };
+        static const char* const am[8] = { "Move", "Edit", "Glitch", "Mute", "Bars", "Undo take", "Double", "Close" };
         for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", am[b]); v.btnKind[b] = 0; }
         fmt(v.btn[3], sizeof(v.btn[3]), "%s", hal.bank().cfg[session.selected()].mute ? "Unmute" : "Mute");
         v.btnSelected = -1;
         v.btnMask = 0;
     }
-    if (moveMode)
+    if (barsMode)
+    {
+        static const char* const bm[8] = { "- 1 bar", "+ 1 bar", "", "", "", "", "Cancel", "OK" };
+        for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", bm[b]); v.btnKind[b] = 0; }
+        v.btnSelected = -1;
+        v.btnMask = 0;
+    }
+    else if (moveMode)
     {
         static const char* const mv[8] = { "To start", "To beat", "", "", "Punch in", "Punch out", "Cancel", "OK" };
         for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", mv[b]); v.btnKind[b] = 0; }
@@ -2312,6 +2334,58 @@ void App::endAutoMute()
 }
 
 // Double the loop: every Part is repeated once, so 4 bars become 8 to play something different on the second half
+// How many bars the loop is: fewer cuts the end off (the audio stays in memory), more repeats the loop
+void App::setLoopBars(int bars)
+{
+    const uint32_t L = session.loopFrames();
+    const int now = session.bars();
+    if (L == 0 || now <= 0 || bars < 1 || bars == now || session.mode() != FourTrackSession::Mode::Idle) return;
+    const uint32_t barFrames = L / (uint32_t)now;
+    const uint32_t N = barFrames * (uint32_t)bars;
+    if (N > hal.sampleRate() * kMaxTakeSeconds) { showPopup(Popup::Message, 11); return; }
+    uint8_t mask = 0;
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+    {
+        if (!session.hasPart(t) || partData[t] == nullptr) continue;
+        if ((uint32_t)(partData[t] - hal.region(t)) + N + kPostFrames > hal.regionFrames()) { showPopup(Popup::Message, 11); return; }
+        mask |= (uint8_t)(1u << t);
+    }
+    if (N > L)
+        for (int t = 0; t < FourTrackSession::kTracks; t++)
+            if ((mask >> t) & 1)
+            {
+                int16_t* d = const_cast<int16_t*>(partData[t]);
+                for (uint32_t i = L; i < N; i++) d[i] = d[i % L]; // the loop goes round again
+            }
+    for (int t = 0; t < FourTrackSession::kTracks; t++) hasUndoTake[t] = false;
+    int keep = 0;
+    for (int i = 0; i < chordEvCount; i++) if (chordEv[i].frame < N) chordEv[keep++] = chordEv[i];
+    chordEvCount = keep;
+    const bool wasPlaying = hal.playerPlaying();
+    session.restore(N, bars, mask);
+    punchIn = punchOut = 0;
+    scrubPos = 0;
+    pushBank();
+    for (int t = 0; t < 4; t++) waveDirty[t] = true;
+    unsaved = true;
+    if (wasPlaying) { hal.playerStop(); startPlayer(); }
+}
+
+void App::barsKey(int k)
+{
+    switch (k)
+    {
+        case kB1: case kLeft: case kDown: if (barsPending > 1) barsPending--; break;
+        case kB2: case kRight: case kUp: barsPending++; break;
+        case kB7: barsMode = false; break;
+        case kB8: case kJogPress: barsMode = false; setLoopBars(barsPending); break;
+        case kPlay: togglePlay(); break;
+        case kStop: pressStop(); break;
+        default: break;
+    }
+    refresh(true);
+}
+
 void App::doubleLoop()
 {
     const uint32_t L = session.loopFrames();
@@ -2395,7 +2469,7 @@ void App::actionKey(int k)
         case kB2: actionMenu = false; editTrack = t; editEnter(); open(Screen::Editor); return;
         case kB3: actionMenu = false; gTrack = t; open(Screen::Glitch); return;
         case kB4: muteTrack(t); break;
-        case kB5: selectTrack(t); break; // pressing the selected track again changes its source
+        case kB5: actionMenu = false; barsMode = true; barsPending = session.bars(); break; // how many bars the loop is
         case kB6: actionMenu = false; undoTake(); return;
         case kB7: actionMenu = false; doubleLoop(); return;
         case kB8: case kJogPress: actionMenu = false; break;

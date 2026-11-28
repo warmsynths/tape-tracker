@@ -1493,7 +1493,11 @@ void App::drawPlayView(Pen& p)
             }
         }
     }
-    else p.text(wx + 8, ly + 30, L.msg1[0] != 0 ? L.msg1 : "Empty track", F14, pal.dim);
+    else
+    {
+        p.text(wx + 8, ly + 14, L.msg1[0] != 0 ? L.msg1 : "Empty track", F17B, L.msg1[0] != 0 ? pal.text : pal.dim);
+        if (L.msg2[0] != 0) p.text(wx + 8, ly + 44, L.msg2, F14, pal.text);
+    }
     const int bars = model.barCount;
     for (int i = 1; i < bars && i < 16; i++) p.rect(wx + i * ww / bars, ly, 1, lh, pal.frame);
     if (model.loopFrames > 0)

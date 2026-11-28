@@ -1094,7 +1094,7 @@ int main()
         CHECK(app.screen() == Screen::RoleSound, "a role opens its sound list");
         app.jog(1);
         app.key(kB8); // arms: the count-in starts
-        CHECK(app.screen() == Screen::Main && app.state().selected() == 0, "B8 arms the track");
+        CHECK(app.screen() == Screen::Play && app.state().selected() == 0, "B8 arms the track");
         CHECK(std::strcmp(app.view().padsMode, "BASS") == 0 && std::strcmp(app.view().lane[0].tag, "BASS") == 0, "the pads and the track say Bass");
         app.pad(0, true);
         CHECK(hal.lastNote == 48, "the top left bass pad is C3");
@@ -1135,7 +1135,7 @@ int main()
         App app(hal, palette());
         app.enter();
         app.setShift(true); app.key(kRec); app.setShift(false);
-        CHECK(app.screen() == Screen::Main, "Shift + Rec arms with the last role");
+        CHECK(app.screen() == Screen::Play, "Shift + Rec arms with the last role");
         CHECK(std::strcmp(app.view().padsMode, "CHORD") == 0, "the last role starts as Chords");
     }
     {   // the chord track: the chords of a Chords take are written down, saved, and followed by Bass
@@ -1276,6 +1276,39 @@ int main()
         app.key(kStop);
         for (int i = 0; i < 20; i++) hal.advance(app, 128);
         CHECK(!hal.trackBank.cfg[0].mute, "and the mute is put back afterwards");
+    }
+    {   // changing how many bars the loop is
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        recordLoop(hal, app);
+        const uint32_t loop = app.view().loopFrames;
+        const int bars0 = app.view().barCount;
+        app.setShift(true); app.key(kJogPress); app.setShift(false);
+        app.key(kB5);
+        app.jog(1);
+        app.key(kB8);
+        CHECK(app.view().barCount == bars0 + 1 && app.view().loopFrames == loop / (uint32_t)bars0 * (uint32_t)(bars0 + 1), "Bars: one more bar repeats the loop");
+        app.setShift(true); app.key(kJogPress); app.setShift(false);
+        app.key(kB5);
+        app.jog(-1);
+        app.key(kB8);
+        CHECK(app.view().barCount == bars0 && app.view().loopFrames == loop, "and one bar fewer cuts it again");
+        app.setShift(true); app.key(kJogPress); app.setShift(false);
+        app.key(kB5);
+        app.jog(1);
+        app.key(kB7);
+        CHECK(app.view().barCount == bars0, "Cancel leaves it as it was");
+    }
+    {   // recording chords or synth shows the pad map (the Play view)
+        FakeHal hal;
+        hal.setDefaults = true;
+        App app(hal, palette());
+        app.enter();
+        app.key(kRec);
+        app.key(kB1);      // Chords
+        app.key(kB8);      // arms
+        CHECK(app.screen() == Screen::Play, "arming a take with the pads shows the Play view");
     }
     {   // chords: Note opens the page and the pads play chords and scale notes
         FakeHal hal;

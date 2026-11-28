@@ -167,7 +167,7 @@ void Synth::render(float* left, float* right, int n)
         const float velScale = 0.4f + 0.6f * v.vel;
         float y0 = v.y[0], y1 = v.y[1], y2 = v.y[2], y3 = v.y[3];
         float sub = v.subPhase;
-        float phA = v.phA, phB = v.phB, g = v.g;
+        float phA = v.phA, phB = v.phB, g = v.g, gTarget = v.g;
         const bool two = p.detune != 0.0f;
         const float shape = p.shape;
         const SynthOsc oscType = p.osc;
@@ -202,11 +202,7 @@ void Synth::render(float* left, float* right, int n)
                 case SynthOsc::Saw:
                     return 2.0f * ph - 1.0f - blep(ph, freq);
                 default:
-                {
-                    float ph2 = ph + 0.5f * shape * 0.5f;
-                    if (ph2 >= 1.0f) ph2 -= 1.0f;
-                    return (pulseWave(ph, freq, pulse) + pulseWave(ph2, freq, 1.0f - pulse)) * 0.5f;
-                }
+                    return pulseWave(ph, freq, pulse); // SuperSquare: the thick part is the second pulse below
             }
         };
         for (int i = 0; i < n; i++)
@@ -218,7 +214,14 @@ void Synth::render(float* left, float* right, int n)
             }
 
             float x = oscSample(phA, f);
-            if (two) x = (x + oscSample(phB, fB)) * 0.6f;
+            if (oscType == SynthOsc::SuperSquare)
+            {
+                // two pulses a little apart in pitch and width: one detuned copy, with the other width
+                phB += two ? fB : f * 1.004f;
+                if (phB >= 1.0f) phB -= 1.0f;
+                x = (x + pulseWave(phB, two ? fB : f * 1.004f, 1.0f - pulse)) * 0.5f;
+            }
+            else if (two) x = (x + oscSample(phB, fB)) * 0.6f;
             if (p.subLevel > 0.0f)
             {
                 sub += f * 0.5f;
@@ -239,8 +242,9 @@ void Synth::render(float* left, float* right, int n)
                 if (fc < 20.0f) fc = 20.0f;
                 if (fc > 0.42f * rate) fc = 0.42f * rate;
                 const float w = 6.2831853f * fc / rate;
-                g = w / (1.0f + w);
+                gTarget = w / (1.0f + w);
             }
+            g += (gTarget - g) * 0.2f; // glide to it, so a quick sweep does not zipper
             const float in = stmlib::SoftClip(x * makeup - k * y3);
             y0 += g * (in - y0);
             y1 += g * (y0 - y1);
@@ -265,6 +269,12 @@ void Synth::render(float* left, float* right, int n)
         ensemble.set_amount(p.ensemble);
         ensemble.set_depth(p.depth);
         ensemble.Process(left, right, (size_t)n);
+    }
+    // keep the sum inside the range: a gentle limiter, so a full chord of a thick patch rounds off and does not clip
+    for (int i = 0; i < n; i++)
+    {
+        left[i] = stmlib::SoftLimit(left[i]);
+        right[i] = stmlib::SoftLimit(right[i]);
     }
     drums.render(left, right, n);
 }

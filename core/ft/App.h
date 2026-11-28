@@ -250,6 +250,10 @@ class App
     bool punchOn() const { return punchOut > punchIn; }
     bool autoMuteOn[4] = {}, autoMuteWas[4] = {};
     void doubleLoop();
+    bool barsMode = false;      // changing how many bars the loop is
+    int barsPending = 0;
+    void barsKey(int k);
+    void setLoopBars(int bars);
     void punchSet(bool in);
     void endAutoMute();
     uint32_t sixteenth() const { return session.bars() > 0 ? session.loopFrames() / ((uint32_t)session.bars() * 16) : 1; }
