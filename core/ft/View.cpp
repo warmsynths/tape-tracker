@@ -188,6 +188,7 @@ void Painter::drawTop()
             T(bx + 4, 34, (b + 1) >= 10 ? n : n + 1, kF12, dim);
         }
     }
+    if (v.punchB > v.punchA) rect(kWaveX + kWaveW * v.punchA / 1000, 52, kWaveW * (v.punchB - v.punchA) / 1000, 4, pal.warn); // the punch window
     rect(784, 56, 6, 342, pal.track); // lane scroll bar
 }
 

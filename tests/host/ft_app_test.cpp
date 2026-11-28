@@ -1222,6 +1222,61 @@ int main()
         hal.advance(app, FakeHal::kRate * 4);
         CHECK(!hal.recActive, "and stops by itself");
     }
+    {   // punch: only the window of the loop is recorded over
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        recordLoop(hal, app);
+        const uint32_t loop = app.view().loopFrames;
+        std::vector<int16_t> before(hal.data[0], hal.data[0] + loop);
+        app.key(kStop);
+        app.key(kJogPress);                 // select the waveform: move mode
+        app.key(kB5);                       // punch in at the start of the loop
+        CHECK(app.view().punchB > app.view().punchA, "Punch in marks a window to the end of the loop");
+        app.key(kB8);
+        app.key(kRight); app.key(kRight);   // two beats on: half of a one-bar loop
+        app.key(kJogPress);
+        app.key(kB6);                       // punch out
+        app.key(kB8);
+        CHECK(app.view().punchB > 100 && app.view().punchB < 900, "Punch out closes the window part way");
+        const uint32_t edge = (uint32_t)((uint64_t)app.view().punchB * loop / 1000);
+        app.key(kRec);
+        for (int i = 0; i < 6000 && app.state().mode() != FourTrackSession::Mode::Idle; i++) hal.advance(app, 128);
+        bool outsideSame = true, insideChanged = false;
+        for (uint32_t i = edge + 2000; i < loop - 2000; i += 331) if (hal.data[0][i] != before[i]) outsideSame = false;
+        for (uint32_t i = 2000; i + 2000 < edge; i += 331) if (hal.data[0][i] != before[i]) insideChanged = true;
+        CHECK(outsideSame, "outside the window the loop is left alone");
+        CHECK(insideChanged, "inside it the new take is recorded");
+    }
+    {   // double: the loop and every Part repeat once
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        recordLoop(hal, app);
+        const uint32_t loop = app.view().loopFrames;
+        const int bars = app.view().barCount;
+        app.setShift(true); app.key(kJogPress); app.setShift(false);
+        app.key(kB7);
+        CHECK(app.view().loopFrames == loop * 2 && app.view().barCount == bars * 2, "Double makes the loop twice as long");
+        bool same = true;
+        for (uint32_t i = 0; i < loop; i += 997) if (hal.data[0][i] != hal.data[0][loop + i]) same = false;
+        CHECK(same, "the second half repeats the first");
+    }
+    {   // replacing in place mutes the old Part while it is written over
+        FakeHal hal;
+        App app(hal, palette());
+        app.enter();
+        app.settingsForTest().layer = false;
+        recordLoop(hal, app);
+        CHECK(!hal.trackBank.cfg[0].mute, "the Part is not muted before");
+        app.key(kRec);
+        app.key(kB8);
+        hal.advance(app, 100000); // the count-in
+        CHECK(hal.trackBank.cfg[0].mute, "the old Part is muted while it is replaced");
+        app.key(kStop);
+        for (int i = 0; i < 20; i++) hal.advance(app, 128);
+        CHECK(!hal.trackBank.cfg[0].mute, "and the mute is put back afterwards");
+    }
     {   // chords: Note opens the page and the pads play chords and scale notes
         FakeHal hal;
         App app(hal, palette());

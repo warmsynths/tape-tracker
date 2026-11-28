@@ -793,7 +793,7 @@ void App::pressRecord()
         if (shift) applyRole(t, lastRole);
         else { roleList = 0; open(Screen::Role); return; }
     }
-    const bool layerNow = set.layer && session.loopFrames() > 0 && session.hasPart(t) && hal.sdPresent() && partData[t] != nullptr && layerScratchTrack(t) >= 0;
+    const bool layerNow = (set.layer || punchOn()) && session.loopFrames() > 0 && session.hasPart(t) && hal.sdPresent() && partData[t] != nullptr && layerScratchTrack(t) >= 0;
     if (session.loopFrames() > 0 && session.hasPart(t) && !replaceConfirmed && !layerNow)
     {
         showPopup(Popup::Replace, t);
@@ -842,6 +842,13 @@ void App::startRecording()
     if (padsChords && trackRole[t] == TrackRole::Chords && !layerPass[t]) chordEvCount = 0; // a new Chords take writes a new chord track
     layerScratch[t] = layerPass[t] ? layerScratchTrack(t) : -1;
     if (layerScratch[t] < 0) layerPass[t] = false;
+    if (session.hasPart(t) && !layerPass[t] && !autoMuteOn[t])
+    {
+        // replacing in place: the old Part is muted while it is written over, and the mute is put back afterwards
+        autoMuteWas[t] = hal.bank().cfg[t].mute;
+        autoMuteOn[t] = true;
+        hal.bank().cfg[t].mute = true;
+    }
     session.pressRecord(layerPass[t]);
     const int track = session.recordingTrack();
     if (session.mode() == FourTrackSession::Mode::RecordingFirst)
@@ -1327,11 +1334,14 @@ void App::mixLayer(int track, uint32_t firstSample, uint32_t recorded)
     const int fade = set.fadePct < 40 ? 40 : (set.fadePct > 100 ? 100 : set.fadePct);
     uint32_t end = recorded < firstSample + length ? recorded : firstSample + length;
     uint32_t k = layerMixed > firstSample ? layerMixed : firstSample;
+    const bool replace = !set.layer; // with Layer off only the punch window is recorded over
     for (; k < end; k++)
     {
-        int64_t j = ((int64_t)(k - firstSample) - lat - shift) % (int64_t)length;
+        const int64_t heard = ((int64_t)(k - firstSample) - lat) % (int64_t)length;
+        if (punchOn() && (heard < (int64_t)punchIn || heard >= (int64_t)punchOut)) continue; // outside the window the loop is left alone
+        int64_t j = (heard - shift) % (int64_t)length;
         if (j < 0) j += (int64_t)length;
-        const int32_t v = (int32_t)dst[j] * fade / 100 + (int32_t)src[k];
+        const int32_t v = replace ? (int32_t)src[k] : (int32_t)dst[j] * fade / 100 + (int32_t)src[k];
         dst[j] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
     }
     layerMixed = k;
@@ -1513,6 +1523,7 @@ void App::tick()
         case FourTrackSession::Mode::ChoosingBars: break;
     }
     serviceTail();
+    if (session.mode() == FourTrackSession::Mode::Idle || session.mode() == FourTrackSession::Mode::ChoosingBars) { for (int t = 0; t < 4; t++) if (autoMuteOn[t]) { endAutoMute(); break; } }
     serviceCountIn();
     serviceClick();
     serviceChordNotes();
@@ -1752,6 +1763,12 @@ void App::fillView()
         else v.fb[0] = 0;
     }
     v.barCount = (uint8_t)session.bars();
+    v.punchA = v.punchB = 0;
+    if (punchOn() && session.loopFrames() > 0)
+    {
+        v.punchA = (uint16_t)((uint64_t)punchIn * 1000 / session.loopFrames());
+        v.punchB = (uint16_t)((uint64_t)punchOut * 1000 / session.loopFrames());
+    }
     v.loopFrames = loop;
     v.gridMode = set.homeGrid;
     {
@@ -1998,7 +2015,15 @@ void App::fillView()
     if (mode == FourTrackSession::Mode::Idle && loop > 0 && session.hasPart(session.selected()))
         fmt(v.hint, sizeof(v.hint), "Track %d: Insert for actions. Shift+Insert move. Shift+B%d mute.", session.selected() + 1, session.selected() + 5);
     if (actionMenu) fmt(v.hint, sizeof(v.hint), "Track %d: choose an action. Insert or B8 closes.", session.selected() + 1);
-    if (moveMode) fmt(v.hint, sizeof(v.hint), "Move Track %d: jog or arrows step by the grid, Shift+arrows by 1 ms.", session.selected() + 1);
+    if (moveMode)
+    {
+        const int32_t L = (int32_t)session.loopFrames();
+        const int tr = session.selected();
+        int32_t p = 0;
+        if (L > 0) { p = (int32_t)((noteFrame(tr) < 0 ? 0 : noteFrame(tr)) + alignShift[tr] + userOffset[tr]) % L; if (p < 0) p += L; }
+        const uint32_t q = (uint32_t)p / sixteenth();
+        fmt(v.hint, sizeof(v.hint), "First sound at %u.%u.%02u (bar.beat.16th). Jog: next 16th. B5, B6: punch.", (unsigned)(q / 16 + 1), (unsigned)((q % 16) / 4 + 1), (unsigned)(q % 4 + 1));
+    }
     if (noteHint[0] != 0) fmt(v.hint, sizeof(v.hint), "%s", noteHint);
     fmt(v.loopMode, sizeof(v.loopMode), "%s", set.loopOnce ? "Play once" : "Repeat");
     fmt(v.padsMode, sizeof(v.padsMode), "%s", padsChords ? (set.roleFlow ? roleTag((int)selectedRole()) : "CHORD") : padsKeysMode ? "KEYS" : "PAD");
@@ -2028,7 +2053,7 @@ void App::fillView()
     }
     if (actionMenu)
     {
-        static const char* const am[8] = { "Move", "Edit", "Glitch", "Mute", "Source", "Undo take", "", "Close" };
+        static const char* const am[8] = { "Move", "Edit", "Glitch", "Mute", "Source", "Undo take", "Double", "Close" };
         for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", am[b]); v.btnKind[b] = 0; }
         fmt(v.btn[3], sizeof(v.btn[3]), "%s", hal.bank().cfg[session.selected()].mute ? "Unmute" : "Mute");
         v.btnSelected = -1;
@@ -2036,8 +2061,14 @@ void App::fillView()
     }
     if (moveMode)
     {
-        static const char* const mv[8] = { "To start", "To beat", "", "", "", "", "Cancel", "OK" };
+        static const char* const mv[8] = { "To start", "To beat", "", "", "Punch in", "Punch out", "Cancel", "OK" };
         for (int b = 0; b < 8; b++) { fmt(v.btn[b], sizeof(v.btn[b]), "%s", mv[b]); v.btnKind[b] = 0; }
+        if (punchOn() && sixteenth() > 0)
+        {
+            const uint32_t a = punchIn / sixteenth(), z = punchOut / sixteenth();
+            fmt(v.btn[4], sizeof(v.btn[4]), "In %u.%u.%02u", (unsigned)(a / 16 + 1), (unsigned)((a % 16) / 4 + 1), (unsigned)(a % 4 + 1));
+            fmt(v.btn[5], sizeof(v.btn[5]), "Out %u.%u.%02u", (unsigned)(z / 16 + 1), (unsigned)((z % 16) / 4 + 1), (unsigned)(z % 4 + 1));
+        }
         fmt(v.btn[2], sizeof(v.btn[2]), "%s", gridName(set.gridIdx));
         fmt(v.btn[3], sizeof(v.btn[3]), "All %s", moveAll ? "on" : "off");
         v.btnSelected = -1;
@@ -2070,6 +2101,8 @@ void App::refresh(bool force)
     sig = hashBytes(sig, &v.monitor, sizeof(v.monitor));
     sig = hashBytes(sig, &v.loopFrames, sizeof(v.loopFrames));
     sig = hashBytes(sig, &v.barCount, sizeof(v.barCount));
+    sig = hashBytes(sig, &v.punchA, sizeof(v.punchA));
+    sig = hashBytes(sig, &v.punchB, sizeof(v.punchB));
     sig = hashBytes(sig, &v.focusLane, sizeof(v.focusLane));
     sig = hashBytes(sig, &v.waitDb, sizeof(v.waitDb));
     sig = hashBytes(sig, &v.waitNow, sizeof(v.waitNow));
@@ -2253,6 +2286,67 @@ void App::moveTo(int track, bool toStart)
     shiftTrack(track, delta, moveAll);
 }
 
+// The punch window: the playhead, rounded to a 16th, is where it starts (B5) or ends (B6)
+void App::punchSet(bool in)
+{
+    const uint32_t L = session.loopFrames();
+    if (L == 0 || session.bars() == 0) return;
+    const uint32_t s = sixteenth();
+    uint32_t pos = hal.playerPlaying() ? hal.playerPosition() : scrubPos;
+    pos = ((pos + s / 2) / s) * s;
+    if (pos > L) pos = L;
+    if (in)
+    {
+        punchIn = pos;
+        if (punchOut <= punchIn) punchOut = L; // from here to the end of the loop until Out is set
+    }
+    else if (pos > punchIn) punchOut = pos;
+    if (punchOut <= punchIn) punchIn = punchOut = 0;
+}
+
+void App::endAutoMute()
+{
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+        if (autoMuteOn[t]) { hal.bank().cfg[t].mute = autoMuteWas[t]; autoMuteOn[t] = false; }
+    pushBank();
+}
+
+// Double the loop: every Part is repeated once, so 4 bars become 8 to play something different on the second half
+void App::doubleLoop()
+{
+    const uint32_t L = session.loopFrames();
+    const int bars = session.bars();
+    if (session.mode() != FourTrackSession::Mode::Idle || L == 0 || bars <= 0 || bars > 127) { showPopup(Popup::Message, 10); return; }
+    const uint32_t N = L * 2;
+    uint8_t mask = 0;
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+    {
+        if (!session.hasPart(t) || partData[t] == nullptr) continue;
+        const uint32_t used = (uint32_t)(partData[t] - hal.region(t)) + N + kPostFrames;
+        if (used > hal.regionFrames() || N > hal.sampleRate() * kMaxTakeSeconds) { showPopup(Popup::Message, 11); return; }
+        mask |= (uint8_t)(1u << t);
+    }
+    for (int t = 0; t < FourTrackSession::kTracks; t++)
+        if ((mask >> t) & 1)
+        {
+            int16_t* d = const_cast<int16_t*>(partData[t]);
+            for (uint32_t i = 0; i < L; i++) d[L + i] = d[i];
+            hasUndoTake[t] = false;
+        }
+    // the chord track repeats too
+    const int n = chordEvCount;
+    for (int i = 0; i < n && chordEvCount < kMaxChordEvents; i++) { chordEv[chordEvCount] = chordEv[i]; chordEv[chordEvCount].frame += L; chordEvCount++; }
+    const bool wasPlaying = hal.playerPlaying();
+    session.restore(N, bars * 2, mask);
+    punchIn = punchOut = 0;
+    scrubPos = 0;
+    pushBank();
+    for (int t = 0; t < 4; t++) waveDirty[t] = true;
+    unsaved = true;
+    if (wasPlaying) { hal.playerStop(); startPlayer(); }
+    refresh(true);
+}
+
 void App::moveKey(int k)
 {
     const int t = session.selected();
@@ -2262,6 +2356,8 @@ void App::moveKey(int k)
         case kB2: moveTo(t, false); break;
         case kB3: set.gridIdx = (uint8_t)((set.gridIdx + 1) % 5); unsaved = true; break;
         case kB4: moveAll = !moveAll; break;
+        case kB5: if (shift) punchIn = punchOut = 0; else punchSet(true); break;
+        case kB6: if (shift) punchIn = punchOut = 0; else punchSet(false); break;
         case kB7:
             for (int i = 0; i < FourTrackSession::kTracks; i++) userOffset[i] = moveEntry[i];
             moveMode = false;
@@ -2301,7 +2397,8 @@ void App::actionKey(int k)
         case kB4: muteTrack(t); break;
         case kB5: selectTrack(t); break; // pressing the selected track again changes its source
         case kB6: actionMenu = false; undoTake(); return;
-        case kB7: case kB8: case kJogPress: actionMenu = false; break;
+        case kB7: actionMenu = false; doubleLoop(); return;
+        case kB8: case kJogPress: actionMenu = false; break;
         case kUp: moveSelection(-1); break;
         case kDown: moveSelection(1); break;
         case kPlay: togglePlay(); break;

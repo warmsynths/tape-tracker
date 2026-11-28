@@ -67,6 +67,7 @@ struct View
     uint32_t loopFrames; // 0: no loop yet
     uint32_t posFrames;
     uint8_t barCount;
+    uint16_t punchA, punchB; // the punch window on the loop in thousandths; equal when off
     char hint[96];
     char loopMode[8];
     char padsMode[6];

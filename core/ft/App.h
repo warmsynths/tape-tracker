@@ -245,6 +245,14 @@ class App
     void scrub(int steps, bool bars);   // move the playhead: a sixteenth a step, or a bar
     void stepBeat(int dir);
     uint32_t scrubPos = 0;              // the playhead while stopped
+    // Punch: only part of the loop is re-recorded (set in move mode, B5 and B6), and "Double" repeats the loop
+    uint32_t punchIn = 0, punchOut = 0;
+    bool punchOn() const { return punchOut > punchIn; }
+    bool autoMuteOn[4] = {}, autoMuteWas[4] = {};
+    void doubleLoop();
+    void punchSet(bool in);
+    void endAutoMute();
+    uint32_t sixteenth() const { return session.bars() > 0 ? session.loopFrames() / ((uint32_t)session.bars() * 16) : 1; }
     void finishLayer(int track, uint32_t firstSample);
     void mixLayer(int track, uint32_t firstSample, uint32_t recorded);
     int layerScratchTrack(int track) const;

@@ -351,3 +351,9 @@ With the bars set, a take that waited for your first note now starts 20 ms befor
 - **The loop starts on your first sound.** Count-in: the first sound the detector finds, on a zero crossing; nothing before it is deleted. Wait for sound: the take starts at the instant the level is passed, on the zero crossing just before it. With auto-stop on, the 4 bars are counted from that first sound, so the loop appears a moment after the 4-bar mark.
 - **The click ticks from the moment it arms**, also while it waits for your first note.
 - **Select and move:** Insert (jog press) selects the whole waveform (move mode); each jog click puts its first sound on the next 16th, wrapping round the loop; Left/Right do the same, Shift + Left/Right move 1 ms. B1 "To start" snaps it back to the beginning. The old actions menu is Shift + Insert.
+
+## FT70: ideas from Capstan (analysed in the chat; ideas only, it is GPL-3)
+- **Punch:** select the waveform (Insert), play or scrub to where you want it to start and press **B5 Punch in**, then to where it ends and press **B6 Punch out** (both round to a 16th; Shift + B5 clears). A yellow bar on the ruler shows the window. Rec then re-records only inside it: with Layer on the new take is added inside the window (older audio lowered by Fade there), with Layer off it replaces inside the window. Outside the window the loop is untouched. Needs an empty track and the card, like layering.
+- **Double:** Shift + Insert, B7 **Double**: the loop and every Part repeat once (4 bars become 8) so you can play something different on the second half. Not past 16 s, not undoable.
+- **Where the first sound is:** in move mode the hint line shows it as bar.beat.16th.
+- **Replacing mutes the old Part** while it is written over, and puts the mute back afterwards.
