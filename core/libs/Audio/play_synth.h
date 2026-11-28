@@ -36,8 +36,8 @@ class AudioPlaySynth : public AudioStream
     bool started = false;
     volatile float levelAmp = 1.0f;
     volatile uint32_t peakCycles = 0;
-    int limitNow = 4;      // voices allowed at once: lowered when the processor is short of time
-    uint32_t calm = 0;
+    int limitNow = 3;      // voices allowed at once: lowered when the processor is short of time
+    uint32_t calm = 0, over = 0;
 };
 
 #endif

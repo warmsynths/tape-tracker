@@ -154,6 +154,26 @@ int main()
         for (float v : a) if (!std::isfinite(v)) finite = false;
         CHECK(finite, "an edited patch with every knob up stays finite");
     }
+    {   // taking over a sounding voice, and cutting the voice limit while notes play, do not click
+        Synth s;
+        s.init(kRate);
+        s.setPreset(0);
+        for (int n = 0; n < 6; n++) s.noteOn(48 + n * 3, 100);
+        renderSeconds(s, 1.0f);
+        s.setVoiceLimit(2);                      // four voices fade out
+        std::vector<float> a = renderSeconds(s, 0.2f);
+        float worst = 0;
+        for (size_t i = 1; i < a.size(); i++) { const float d = std::fabs(a[i] - a[i - 1]); if (d > worst) worst = d; }
+        CHECK(worst < 0.2f, "dropping to two voices does not jump");
+        s.noteOn(72, 100); s.noteOn(75, 100);    // both voices are busy: they are taken over
+        std::vector<float> b = renderSeconds(s, 0.3f);
+        float w2 = 0;
+        for (size_t i = 1; i < b.size(); i++) { const float d = std::fabs(b[i] - b[i - 1]); if (d > w2) w2 = d; }
+        CHECK(w2 < 0.2f, "taking over a sounding voice does not jump");
+        bool sounds = false;
+        for (float v : b) if (std::fabs(v) > 0.01f) sounds = true;
+        CHECK(sounds, "and the new notes sound");
+    }
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
     return failures ? 1 : 0;
 }

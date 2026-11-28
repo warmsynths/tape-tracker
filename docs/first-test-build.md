@@ -412,3 +412,14 @@ checked in the emulator and by the host tests. It will be compiled for the first
 
 - Takes now go up to 20 s (was 16 s). The track regions are 22 s (20 s plus 2 s for the tail), and the sample memory grew by the 1.5 MB the stock delay buffer used to take, so the sample space stays about the same (about 5.5 MB).
 - Bars that fit: tempo / 12 (80 BPM: 6 bars, 120 BPM: 10 bars). Double, the progress bar and the messages say 20 s.
+
+## Synth fixes after the FT77 test (source only, not built)
+
+The test: Dream Keys and Glass Pad nice; Warm Pad a tiny bit of distortion; Juno Clean distorts a little as a note goes on; Strings distorts; Heartbreak breaks up and freezes the Tracker.
+
+- The model says no pad clips (peaks under 0.85), so the distortion is the audio running out of time, not level.
+- **Hot synth code now runs from RAM.** On this chip, code in flash waits for the flash; the Synth render, ensemble, overdrive and drum render are copied into RAM at start-up (`.fastrun`), which should make them noticeably faster. About a few KB of RAM.
+- **No more clicks when a voice is taken over.** A sounding voice that a new note takes over, or that the load limiter switches off, now fades out over one block (3 ms) before the new note starts. Before, it cut at once, which sounds like crackle every time a chord went past the voice limit.
+- **Limiter is calmer:** a voice is shed only after three slow blocks in a row (one stray slow block no longer counts), it starts at 3 voices, climbs back after about 1.7 s of calm, and drops to 2 at once when a block takes over 86% of the time.
+- **Heartbreak:** the overdrive is off (it cut the level to a quarter and it was the only pad using it), the release is 1.8 s instead of 2.4 s, and the level is 0.85. Fewer voices overlap.
+- Still unknown: the real "Synth load" number on the device (Config > About).

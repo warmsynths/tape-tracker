@@ -2,6 +2,7 @@
 #define FT_DRUMS_H_
 
 #include <stdint.h>
+#include "Fast.h"
 
 #include "plaits/dsp/drums/analog_bass_drum.h"
 #include "plaits/dsp/drums/analog_snare_drum.h"
@@ -30,7 +31,7 @@ class DrumKit
     void trigger(int voice, int velocity); // velocity 1 to 127
     bool active() const { return activeFor > 0; }
     // Adds `n` frames (n <= kMaxBlock) to left and right.
-    void render(float* left, float* right, int n);
+    FT_FASTRUN void render(float* left, float* right, int n);
     void reset();
 
     static const char* kitName(int kit);

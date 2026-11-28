@@ -30,6 +30,7 @@
 #define PLAITS_DSP_FX_ENSEMBLE_H_
 
 #include "stmlib/stmlib.h"
+#include "../../../../Fast.h" // Four-Track: run in RAM on the Tracker
 
 #include "stmlib/dsp/dsp.h"
 
@@ -56,7 +57,7 @@ class Ensemble {
     engine_.Clear();
   }
   
-  void Process(float* left, float* right, size_t size) {
+  FT_FASTRUN void Process(float* left, float* right, size_t size) {
     typedef E::Reserve<511, E::Reserve<511> > Memory;
     E::DelayLine<Memory, 0> line_l;
     E::DelayLine<Memory, 1> line_r;

@@ -60,11 +60,10 @@ void Synth::setVoiceLimit(int n)
     limit = n < 1 ? 1 : (n > kVoices ? kVoices : n);
     for (int i = limit; i < kVoices; i++)
     {
-        // a voice that is no longer allowed is cut (the quietest way: its amplitude is already low or it is released)
-        voice[i].gate = false;
-        voice[i].amp.value = 0.0f;
-        voice[i].amp.stage = 0;
-        voice[i].flt.stage = 0;
+        // a voice that is no longer allowed fades out over the next block, so there is no click
+        Voice& v = voice[i];
+        v.gate = false;
+        if (v.busy()) v.pendNote = kDying;
     }
 }
 
@@ -97,18 +96,29 @@ void Synth::noteOn(int note, int velocity)
     if (pick == nullptr) for (int i = 0; i < limit; i++) if (!voice[i].busy()) { pick = &voice[i]; break; }
     if (pick == nullptr) for (int i = 0; i < limit; i++) if (!voice[i].gate && (pick == nullptr || voice[i].age < pick->age)) pick = &voice[i];
     if (pick == nullptr) { pick = &voice[0]; for (int i = 0; i < limit; i++) if (voice[i].age < pick->age) pick = &voice[i]; }
+    if (pick->busy() && pick->amp.value > 0.02f && pick->pendNote == kNoPending)
+    {
+        // taking over a sounding voice: it fades out over one block, then the new note starts on it
+        pick->pendNote = note;
+        pick->pendVel = velocity;
+        return;
+    }
+    if (pick->busy() && pick->pendNote != kNoPending) { pick->pendNote = note; pick->pendVel = velocity; return; }
     startVoice(*pick, note, velocity);
 }
 
 void Synth::noteOff(int note)
 {
     for (Voice& v : voice)
+    {
+        if (v.pendNote == note) v.pendNote = v.busy() ? kDying : kNoPending; // released before it ever started
         if (v.gate && v.midi == note)
         {
             v.gate = false;
             v.amp.release();
             v.flt.release();
         }
+    }
 }
 
 void Synth::allNotesOff()
@@ -116,6 +126,7 @@ void Synth::allNotesOff()
     for (Voice& v : voice)
     {
         v.gate = false;
+        v.pendNote = v.busy() ? kDying : kNoPending;
         v.amp.release();
         v.flt.release();
     }
@@ -168,10 +179,14 @@ void Synth::render(float* left, float* right, int n)
     if (pulse < 0.1f) pulse = 0.1f;
     if (pulse > 0.9f) pulse = 0.9f;
 
-    for (int vi = 0; vi < limit; vi++)
+    for (int vi = 0; vi < kVoices; vi++)
     {
         Voice& v = voice[vi];
         if (!v.busy()) continue;
+        if (vi >= limit && v.pendNote != kDying) continue;
+        const bool fading = v.pendNote != kNoPending;
+        float fadeMul = 1.0f;
+        const float fadeStep = fading ? 1.0f / (float)n : 0.0f;
         // pitch: glide in a mono lead, then vibrato
         v.pitch += (v.note - v.pitch) * (glideK > 1.0f ? 1.0f : glideK);
         const float note = v.pitch + lfo * p.lfoPitch + mod;
@@ -268,7 +283,8 @@ void Synth::render(float* left, float* right, int n)
                 y2 += g * (y1 - y2);
                 y3 += g * (y2 - y3);
 
-                sum[i] += y3 * v.amp.value * velScale * 0.5f;
+                fadeMul -= fadeStep;
+                sum[i] += y3 * v.amp.value * velScale * 0.5f * fadeMul;
             }
         };
         if (oscType == SynthOsc::Shape) { if (two) run(Tag<0>{}, Tag<1>{}); else run(Tag<0>{}, Tag<0>{}); }
@@ -277,6 +293,14 @@ void Synth::render(float* left, float* right, int n)
         v.phA = phA; v.phB = phB; v.g = g;
         v.y[0] = y0; v.y[1] = y1; v.y[2] = y2; v.y[3] = y3;
         v.subPhase = sub;
+        if (fading)
+        {
+            const int next = v.pendNote, vel = v.pendVel;
+            v.pendNote = kNoPending;
+            v.amp.value = 0.0f; v.amp.stage = 0; v.flt.value = 0.0f; v.flt.stage = 0;
+            for (float& s : v.y) s = 0.0f;
+            if (next >= 0) startVoice(v, next, vel);
+        }
     }
 
     if (p.drive > 0.0f) overdrive.Process(p.drive, sum, (size_t)n);

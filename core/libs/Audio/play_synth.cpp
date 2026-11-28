@@ -112,7 +112,9 @@ void AudioPlaySynth::update(void)
     const uint32_t spent = cycleCount() - t0;
     if (spent > peakCycles) peakCycles = spent;
     // Short of time (more than about half a block): allow fewer voices at once. Plenty of time for a while: allow more.
-    if (spent > 270000u) { calm = 0; if (limitNow > 2) { limitNow--; synth.setVoiceLimit(limitNow); } }
-    else if (spent < 150000u) { if (++calm > 400 && limitNow < ft::Synth::kVoices) { limitNow++; synth.setVoiceLimit(limitNow); calm = 0; } }
-    else calm = 0;
+    // (a single slow block is not enough: the card or the display can steal a block now and then)
+    if (spent > 450000u) { calm = 0; over = 0; if (limitNow > 2) { limitNow = 2; synth.setVoiceLimit(2); } } // nearly out of time: drop to two voices at once
+    else if (spent > 330000u) { calm = 0; if (++over >= 3 && limitNow > 2) { limitNow--; synth.setVoiceLimit(limitNow); over = 0; } }
+    else if (spent < 180000u) { over = 0; if (++calm > 600 && limitNow < ft::Synth::kVoices) { limitNow++; synth.setVoiceLimit(limitNow); calm = 0; } }
+    else { calm = 0; over = 0; }
 }

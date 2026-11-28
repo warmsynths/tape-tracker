@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "Fast.h"
+
 #include "Drums.h"
 #include "SynthPatch.h"
 #include "plaits/dsp/fx/ensemble.h"
@@ -43,7 +45,7 @@ class Synth
     int voiceLimit() const { return limit; }
 
     // Renders `n` frames (n <= kMaxBlock), overwriting left and right.
-    void render(float* left, float* right, int n);
+    FT_FASTRUN void render(float* left, float* right, int n);
 
   private:
     struct Env
@@ -65,6 +67,8 @@ class Synth
         float vel = 1.0f;
         int midi = -1;
         bool gate = false;
+        int pendNote = -1;        // a note that waits for this voice to fade out (it was stolen), or -2: fade out and stop
+        int pendVel = 0;
         uint32_t age = 0;
         bool busy() const { return amp.stage != 0; }
     };
@@ -79,6 +83,7 @@ class Synth
     Voice voice[kVoices];
     uint32_t clock = 0;
     int limit = kVoices;
+    static constexpr int kNoPending = -1, kDying = -2;
     float lfoPhase = 0.0f;
     float bendSemis = 0.0f, vibDepth = 0.0f, vibPhase = 0.0f;
     uint32_t noiseState = 22222;
