@@ -37,6 +37,12 @@ float cycleValue(const SynthPatch& p, float ph)
             const float d = fabsf(ph - 0.5f);
             return d < notch * 0.25f ? v * 0.2f : v;
         }
+        case SynthOsc::Fm:
+            return sinf(2.0f * kPi * ph + 2.0f * sinf(2.0f * kPi * ph * (1.0f + p.shape * 4.0f)));
+        case SynthOsc::Modal:
+            return 0.6f * sinf(2.0f * kPi * ph) + 0.3f * sinf(2.0f * kPi * ph * 2.76f) + 0.15f * sinf(2.0f * kPi * ph * 5.4f);
+        case SynthOsc::String:
+            return (2.0f * ph - 1.0f) * (0.5f + 0.5f * sinf(2.0f * kPi * ph * 3.0f));
         default:
         {
             // a thick pulse: a square with a second, slightly shifted one on top

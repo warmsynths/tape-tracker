@@ -32,9 +32,9 @@ const SynthPatch kPresets[kPresetCount] = {
     { "Juno Clean", "Pad", "Clean, wide saw pad with a bright chorus: synthwave.", SynthOsc::Saw, 0.50f, 0.50f, 9.0f, 0.25f, 0.00f, 0.62f, 0.08f, 0.8f, 0.6f,
       0.06f, 0.80f, 0.90f, 0.55f, 0.05f, 1.20f, 0.70f, 0.50f,
       0.50f, 0.00f, 0.02f, 0.00f, 0.00f, 0.60f, 0.40f, 0.0f, false, 0.7f },
-    { "Noir Strings", "Pad", "Dark, slow strings with some grit: a smoky string section.", SynthOsc::SuperSquare, 0.50f, 0.50f, 10.0f, 0.00f, 0.03f, 0.42f, 0.05f, 0.6f, 0.5f,
-      0.70f, 1.00f, 0.85f, 1.20f, 0.60f, 1.00f, 0.70f, 1.00f,
-      0.25f, 0.04f, 0.05f, 0.00f, 0.05f, 0.45f, 0.40f, 0.0f, false, 0.7f, 0.5f },
+    { "Music Box", "Bell", "Struck metal teeth that ring and fade. Shape moves from bar to bell.", SynthOsc::Modal, 0.62f, 0.35f, 0.0f, 0.00f, 0.00f, 0.85f, 0.00f, 0.0f, 0.6f,
+      0.002f, 2.20f, 1.00f, 0.40f, 0.002f, 0.50f, 0.80f, 0.40f,
+      0.00f, 0.00f, 0.00f, 0.00f, 0.00f, 0.25f, 0.25f, 0.0f, false, 0.9f, 0.1f },
     { "Tape Choir", "Pad", "A hazy, detuned pad that drifts like an old tape: nostalgic.", SynthOsc::Shape, 0.30f, 0.50f, 16.0f, 0.15f, 0.05f, 0.30f, 0.10f, 1.2f, 0.4f,
       1.40f, 1.00f, 0.85f, 1.80f, 1.40f, 2.00f, 0.60f, 1.80f,
       0.30f, 0.08f, 0.12f, 0.00f, 0.00f, 0.50f, 0.50f, 0.0f, false, 0.8f, 1.0f },
@@ -44,12 +44,12 @@ const SynthPatch kPresets[kPresetCount] = {
     { "Glass Pad", "Pad", "Bright, airy pad with a breath of noise.", SynthOsc::SuperSquare, 0.30f, 0.50f, 6.0f, 0.00f, 0.04f, 0.78f, 0.05f, 0.3f, 0.7f,
       0.50f, 0.80f, 0.90f, 1.40f, 0.30f, 1.00f, 0.80f, 1.20f,
       0.80f, 0.01f, 0.10f, 0.00f, 0.00f, 0.40f, 0.30f, 0.0f, false, 0.7f },
-    { "Dusty Rhodes", "Keys", "Soft, dusty electric piano with a slow shimmer.", SynthOsc::Shape, 0.20f, 0.50f, 4.0f, 0.10f, 0.01f, 0.38f, 0.08f, 1.4f, 0.6f,
-      0.005f, 1.20f, 0.25f, 0.60f, 0.005f, 0.70f, 0.15f, 0.50f,
-      4.50f, 0.00f, 0.12f, 0.00f, 0.12f, 0.30f, 0.30f, 0.0f, false, 1.6f, 0.3f },
-    { "Cold Stab", "Stab", "A short, cold chord hit for stabs and chopped-sample style playing.", SynthOsc::Saw, 0.50f, 0.50f, 12.0f, 0.20f, 0.00f, 0.45f, 0.12f, 2.0f, 0.5f,
-      0.005f, 0.35f, 0.00f, 0.35f, 0.005f, 0.30f, 0.00f, 0.30f,
-      0.00f, 0.00f, 0.00f, 0.00f, 0.10f, 0.30f, 0.30f, 0.0f, false, 1.5f, 0.2f },
+    { "FM Rhodes", "Keys", "A real two-operator FM electric piano: a bell-like strike and a soft body.", SynthOsc::Fm, 0.12f, 0.55f, 3.0f, 0.12f, 0.01f, 0.62f, 0.00f, 0.3f, 0.6f,
+      0.003f, 1.40f, 0.25f, 0.50f, 0.003f, 0.55f, 0.15f, 0.40f,
+      4.50f, 0.00f, 0.12f, 0.00f, 0.12f, 0.30f, 0.30f, 0.0f, false, 1.2f, 0.2f },
+    { "Harp", "Pluck", "A plucked string: harp or nylon guitar. Decay is how long it rings.", SynthOsc::String, 0.55f, 0.50f, 0.0f, 0.00f, 0.00f, 0.80f, 0.00f, 0.0f, 0.5f,
+      0.002f, 2.00f, 1.00f, 0.25f, 0.002f, 0.50f, 0.80f, 0.30f,
+      0.00f, 0.00f, 0.00f, 0.00f, 0.00f, 0.20f, 0.20f, 0.0f, false, 1.4f, 0.0f },
     { "Dark Moog Bass", "Bass", "Round, menacing mono bass with a quick filter snap.", SynthOsc::Shape, 0.75f, 0.50f, 0.0f, 0.50f, 0.00f, 0.26f, 0.22f, 2.0f, 0.3f,
       0.005f, 0.30f, 0.45f, 0.18f, 0.005f, 0.25f, 0.40f, 0.15f,
       0.00f, 0.00f, 0.00f, 0.00f, 0.25f, 0.00f, 0.50f, 0.03f, true, 1.9f, 0.15f },
@@ -70,7 +70,7 @@ const char* const kMacroNames[kSynthMacros] = { "Bright", "Reson", "Attack", "Re
 enum Unit : uint8_t { uPercent, uSeconds, uHertz, uCents, uSemitones, uOctaves, uOsc, uSwitch };
 struct ParamDef { const char* name; float SynthPatch::*f; float lo, hi, step, fine; Unit unit; };
 const ParamDef kParams[kSynthParams] = {
-    { "Oscillator", nullptr, 0, 2, 1, 1, uOsc },
+    { "Oscillator", nullptr, 0, 5, 1, 1, uOsc },
     { "Shape", &SynthPatch::shape, 0, 1, 0.05f, 0.01f, uPercent },
     { "Pulse", &SynthPatch::pulse, 0, 1, 0.05f, 0.01f, uPercent },
     { "Detune", &SynthPatch::detune, 0, 40, 1.0f, 0.25f, uCents },
@@ -155,7 +155,7 @@ void synthParamStep(SynthPatch& p, int i, int dir, bool fine)
     if (d.unit == uOsc)
     {
         int o = (int)p.osc + dir;
-        p.osc = (SynthOsc)(o < 0 ? 0 : o > 2 ? 2 : o);
+        p.osc = (SynthOsc)(o < 0 ? 0 : o > 5 ? 5 : o);
         return;
     }
     if (d.unit == uSwitch)
@@ -191,7 +191,7 @@ void synthParamSet(SynthPatch& p, int i, float value)
 {
     if (i < 0 || i >= kSynthParams) return;
     const ParamDef& d = kParams[i];
-    if (d.unit == uOsc) { const int o = (int)(value + 0.5f); p.osc = (SynthOsc)(o < 0 ? 0 : o > 2 ? 2 : o); return; }
+    if (d.unit == uOsc) { const int o = (int)(value + 0.5f); p.osc = (SynthOsc)(o < 0 ? 0 : o > 5 ? 5 : o); return; }
     if (d.unit == uSwitch) { p.mono = value > 0.5f; return; }
     if (!(value == value)) value = d.lo; // not a number
     p.*(d.f) = clampf(value, d.lo, d.hi);
@@ -201,7 +201,7 @@ float synthParamFraction(const SynthPatch& p, int i)
 {
     if (i < 0 || i >= kSynthParams) return 0.0f;
     const ParamDef& d = kParams[i];
-    if (d.unit == uOsc) return (float)(int)p.osc / 2.0f;
+    if (d.unit == uOsc) return (float)(int)p.osc / 5.0f;
     if (d.unit == uSwitch) return p.mono ? 1.0f : 0.0f;
     const float v = p.*(d.f);
     return clampf((v - d.lo) / (d.hi - d.lo), 0.0f, 1.0f);
@@ -214,7 +214,7 @@ void synthParamText(const SynthPatch& p, int i, char* out, int size)
     const ParamDef& d = kParams[i];
     if (d.unit == uOsc)
     {
-        fmt(out, size, "%s", p.osc == SynthOsc::Shape ? "Shape" : p.osc == SynthOsc::Saw ? "Saw" : "Super square");
+        fmt(out, size, "%s", p.osc == SynthOsc::Shape ? "Shape" : p.osc == SynthOsc::Saw ? "Saw" : p.osc == SynthOsc::SuperSquare ? "Super square" : p.osc == SynthOsc::Fm ? "FM" : p.osc == SynthOsc::Modal ? "Modal" : "String");
         return;
     }
     if (d.unit == uSwitch)

@@ -79,6 +79,59 @@ void Synth::startVoice(Voice& v, int note, int velocity)
     v.amp.trigger();
     v.flt.trigger();
     if (!wasBusy) { v.amp.value = 0.0f; v.flt.value = 0.0f; for (float& s : v.y) s = 0.0f; }
+    if (p.osc == SynthOsc::Modal) initModal(v, note, v.vel);
+    else if (p.osc == SynthOsc::String) initString(v, note, v.vel);
+}
+
+// A struck bar or bell: six partials, each a sine that dies away (a resonator excited by one impulse)
+void Synth::initModal(Voice& v, int note, float vel)
+{
+    static const float bar[6] = { 1.0f, 2.76f, 5.40f, 8.93f, 13.34f, 18.64f };
+    static const float bell[6] = { 1.0f, 2.32f, 4.25f, 6.63f, 9.38f, 12.5f };
+    const float f = noteToNorm((float)note, rate);
+    const float s = p.shape;
+    for (int k = 0; k < 6; k++)
+    {
+        const float harmonic = (float)(k + 1);
+        const float ratio = s < 0.5f ? harmonic + (bar[k] - harmonic) * (s * 2.0f) : bar[k] + (bell[k] - bar[k]) * ((s - 0.5f) * 2.0f);
+        const float ph = f * ratio; // cycles per sample
+        float amp = vel / (1.0f + 0.55f * (float)k);
+        if (ph > 0.45f) amp = 0.0f;
+        const float seconds = (p.decay < 0.05f ? 0.05f : p.decay) / (1.0f + (float)k * (0.4f + p.pulse * 3.0f));
+        const float r = 1.0f - 1.0f / (seconds * rate); // (exp2f_ is not exact enough this close to 1)
+        v.mc[k] = 2.0f * r * plaits::Sine(ph + 0.25f);
+        v.mr[k] = r * r;
+        v.my1[k] = amp * r * plaits::Sine(ph);
+        v.my2[k] = 0.0f;
+    }
+}
+
+// A plucked string: a loop of noise that loses a little of itself every time round
+void Synth::initString(Voice& v, int note, float vel)
+{
+    const int vi = (int)(&v - voice);
+    const float f = noteToNorm((float)note, rate);
+    float len = 1.0f / f - 0.5f;
+    if (len > (float)(kKsLen - 4)) len = (float)(kKsLen - 4);
+    if (len < 4.0f) len = 4.0f;
+    const int li = (int)len;
+    v.ksL = len;
+    const float seconds = p.decay < 0.05f ? 0.05f : p.decay;
+    float g = 1.0f - len / (seconds * rate);
+    v.ksG = g > 0.9999f ? 0.9999f : g;
+    v.ksPrev = 0.0f;
+    // the pluck: noise, softened more or less by Shape
+    const float a = 0.15f + 0.85f * p.shape;
+    float lp = 0.0f;
+    for (int i = 0; i < kKsLen; i++) ks[vi][i] = 0;
+    for (int i = 0; i < li + 2; i++)
+    {
+        noiseState = noiseState * 1664525u + 1013904223u;
+        const float w = (float)(int32_t)noiseState * (1.0f / 2147483648.0f);
+        lp += a * (w - lp);
+        ks[vi][i] = (int16_t)(lp * vel * 15000.0f);
+    }
+    v.ksP = li + 2;
 }
 
 void Synth::noteOn(int note, int velocity)
@@ -179,6 +232,7 @@ void Synth::render(float* left, float* right, int n)
     if (pulse < 0.1f) pulse = 0.1f;
     if (pulse > 0.9f) pulse = 0.9f;
 
+    float raw[kMaxBlock];
     for (int vi = 0; vi < kVoices; vi++)
     {
         Voice& v = voice[vi];
@@ -253,7 +307,9 @@ void Synth::render(float* left, float* right, int n)
                     advance(v.flt, fRate * 4.0f, fDecayK * 4.0f > 1.0f ? 1.0f : fDecayK * 4.0f, p.fSustain, fReleaseK * 4.0f > 1.0f ? 1.0f : fReleaseK * 4.0f, v.gate);
                 }
 
-                float x = osc(phA, f);
+                float x;
+                if constexpr (OSC == 9) x = raw[i]; // made ahead of the loop: FM, a struck bar or a plucked string
+                else x = osc(phA, f);
                 if constexpr (OSC == 2)
                 {
                     // two pulses a little apart in pitch and width
@@ -298,7 +354,62 @@ void Synth::render(float* left, float* right, int n)
                 sum[i] += y3 * v.amp.value * velScale * 0.5f * fadeMul;
             }
         };
-        if (oscType == SynthOsc::Shape) { if (two) run(Tag<0>{}, Tag<1>{}); else run(Tag<0>{}, Tag<0>{}); }
+        if (oscType == SynthOsc::Fm)
+        {
+            static const float ratios[12] = { 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 3.5f, 4.0f, 5.0f, 6.0f, 7.0f, 9.0f, 14.0f };
+            const int ri = (int)(shape * 11.99f);
+            const float ratio = ratios[ri < 0 ? 0 : (ri > 11 ? 11 : ri)] * detuneRatio;
+            const float index = p.pulse * 7.0f * (0.2f + 0.8f * v.flt.value); // the filter envelope is the brightness of the strike
+            for (int i = 0; i < n; i++)
+            {
+                phA += f; if (phA >= 1.0f) phA -= 1.0f;
+                phB += f * ratio; phB -= (float)(int)phB;
+                float ph = phA + index * plaits::Sine(phB) * 0.16f;
+                ph -= (float)(int)ph;
+                if (ph < 0.0f) ph += 1.0f;
+                raw[i] = plaits::Sine(ph);
+            }
+            run(Tag<9>{}, Tag<0>{});
+        }
+        else if (oscType == SynthOsc::Modal)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                float x = 0.0f;
+                for (int k = 0; k < 6; k++)
+                {
+                    const float y0 = v.mc[k] * v.my1[k] - v.mr[k] * v.my2[k];
+                    v.my2[k] = v.my1[k];
+                    v.my1[k] = y0;
+                    x += y0;
+                }
+                raw[i] = x * 1.3f;
+            }
+            run(Tag<9>{}, Tag<0>{});
+        }
+        else if (oscType == SynthOsc::String)
+        {
+            int16_t* b = ks[vi];
+            const int li = (int)v.ksL;
+            const float fr = v.ksL - (float)li;
+            int w = v.ksP;
+            float prev = v.ksPrev;
+            for (int i = 0; i < n; i++)
+            {
+                int r0 = w - li; if (r0 < 0) r0 += kKsLen;
+                int r1 = r0 - 1; if (r1 < 0) r1 += kKsLen;
+                const float y = ((float)b[r0] * (1.0f - fr) + (float)b[r1] * fr) * (1.0f / 16384.0f);
+                const float nw = v.ksG * (0.5f * y + 0.5f * prev); // the average takes the top off every time round
+                prev = y;
+                b[w] = (int16_t)(nw * 16384.0f);
+                if (++w >= kKsLen) w = 0;
+                raw[i] = nw * 2.0f;
+            }
+            v.ksP = w;
+            v.ksPrev = prev;
+            run(Tag<9>{}, Tag<0>{});
+        }
+        else if (oscType == SynthOsc::Shape) { if (two) run(Tag<0>{}, Tag<1>{}); else run(Tag<0>{}, Tag<0>{}); }
         else if (oscType == SynthOsc::Saw) { if (two) run(Tag<1>{}, Tag<1>{}); else run(Tag<1>{}, Tag<0>{}); }
         else { if (two) run(Tag<2>{}, Tag<1>{}); else run(Tag<2>{}, Tag<0>{}); }
         v.phA = phA; v.phB = phB; v.g = g;

@@ -67,6 +67,9 @@ class Synth
         float vel = 1.0f;
         float driftV = 0.0f, driftT = 0.0f; // the voice's own slow pitch wander and where it is heading
         int driftN = 0;
+        float my1[6] = {}, my2[6] = {}, mc[6] = {}, mr[6] = {}; // the six partials of a Modal voice (a decaying sine each)
+        int ksP = 0;                                            // a String voice: write position, length and loss of its loop
+        float ksL = 100.0f, ksG = 0.99f, ksPrev = 0.0f;
         int midi = -1;
         bool gate = false;
         int pendNote = -1;        // a note that waits for this voice to fade out (it was stolen), or -2: fade out and stop
@@ -93,6 +96,10 @@ class Synth
     plaits::Ensemble ensemble;
     float ensembleBuffer[1024] = {};
     float mixA[kMaxBlock], mixB[kMaxBlock], sum[kMaxBlock], outR[kMaxBlock];
+    static constexpr int kKsLen = 800;                // longest string loop: about 55 Hz
+    int16_t ks[kVoices][kKsLen] = {};                 // the plucked strings, one loop each (16-bit, scaled by 16384)
+    void initModal(Voice& v, int note, float vel);
+    void initString(Voice& v, int note, float vel);
 };
 } // namespace ft
 

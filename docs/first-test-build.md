@@ -460,3 +460,15 @@ The test: Dream Keys and Glass Pad nice; Warm Pad a tiny bit of distortion; Juno
 - **Tape drift:** every voice now wanders slowly in pitch (up to about 30 cents, a new target about every half second), differently for each voice. It is a patch setting, not on the Advanced page. Tape Choir, Wobbly Lead and Noir Strings use it most.
 - **Drive was cutting the level:** the vendored Plaits overdrive attenuated a lot at low settings (about 15 dB at 0.1), so every patch with a little drive was far quieter than the others. Replaced with a simple soft saturation that keeps the level. The patch Level now goes to 200% so single-voice bass and lead patches can match the pads.
 - Cost (model, 6 voices for 1 second): the new patches are 46 to 69 million instructions, the same band as the old ones (the heaviest before was 69). Tape drift adds almost nothing. No extra memory.
+
+## Three engine patches (source only, not built)
+
+Three new kinds of sound, written for this synth (the Plaits engines of the same kinds need a lot of scaffolding; these are lean and cheap):
+
+- **FM Rhodes** (FM): a two-operator FM electric piano. Shape picks the modulator ratio, Pulse the amount, and the filter envelope is how bright the strike is.
+- **Music Box** (Modal): six decaying sines in the ratios of a bar or a bell. Shape goes from harmonic through bar to bell, Pulse is how quickly the high partials die. It rings on its own after you let go.
+- **Harp** (String): a plucked-string loop (Karplus-Strong). Shape is how bright the pluck is, Decay how long it rings. It plays in tune (440 Hz tested).
+- They took the slots of Noir Strings (now Music Box), Dusty Rhodes (now FM Rhodes) and Cold Stab (now Harp). The Sound screen holds twelve tiles, so a new one has to replace one.
+- Cost (model, 6 voices, 1 s): Music Box 42 M, FM Rhodes 57 M, Harp 45 M instructions, all below the 69 M of the heaviest patch before.
+- Extra memory: 9.6 KB of RAM for the string loops.
+- Not added: Cloud Pad (swarm) and the Weird FM Bell. Tell me what to swap for them.

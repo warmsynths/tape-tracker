@@ -174,6 +174,45 @@ int main()
         for (float v : b) if (std::fabs(v) > 0.01f) sounds = true;
         CHECK(sounds, "and the new notes sound");
     }
+    {   // the FM, struck-bar and plucked-string patches sound, ring on their own, and play at the right pitch
+        for (int pre : { 2, 6, 7 })
+        {
+            Synth s;
+            s.init(kRate);
+            s.setPreset(pre);
+            s.noteOn(69, 100);
+            std::vector<float> a = renderSeconds(s, 0.6f);
+            float pk = 0; bool finite = true;
+            for (float v : a) { if (!std::isfinite(v)) finite = false; if (std::fabs(v) > pk) pk = std::fabs(v); }
+            CHECK(finite && pk > 0.05f, "an engine patch makes sound");
+            if (pre == 7)
+            {
+                // the pitch, from where the sound best matches a copy of itself
+                double best = -1; int bestLag = 0;
+                for (int lag = 20; lag < 1200; lag++)
+                {
+                    double c = 0, en = 0;
+                    for (size_t i = 2000; i + lag < a.size(); i++) { c += a[i] * a[i + lag]; en += a[i] * a[i]; }
+                    const double v = c / (en + 1e-9);
+                    if (v > best) { best = v; bestLag = lag; }
+                }
+                const float hz = (float)kRate / (float)bestLag;
+                CHECK(hz > 425.0f && hz < 455.0f, "the plucked string plays A at 440 Hz");
+            }
+        }
+        Synth s;
+        s.init(kRate);
+        s.setPreset(2);
+        s.noteOn(72, 100);
+        renderSeconds(s, 0.05f);
+        std::vector<float> early = renderSeconds(s, 0.3f);
+        s.noteOff(72);
+        std::vector<float> late = renderSeconds(s, 3.0f);
+        float e = 0, l = 0;
+        for (size_t i = 0; i < early.size(); i++) e += early[i] * early[i];
+        for (size_t i = late.size() - 4000; i < late.size(); i++) l += late[i] * late[i];
+        CHECK(e > 0.01f && l < e * 0.05f, "a struck bar dies away");
+    }
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);
     return failures ? 1 : 0;
 }
