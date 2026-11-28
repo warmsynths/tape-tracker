@@ -8,6 +8,7 @@ void AudioPlaySynth::begin(float sampleRate)
     synth.init(sampleRate);
     synth.setPreset(0);
     started = true;
+    synth.setVoiceLimit(limitNow);
     AudioInterrupts();
 }
 
@@ -110,4 +111,8 @@ void AudioPlaySynth::update(void)
     release(right);
     const uint32_t spent = cycleCount() - t0;
     if (spent > peakCycles) peakCycles = spent;
+    // Short of time (more than about half a block): allow fewer voices at once. Plenty of time for a while: allow more.
+    if (spent > 270000u) { calm = 0; if (limitNow > 2) { limitNow--; synth.setVoiceLimit(limitNow); } }
+    else if (spent < 150000u) { if (++calm > 400 && limitNow < ft::Synth::kVoices) { limitNow++; synth.setVoiceLimit(limitNow); calm = 0; } }
+    else calm = 0;
 }

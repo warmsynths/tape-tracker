@@ -370,3 +370,9 @@ Juno Pad is now **Juno Clean** (clean wide saw pad with a bright chorus, for syn
 - **Humanise** is now the seventh setting along the top of the **Chords** page (Left/Right to it, jog changes it), and **B4 "Humanise"** on the Sound page jumps straight to it.
 - **Boot logo** is drawn at twice the size (400 x 240, scaled by the display chip; unchecked on the chip).
 - **Name:** Config, About, the first row is now "Firmware: Four-Track Recorder FT73-xxxx", and the update list shows "Four-Track Recorder FT72" instead of the file name. The name is one constant, `kProductName` in `core/ft/App.h`. The file name must keep starting with `PolyendTrac` and ending `.ptf` for the stock updater.
+
+## FT74 – synth overload protection
+
+- The synth now watches how long each audio block takes. If it gets close to running out of time, it allows fewer voices at once (down to 2) and brings them back after a calm second or so. This is meant to stop the break-up on heavy pads (Heartbreak, Strings, Warm Pad) and the freeze when tweaking Release, Reson or Thick while playing.
+- Config > About > "Synth load" now shows the load and the voice count, e.g. "45% (4 voices)".
+- Not measured on the device yet. The load number from the real device is what decides if more cutting is needed.

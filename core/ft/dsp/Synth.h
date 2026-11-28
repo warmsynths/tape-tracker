@@ -38,6 +38,9 @@ class Synth
     void noteOff(int note);
     void allNotesOff();
     bool active() const;
+    // How many voices may sound at once (1 to kVoices). The audio side lowers it when the processor is short of time.
+    void setVoiceLimit(int n);
+    int voiceLimit() const { return limit; }
 
     // Renders `n` frames (n <= kMaxBlock), overwriting left and right.
     void render(float* left, float* right, int n);
@@ -75,6 +78,7 @@ class Synth
     float brightness = 0.5f;
     Voice voice[kVoices];
     uint32_t clock = 0;
+    int limit = kVoices;
     float lfoPhase = 0.0f;
     float bendSemis = 0.0f, vibDepth = 0.0f, vibPhase = 0.0f;
     uint32_t noiseState = 22222;

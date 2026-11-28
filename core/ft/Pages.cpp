@@ -1642,8 +1642,8 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             {
                 n = "Synth load";
                 if (synthPeak < hal.synthLoad()) synthPeak = hal.synthLoad();
-                fmt(value, size, "%d%%", synthPeak < 0 ? 0 : synthPeak);
-                h = "The heaviest block of the synth since you opened this page, as a share of the time it has. Play a chord and look: above 80% means dropouts.";
+                fmt(value, size, "%d%% (%d voices)", synthPeak < 0 ? 0 : synthPeak, hal.synthVoices());
+                h = "The heaviest block of the synth since you opened this page, as a share of the time it has. Play a chord and look. When it is high the synth allows fewer voices at once (the number in brackets).";
             }
             else { n = "Build"; fmt(value, size, "%s", FT_BUILD_ID); h = "The build of the Four-Track code. The emulator shows the same id when it runs the same code."; }
             break;
