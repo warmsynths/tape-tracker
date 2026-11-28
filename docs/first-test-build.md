@@ -447,3 +447,9 @@ The test: Dream Keys and Glass Pad nice; Warm Pad a tiny bit of distortion; Juno
 - Found by the owner: the fizz and the "going crazy" on held chords was the chorus. Several pads had it at 100% with the depth up to 100%.
 - Chorus amount and depth are now lower on every patch (about 0.3 to 0.65), and the synth caps both at 0.7 whatever the knobs or the patch say.
 - Drums take then freeze (owner report): could not be reproduced in the host test (a drum take, Stop, then Config and Params all work). A host test now checks that. The cause is probably specific to the device.
+
+## Freeze after stopping a long drum take (source only, not built)
+
+- Owner report: pressed Stop on a long Drums take; the screen stopped changing and no button worked, but the pads still made sound and kits still changed.
+- Found in the stock `Recorder::stop()`: it drains the left and right record queues with `while (left has a block or right has a block) update();`. For a take from the pad bus (two queues into one mono track), `update()` only consumes a block when both queues have one. If one queue has a block the other lacks (the two queues can drift apart on a long take, or when Stop lands between the two `end()` calls), nothing is consumed and the loop never ends. That freezes the main loop; the audio and the pad callbacks keep running.
+- Fixed: the drain is bounded (40 passes) and anything left is thrown away. This also protects every other take from the same hang.

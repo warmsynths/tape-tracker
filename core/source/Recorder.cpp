@@ -216,8 +216,12 @@ void Recorder::stop()
 
     if (isActive)
     {
-        while ((recordingQueue[AudioInput::InputChannels::kLeft]->available() > 0) ||
-               (recordingQueue[AudioInput::InputChannels::kRight]->available() > 0))
+        // A left block with no right block (or the other way round) is never used by update(), so this loop could
+        // spin for ever: it is bounded (each queue holds at most QUEUE_SIZE blocks) and what is left is thrown away.
+        int guard = 4 * QUEUE_SIZE;
+        while (((recordingQueue[AudioInput::InputChannels::kLeft]->available() > 0) ||
+                (recordingQueue[AudioInput::InputChannels::kRight]->available() > 0)) &&
+               guard-- > 0)
         {
             update();
         }
