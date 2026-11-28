@@ -1157,7 +1157,7 @@ uint32_t App::autoFrames() const
 
 int App::barsFit(int tempoTenths) const
 {
-    return tempoTenths / 150; // 16 s at 4 beats a bar: bars * 2400 / tempo <= 16
+    return tempoTenths / 120; // 20 s at 4 beats a bar: bars * 240 / tempo <= 20
 }
 
 int App::barsStep(int from, int dir) const
@@ -1932,7 +1932,7 @@ void App::fillView()
             const uint32_t leftTenths = (maxFrames - got) * 10 / rate;
             L.progress = (uint8_t)(got * 100 / maxFrames);
             L.warn = leftTenths <= 30;
-            fmt(L.side1, sizeof(L.side1), "%s", L.warn ? "Memory nearly full" : "Up to 16 s per Part");
+            fmt(L.side1, sizeof(L.side1), "%s", L.warn ? "Memory nearly full" : "Up to 20 s per Part");
             fmt(L.side2, sizeof(L.side2), "%u.%u s left", (unsigned)(leftTenths / 10), (unsigned)(leftTenths % 10));
             if (want > 0)
             {
@@ -2027,7 +2027,7 @@ void App::fillView()
     {
         if (waitingSound && levelCheck) fmt(v.hint, sizeof(v.hint), "Play your loudest, set the line above the buzz, then press Rec.");
         else if (waitingSound) fmt(v.hint, sizeof(v.hint), "Waiting for your first note: it starts at %d dB. Stop cancels.", (int)set.waitDb);
-        else if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 16 s the take stops by itself and keeps everything.");
+        else if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 20 s the take stops by itself and keeps everything.");
         else if (autoFrames() > 0) fmt(v.hint, sizeof(v.hint), "Recording the bars from your first sound. Stop ends it early.");
         else fmt(v.hint, sizeof(v.hint), "B2 or Stop ends the take. Then: How many bars?");
     }

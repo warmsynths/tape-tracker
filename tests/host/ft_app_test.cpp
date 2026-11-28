@@ -47,12 +47,12 @@ struct FakeHal : Hal
 
     FakeHal()
     {
-        for (auto& m : mem) m.assign(kRate * 18, 0);
+        for (auto& m : mem) m.assign(kRate * 22, 0);
     }
     uint32_t sampleRate() const override { return kRate; }
     uint32_t millis() override { return nowMs; }
     int16_t* region(int t) override { return mem[t].data(); }
-    uint32_t regionFrames() const override { return kRate * 18; }
+    uint32_t regionFrames() const override { return kRate * 22; }
     void applySource(Source s) override { applied = s; }
     void inputLevels(float& l, float& r) override { l = 0.1f; r = 0.1f; }
     void recordStart(int t, Source) override { recActive = true; recTrack = t; recLen = 0; full = false; captured = false; }
@@ -1086,7 +1086,7 @@ int main()
         hal.advance(app, FakeHal::kRate * 30);
         CHECK(app.state().mode() == Mode::ChoosingBars, "memory full ends the first take and asks for the bars");
         CHECK(app.view().prompt.memoryFull, "the question says memory is full");
-        CHECK(app.state().pendingFrames() == FakeHal::kRate * 16, "the take is limited to 16 seconds");
+        CHECK(app.state().pendingFrames() == FakeHal::kRate * 20, "the take is limited to 20 seconds");
     }
     {   // stop during a later Part keeps what was played and silences the rest
         FakeHal hal;

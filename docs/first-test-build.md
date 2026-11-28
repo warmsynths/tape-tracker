@@ -407,3 +407,8 @@ checked in the emulator and by the host tests. It will be compiled for the first
 - This frees 1.5 MB of external RAM (the section simply ends sooner in the linker script; no flash or boot area is touched).
 - The freed RAM is not used yet. Next decision: longer tracks (about 20 s) or more sample space.
 - The scratch area (768 KB) stays: it holds the SD sample-streaming buffer, the plugin loader and the stock exporter's render buffer.
+
+## 20 s tracks (source only, not built)
+
+- Takes now go up to 20 s (was 16 s). The track regions are 22 s (20 s plus 2 s for the tail), and the sample memory grew by the 1.5 MB the stock delay buffer used to take, so the sample space stays about the same (about 5.5 MB).
+- Bars that fit: tempo / 12 (80 BPM: 6 bars, 120 BPM: 10 bars). Double, the progress bar and the messages say 20 s.

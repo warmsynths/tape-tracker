@@ -32,7 +32,7 @@ void operator delete(void*, size_t) noexcept {}
 namespace
 {
 constexpr uint32_t kMaxRate = 48000;
-constexpr uint32_t kRegionSeconds = 18;
+constexpr uint32_t kRegionSeconds = 22;
 constexpr int kBlock = 128;
 
 int16_t g_mem[4][kMaxRate * kRegionSeconds];
@@ -116,7 +116,7 @@ __attribute__((import_module("host"), import_name("file_list"))) int host_file_l
 }
 
 constexpr int kSampleSlots = 48;
-constexpr uint32_t kSamplePool = 3000000; // frames: about 6 MB, what the Tracker has left for samples with 16 s tracks
+constexpr uint32_t kSamplePool = 3000000; // frames: about 6 MB, what the Tracker has left for samples with 20 s tracks
 int16_t g_samples[kSamplePool];
 struct SampleSlot { uint32_t start, length; char name[24]; int8_t tuneSt = 0, tuneCt = 0; uint8_t volume = 100; int8_t pan = 0; bool loop = false; uint16_t pStart = 0, pEnd = 65535; };
 constexpr int kScratchSlot = kSampleSlots; // a sample being previewed from the card; it lives in the free tail

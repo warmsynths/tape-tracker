@@ -62,7 +62,7 @@ const float MIN_WAVE_FLOAT = -1.0;
 // T1
 const uint32_t EXTERAL_MEMORY_ADDRESS = 0x70000000;
 const uint32_t TOTAL_EXTERNAL_MEMORY = (16 * 1024 * 1024); // 16 MB
-const uint32_t SAMPLE_MEMORY_SIZE = (45 * 256 * 1024);     // 11,25 MB = 133.7469 sec = 2.229 min
+const uint32_t SAMPLE_MEMORY_SIZE = (51 * 256 * 1024);     // 12,75 MB: the old 11,25 MB plus the 1,5 MB of the stock delay buffer that is gone
 #else
 // Tmini / Tplus
 const uint32_t EXTERAL_MEMORY_ADDRESS = 0x80000000;
@@ -88,7 +88,7 @@ const uint32_t EDIT_BUFF_OFFSET = SAMPLE_MEMORY_SIZE - (2 * SAMPLE_CHANNELS * ED
 // Four-Track recorder: the four track regions sit at the very top of the sample memory. Loaded
 // samples must stay below them, so the project's memory limit is lowered by this amount.
 constexpr uint32_t kFourTrackSampleRate = 44118;
-constexpr uint32_t kFourTrackRegionFrames = kFourTrackSampleRate * 18; // 16 s takes and 2 s to spare
+constexpr uint32_t kFourTrackRegionFrames = kFourTrackSampleRate * 22; // 20 s takes and 2 s to spare
 constexpr uint32_t kFourTrackRegionBytes = kFourTrackRegionFrames * 2; // 16-bit mono
 constexpr uint32_t kFourTrackTracks = 4;
 // The Four-Track application itself (screens, project jobs) also lives in the sample memory,
