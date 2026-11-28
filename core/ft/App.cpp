@@ -680,6 +680,8 @@ void App::promptConfirm()
     }
     // a line or mic take arrived late by the input latency: move it back (a pad take has none)
     if (active >= 0 && trackSource[active] != Source::Pads) alignShift[active] = -latencyFrames;
+    if (active >= 0 && pendingSnap > 0) alignShift[active] -= (int32_t)pendingSnap; // the first note is the start of the loop
+    pendingSnap = 0;
     unsaved = true;
     pushBank();
     syncPlayer();
@@ -843,7 +845,7 @@ void App::startRecording()
         applySource(trackSource[track]);
         hal.recordStart(track, trackSource[track]);
         takeOffset = 0;
-        autoSnapped = false;
+        pendingSnap = 0;
         waitScanned = 0;
         waitLevelDb = -60;
         waitingSound = set.waitSound && trackSource[track] != Source::Pads;
@@ -1140,17 +1142,13 @@ void App::serviceTail()
 void App::serviceFirstTake()
 {
     const uint32_t want = autoFrames();
-    if (want > 0 && hal.recordActive() && !autoSnapped && hal.recordLength() >= takeOffset + want)
+    if (want > 0 && hal.recordActive() && hal.recordLength() >= takeOffset + want)
     {
-        // The bars are counted from the first note: move the start of the loop onto it (on a zero crossing). What came
-        // before stays in the memory, so the Part Editor can still move the loop back over it.
+        // The loop ends on the bar line as always. The waveform is snapped into position by moving its start onto the
+        // first note (on a zero crossing): the quiet before it plays at the end of the loop instead, so nothing is lost.
         const int rec0 = session.recordingTrack();
         const int onset = findFirstOnset(hal.region(rec0) + takeOffset, 0, want, hal.sampleRate());
-        if (onset > 0) takeOffset += (uint32_t)onset;
-        autoSnapped = true;
-    }
-    if (want > 0 && hal.recordActive() && autoSnapped && hal.recordLength() >= takeOffset + want)
-    {
+        pendingSnap = onset > 0 ? (uint32_t)onset : 0;
         const int rec = session.recordingTrack();
         const uint32_t used = takeOffset + want + kPostFrames;
         const uint32_t room = hal.regionFrames() > used ? hal.regionFrames() - used : 0;

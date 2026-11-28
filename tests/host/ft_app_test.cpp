@@ -1198,11 +1198,9 @@ int main()
         app.key(kB5);
         hal.advance(app, FakeHal::kRate * 3 + 4000);   // the count-in
         hal.advance(app, FakeHal::kRate * 12 + FakeHal::kRate / 4);
-        CHECK(app.view().statusKind == 2, "the loop is not ready until the 4 bars after the first note are in");
-        hal.advance(app, FakeHal::kRate);
-        CHECK(app.view().statusKind == 1 && app.view().loopFrames == FakeHal::kRate * 12, "then it plays, 12 s long");
-        CHECK(hal.data[0] != nullptr && hal.data[0][200] != 0, "the loop starts on the first note, not on the quiet before it");
-        CHECK(hal.data[0] - hal.mem[0].data() >= (long)(FakeHal::kRate / 2), "the quiet before it is still in memory");
+        CHECK(app.view().statusKind == 1 && app.view().loopFrames == FakeHal::kRate * 12, "the loop appears on the bar line, 12 s long");
+        const int32_t off = hal.bank().cfg[0].offset;
+        CHECK(off < -(int32_t)(FakeHal::kRate / 2 - 500) && off > -(int32_t)(FakeHal::kRate / 2 + 500), "the first note is moved to the start of the loop");
     }
     {   // chords: Note opens the page and the pads play chords and scale notes
         FakeHal hal;
