@@ -303,14 +303,22 @@ void cDisplay::begin(DisplayDriver* displayDriver, Timer* timer)
     API_BITMAP_SOURCE(bitmaps[bitmap_index].address);
     API_BITMAP_LAYOUT(
       bitmaps[bitmap_index].format, bitmaps[bitmap_index].linestride, bitmaps[bitmap_index].height);
+#ifdef TRACKER_MINI
     API_BITMAP_SIZE(
       NEAREST, BORDER, BORDER, bitmaps[bitmap_index].width, bitmaps[bitmap_index].height);
+#else
+    // the Four-Track logo is drawn at twice its size (the chip scales the bitmap: 128 is 0.5 in its 8.8 steps)
+    API_BITMAP_TRANSFORM_A(128);
+    API_BITMAP_TRANSFORM_E(128);
+    API_BITMAP_SIZE(
+      BILINEAR, BORDER, BORDER, 2 * bitmaps[bitmap_index].width, 2 * bitmaps[bitmap_index].height);
+#endif
 
     API_BEGIN(BITMAPS);
 #ifdef TRACKER_MINI
     API_VERTEX2F((800 / 2) - (bitmaps[bitmap_index].width / 2), 100);
 #else
-    API_VERTEX2F((800 / 2) - (bitmaps[bitmap_index].width / 2), (480 - bitmaps[bitmap_index].height) / 2); // centred
+    API_VERTEX2F((800 - 2 * bitmaps[bitmap_index].width) / 2, (480 - 2 * bitmaps[bitmap_index].height) / 2); // twice the size, centred
 #endif
     API_END();
 

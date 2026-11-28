@@ -1615,7 +1615,17 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             {
                 // one row for every update file on the card, newest first
                 fmt(name, size, "Update file %d of %d", r, fwCount);
-                fmt(value, size, "%s", fwNames[r - 1]);
+                {
+                    // shown as the build ("FT73"), without the file name's fixed start and end
+                    const char* f = fwNames[r - 1];
+                    const char* b = f;
+                    for (const char* c = f; c[0] != 0 && c[1] != 0; c++) if (c[0] == '_' && c[1] == 'F') { b = c + 1; break; }
+                    char buf[48];
+                    int n2 = 0;
+                    while (b[n2] != 0 && b[n2] != '_' && b[n2] != '.' && n2 < 20) { buf[n2] = b[n2]; n2++; }
+                    buf[n2] = 0;
+                    fmt(value, size, "%s %s", kProductName, buf);
+                }
                 fmt(help, size, "B1 installs %s from the card. The project is saved first.", fwNames[r - 1]);
                 return;
             }
@@ -1627,7 +1637,7 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             }
             break;
         default:
-            if (r == 0) { n = "Version"; hal.firmwareVersion(value, size); h = "The firmware version of this Tracker."; }
+            if (r == 0) { n = "Firmware"; char ver[32]; hal.firmwareVersion(ver, sizeof ver); fmt(value, size, "%s %s", kProductName, FT_BUILD_ID); (void)ver; h = "The name and build of this firmware. The Tracker's own version is under Installed in the Firmware group."; }
             else if (r == 2)
             {
                 n = "Synth load";
@@ -1906,8 +1916,8 @@ void App::resetAll()
 
 void App::chordsKey(int k)
 {
-    if (k == kLeft) chField = clampi(chField - 1, 0, 5);
-    else if (k == kRight) chField = clampi(chField + 1, 0, 5);
+    if (k == kLeft) chField = clampi(chField - 1, 0, 6);
+    else if (k == kRight) chField = clampi(chField + 1, 0, 6);
     else if (k == kB1)
     {
         if (padsChords) chordsOff();
@@ -1953,7 +1963,8 @@ void App::chordsJog(int delta)
             if (chSound < kSynthPresets) soundPick(chSound);
             break;
         case 4: c.voicing = (Voicing)(((int)c.voicing + kVoicings + d) % kVoicings); break;
-        default: c.octave = (int8_t)clampi(c.octave + d, -2, 2); break;
+        case 5: c.octave = (int8_t)clampi(c.octave + d, -2, 2); break;
+        default: c.humanise = (uint8_t)clampi((int)c.humanise + d * 5, 0, 100); break;
     }
     chords.rebuild();
     soundMark();
@@ -2023,6 +2034,7 @@ void App::soundKey(int k)
     else if (k == kB1) soundHear(true);
     else if (k == kB2) { sndMacros = SynthMacros(); soundApply(); soundMark(); }
     else if (k == kB3) soundPick(sndPreset);
+    else if (k == kB4) { soundHear(false); chField = 6; open(Screen::Chords); return; } // Humanise, on the Chords page
     else if (k == kB7) { soundHear(false); open(Screen::SoundAdv); return; }
     else if (k == kB8 || k == kInstr) { soundHear(false); back(); return; }
 }

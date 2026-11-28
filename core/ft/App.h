@@ -14,6 +14,8 @@
 
 namespace ft
 {
+// What the firmware is called on its own screens (Config, About). Change it here.
+constexpr const char* kProductName = "Four-Track Recorder";
 // The longest first take (and so the longest loop) in seconds. The memory behind each track is 2 s more.
 constexpr uint32_t kMaxTakeSeconds = 16;
 // Buttons and keys of the Tracker that the application reacts to. The eight buttons under the

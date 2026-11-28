@@ -365,3 +365,8 @@ With the bars set, a take that waited for your first note now starts 20 ms befor
 
 ## FT72: three new pads
 Juno Pad is now **Juno Clean** (clean wide saw pad with a bright chorus, for synthwave), Brass is now **Heartbreak** (a slow, wistful, wobbly pad that opens over a couple of seconds, with tape-like pitch drift and a long release) and Tine Keys is now **Glass Pad** (bright, airy, breath of noise). Warm Pad and Strings stay. Sound page, jog on the tiles.
+
+## FT73: Humanise within reach, bigger boot logo, a name for the firmware
+- **Humanise** is now the seventh setting along the top of the **Chords** page (Left/Right to it, jog changes it), and **B4 "Humanise"** on the Sound page jumps straight to it.
+- **Boot logo** is drawn at twice the size (400 x 240, scaled by the display chip; unchecked on the chip).
+- **Name:** Config, About, the first row is now "Firmware: Four-Track Recorder FT73-xxxx", and the update list shows "Four-Track Recorder FT72" instead of the file name. The name is one constant, `kProductName` in `core/ft/App.h`. The file name must keep starting with `PolyendTrac` and ending `.ptf` for the stock updater.

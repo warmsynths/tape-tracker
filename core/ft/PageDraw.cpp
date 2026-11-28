@@ -1412,17 +1412,18 @@ void App::drawChords(Pen& p)
 {
     p.topBar(model);
     const ChordCfg& c = chords.cfg;
-    char v[6][24];
+    char v[7][24];
     fmt(v[0], 24, "%s", Chords::keyName(c.key));
     fmt(v[1], 24, "%s", Chords::scaleName(c.scale));
     fmt(v[2], 24, "%s", Chords::styleName(c.style));
     fmt(v[3], 24, "%s%s", chSound < kSynthPresets ? synthPreset(chSound).name : "Sample", chSound < kSynthPresets && (sndMacros.any() || soundEdited()) ? " *" : "");
     fmt(v[4], 24, "%s", Chords::voicingName((int)c.voicing));
     fmt(v[5], 24, "%s%d", c.octave > 0 ? "+" : "", c.octave);
-    static const char* const names[6] = { "Key", "Scale", "Style", "Sound", "Voicing", "Octave" };
-    static const int widths[6] = { 64, 150, 112, 150, 112, 76 };
+    fmt(v[6], 24, "%d%%", (int)c.humanise);
+    static const char* const names[7] = { "Key", "Scale", "Style", "Sound", "Voicing", "Octave", "Humanise" };
+    static const int widths[7] = { 64, 126, 106, 126, 106, 76, 90 };
     int x = 14;
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 7; i++)
     {
         p.cell(x, 40, widths[i], 46, i == chField, pal.panel);
         p.text(x + 10, 45, names[i], F12, pal.dim);
@@ -1710,8 +1711,8 @@ void App::drawSound(Pen& p)
         p.textMid(x, 90, y + 60, synthMacroName(i), F14, pal.text);
         p.textMid(x, 90, y + 74, synthMacroHint(i), F12, pal.dim);
     }
-    p.text(14, 412, "Jog changes the selected patch or knob. Hold B1 to hear it. Pads play it too.", F14, pal.text);
-    const char* l[8] = { "Hear", "Knobs to 0", "Reset patch", "", "", "", "Advanced", "Back" };
+    p.text(14, 412, "Jog changes the patch or knob. Hold B1 to hear it. B4 opens Humanise and the other feel settings.", F14, pal.text);
+    const char* l[8] = { "Hear", "Knobs to 0", "Reset patch", "Humanise", "", "", "Advanced", "Back" };
     p.buttons(l, hearPad >= 0 ? 1 : 0);
 }
 
