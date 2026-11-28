@@ -12,7 +12,7 @@
 
 namespace ft
 {
-// A vintage-style polysynth built on Plaits' oscillators and ensemble (MIT, see NOTICE.md):
+// A vintage-style polysynth with its own oscillators, and Plaits' ensemble chorus and drums (MIT, see NOTICE.md):
 // two oscillators and a sub oscillator, a 24 dB per octave resonant low-pass, two envelopes, one
 // low-frequency oscillator, drive and a stereo ensemble chorus. Portable: the web emulator and the
 // Tracker run the same code.

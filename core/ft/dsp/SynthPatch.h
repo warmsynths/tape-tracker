@@ -7,13 +7,13 @@ namespace ft
 {
 // What a sound is, without any of the signal processing: the settings of one synth patch, the ready
 // made patches, the eight tweak knobs that sit on top of a patch, and a table of every raw setting for
-// the Advanced page. No Plaits here, so the screens can use it.
+// the Advanced page. Nothing from the audio engine here, so the screens can use it.
 
 enum class SynthOsc : uint8_t
 {
-    Shape,       // triangle to saw to square with pulse width (Plaits VariableShapeOscillator)
-    Saw,         // saw with a moving notch (VariableSawOscillator)
-    SuperSquare, // thick, detuned pulse (SuperSquareOscillator)
+    Shape,       // triangle to saw to square with pulse width
+    Saw,         // saw with a moving notch
+    SuperSquare, // thick, detuned pulse
     Fm,          // two-operator FM: Shape picks the modulator ratio, Pulse the amount (the filter envelope shapes it)
     Modal,       // a struck bar or bell: six ringing partials. Shape goes from harmonic through bar to bell, Pulse is how fast the high ones die
     String       // a plucked string: Shape is how bright the pluck is, Decay how long it rings
