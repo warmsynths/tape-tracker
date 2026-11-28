@@ -143,11 +143,18 @@ void App::popupKey(int k)
             auto move = [&](int d) { int t = copyTarget; for (int i = 0; i < 4; i++) { t = (t + d + 4) % 4; if (t != src) { copyTarget = t; break; } } };
             if (k == kB7) close();
             else if (k == kB8) { close(); doCopy(); }
+            else if (k == kB5) { close(); bounceOpen(); }
             else if (k >= kB1 && k <= kB4) { if (k - kB1 != src) copyTarget = k - kB1; showPopup(Popup::Copy); }
             else if (k == kLeft || k == kUp) { move(-1); showPopup(Popup::Copy); }
             else if (k == kRight || k == kDown) { move(1); showPopup(Popup::Copy); }
             break;
         }
+        case Popup::Bounce:
+            if (k == kB7) close();
+            else if (k == kB8) { close(); doBounce(); }
+            else if (k >= kB1 && k <= kB4) { const int t = k - kB1; if (t != bounceTarget && session.hasPart(t)) bounceSel ^= (uint8_t)(1u << t); showPopup(Popup::Bounce); }
+            else if (k == kB5) { bounceClear = !bounceClear; showPopup(Popup::Bounce); }
+            break;
         case Popup::Clear:
             if (k == kB7) close();
             else if (k == kB8) { close(); doClear(); }
@@ -1764,6 +1771,99 @@ void App::copyOpen()
     for (int k = 1; k < 4 && copyTarget < 0; k++) { const int t = (src + k) % 4; if (!session.hasPart(t)) copyTarget = t; }
     if (copyTarget < 0) copyTarget = (src + 1) % 4;
     showPopup(Popup::Copy);
+}
+
+static float bounceAmp(int tenthsDb)
+{
+    if (tenthsDb <= -600) return 0.0f;
+    const float x = (float)tenthsDb / 10.0f / 6.0206f; // octaves of amplitude
+    const int xi = (int)(x < 0 ? x - 1.0f : x);
+    const float f = x - (float)xi;
+    float a = 1.0f + f * (0.693147f + f * (0.240227f + f * 0.055504f));
+    for (int i = 0; i < xi; i++) a *= 2.0f;
+    for (int i = 0; i > xi; i--) a *= 0.5f;
+    return a;
+}
+
+void App::bounceOpen()
+{
+    if (session.mode() != FourTrackSession::Mode::Idle || session.loopFrames() == 0) { showPopup(Popup::Message, 8); return; }
+    bounceTarget = -1;
+    for (int t = 3; t >= 0 && bounceTarget < 0; t--) if (!session.hasPart(t)) bounceTarget = t;
+    if (bounceTarget < 0) { showPopup(Popup::Message, 12); return; }
+    bounceSel = 0;
+    int n = 0;
+    for (int t = 0; t < 4; t++) if (session.hasPart(t) && !hal.bank().cfg[t].mute) { bounceSel |= (uint8_t)(1u << t); n++; }
+    if (n == 0) { showPopup(Popup::Message, 8); return; }
+    showPopup(Popup::Bounce);
+}
+
+void App::doBounce()
+{
+    const uint32_t frames = session.loopFrames();
+    const int dst = bounceTarget;
+    if (dst < 0 || bounceSel == 0 || frames == 0 || session.hasPart(dst)) return;
+    lastOp = LastOp();
+    lastOp.kind = 4;
+    uint8_t mask = (uint8_t)(1u << dst);
+    if (bounceClear) mask |= bounceSel;
+    lastOp.mask = mask;
+    for (int i = 0; i < 4; i++) if ((mask >> i) & 1) snapshotForUndo(i);
+    int16_t* to = hal.region(dst);
+    for (uint32_t i = 0; i < frames; i++)
+    {
+        float sum = 0.0f;
+        for (int t = 0; t < 4; t++)
+        {
+            if (!((bounceSel >> t) & 1) || partData[t] == nullptr) continue;
+            const TrackCfg& c = hal.bank().cfg[t];
+            int64_t w = (int64_t)i - c.offset;
+            w %= (int64_t)frames;
+            if (w < 0) w += frames;
+            const uint32_t te = c.trimEnd < frames ? c.trimEnd : frames;
+            if ((uint32_t)w < c.trimStart || (uint32_t)w >= te) continue;
+            float s = (float)partData[t][w] * c.gain;
+            if (c.fadeIn && (uint32_t)w - c.trimStart < c.fadeIn) s *= (float)((uint32_t)w - c.trimStart) / (float)c.fadeIn;
+            if (c.fadeOut && te - (uint32_t)w < c.fadeOut) s *= (float)(te - (uint32_t)w) / (float)c.fadeOut;
+            const int pan = c.pan < 0 ? -c.pan : c.pan;
+            sum += s * bounceAmp(c.levelDb10) * (1.0f - (float)pan / 200.0f);
+        }
+        to[i] = (int16_t)(sum > 32767.0f ? 32767 : (sum < -32768.0f ? -32768 : (int)sum));
+    }
+    partData[dst] = to;
+    alignShift[dst] = 0;
+    userOffset[dst] = 0;
+    TrackCfg& d = hal.bank().cfg[dst];
+    d = TrackCfg();
+    trackRole[dst] = TrackRole::Audio;
+    roleChosen[dst] = true;
+    uint8_t parts = 0;
+    for (int i = 0; i < 4; i++) if (session.hasPart(i)) parts |= (uint8_t)(1u << i);
+    parts |= (uint8_t)(1u << dst);
+    if (bounceClear)
+        for (int i = 0; i < 4; i++)
+            if ((bounceSel >> i) & 1)
+            {
+                parts &= (uint8_t)~(1u << i);
+                session.clearPart(i);
+                roleChosen[i] = false;
+                partData[i] = nullptr;
+                alignShift[i] = 0;
+                userOffset[i] = 0;
+                TrackCfg& c = hal.bank().cfg[i];
+                c.trimStart = 0; c.trimEnd = 0xFFFFFFFFu; c.fadeIn = 0; c.fadeOut = 0; c.gain = 1.0f; c.offset = 0;
+                noteAt[i] = -2;
+                waveDirty[i] = true;
+            }
+    session.restore(frames, session.bars(), parts);
+    session.selectTrack(dst);
+    noteAt[dst] = -2;
+    waveDirty[dst] = true;
+    unsaved = true;
+    pushBank();
+    syncPlayer();
+    fmt(noteHint, sizeof noteHint, "Bounced onto Track %d. Shift + Copy undoes it.", dst + 1);
+    refresh(true);
 }
 
 void App::clearOpen(bool all)

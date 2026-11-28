@@ -667,6 +667,28 @@ static void pagesAndProjects()
         cols.advance(app2, 3000);
         CHECK(!app2.view().lane[0].bitmap && cols.masks.empty(), "with columns nothing is uploaded");
     }
+    {   // Bounce: two Parts mixed onto an empty track
+        FakeHal hal;
+        App app(hal, palette());
+        app.setMeasure(&gfx);
+        app.enter();
+        recordLoop(hal, app);
+        const uint32_t loop = app.state().loopFrames();
+        app.key(kCopy); app.key(kB3); app.key(kB8);
+        CHECK(app.state().hasPart(0) && app.state().hasPart(2), "two Parts to bounce");
+        app.key(kCopy);
+        app.key(kB5);
+        CHECK(app.popup() == Popup::Bounce, "Bounce opens from the copy panel");
+        for (int st = 0; st < app.stagesOf(5); st++) app.draw(5, st, gfx);
+        CHECK(!app.pageOverflowed(), "the bounce panel fits");
+        app.key(kB8);
+        CHECK(app.state().hasPart(3) && !app.state().hasPart(0) && !app.state().hasPart(2), "Bounce puts the mix on the empty track and clears the sources");
+        bool any = false;
+        for (uint32_t i = 0; i < loop; i++) if (hal.mem[3][i] != 0) any = true;
+        CHECK(any, "the bounced track has sound");
+        app.setShift(true); app.key(kCopy); app.setShift(false);
+        CHECK(!app.state().hasPart(3) && app.state().hasPart(0) && app.state().hasPart(2), "Shift + Copy undoes the bounce");
+    }
     {   // Copy and Clear, with one undo step
         FakeHal hal;
         App app(hal, palette());

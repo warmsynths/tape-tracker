@@ -382,3 +382,10 @@ Juno Pad is now **Juno Clean** (clean wide saw pad with a bright chorus, for syn
 - Pads played while a track is recording get a small dot in their corner (chord pads and Bass/Melody/Drums pads). The dots reset when a new take starts on that track.
 - While you record a loop (the Part pass), the Play view lane draws the level heard so far, in red, by place in the loop. The first take does not draw yet, because its length is not known until it ends.
 - Not done: the Bass bottom row.
+
+## FT76 – Bounce (the four-track way)
+
+- Copy → B5 "Bounce" opens a panel. It mixes the tracks you pick (B1–B4 toggle) onto the last empty track.
+- Level, mute, trims, fades, Offset and normalize are baked in. The result is mono. Sends, tone and the live filter are not baked in.
+- B5 in the panel chooses whether the mixed tracks are cleared afterwards (on by default). Shift + Copy undoes the whole thing.
+- It needs an empty track. With none free it says so.

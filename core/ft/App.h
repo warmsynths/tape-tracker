@@ -53,7 +53,7 @@ enum class Screen : uint8_t
 
 enum class Popup : uint8_t
 {
-    None, Replace, NoSound, NotArmed, SdMissing, Unsaved, Message, ReplaceSlot, Copy, Clear, Busy
+    None, Replace, NoSound, NotArmed, SdMissing, Unsaved, Message, ReplaceSlot, Copy, Clear, Busy, Bounce
 };
 
 struct Settings
@@ -598,6 +598,12 @@ class App
     int copyTarget = 0;
     bool clearAll = false;
     char noteHint[72] = {};
+    // Bounce: mix several tracks onto an empty one (level, mute, trims, fades and Offset baked in), as on a four-track
+    uint8_t bounceSel = 0;
+    bool bounceClear = true;
+    int bounceTarget = -1;
+    void bounceOpen();
+    void doBounce();
     void copyOpen();
     void clearOpen(bool all);
     void doCopy();
