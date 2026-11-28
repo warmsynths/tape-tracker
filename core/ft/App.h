@@ -451,6 +451,7 @@ class App
     void deviceChange(int group, int row, int delta);
     void firmwareGo();
     void serviceFirmware();
+    int synthOver = 0;
     int synthPeak = 0;            // the synth load shown in About
     int dvGroup = 0, dvRow = 0;
     bool dvRows = true;           // focus is on the rows (false: on the list of groups)

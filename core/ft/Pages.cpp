@@ -1720,7 +1720,7 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             else if (r == 2)
             {
                 n = "Synth load";
-                fmt(value, size, "peak %d%%, %d over, %d voices", synthPeak < 0 ? 0 : synthPeak, hal.synthOverruns(), hal.synthVoices());
+                fmt(value, size, "peak %d%%, %d over, %d voices", synthPeak < 0 ? 0 : synthPeak, synthOver, hal.synthVoices());
                 h = "The heaviest synth block since the Tracker started, as a share of the time it has, how many blocks took almost all of it ('over'), and how many voices it allows now. It is measured while you play on any screen. B2 clears the peak.";
             }
             else { n = "Build"; fmt(value, size, "%s", FT_BUILD_ID); h = "The build of the Four-Track code. The emulator shows the same id when it runs the same code."; }

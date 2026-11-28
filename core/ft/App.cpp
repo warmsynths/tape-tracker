@@ -2133,6 +2133,7 @@ void App::refresh(bool force)
     sig = hashBytes(sig, &v.statusKind, sizeof(v.statusKind));
     sig = hashBytes(sig, &v.monitor, sizeof(v.monitor));
     sig = hashBytes(sig, &v.loopFrames, sizeof(v.loopFrames));
+    if (current == Screen::Device) { synthOver = hal.synthOverruns(); sig = hashBytes(sig, &synthPeak, sizeof(synthPeak)); sig = hashBytes(sig, &synthOver, sizeof(synthOver)); } // About shows the synth load live
     sig = hashBytes(sig, &v.barCount, sizeof(v.barCount));
     sig = hashBytes(sig, &v.punchA, sizeof(v.punchA));
     sig = hashBytes(sig, &v.punchB, sizeof(v.punchB));
