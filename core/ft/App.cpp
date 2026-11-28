@@ -272,8 +272,8 @@ void App::key(int k)
         case kJogPress:
             if (session.mode() == FourTrackSession::Mode::Idle && session.loopFrames() > 0 && session.hasPart(session.selected()))
             {
-                if (shift) enterMove();
-                else { actionMenu = true; refresh(true); }
+                if (shift) { actionMenu = true; refresh(true); } // Shift + Insert: the menu of things to do with the Part
+                else enterMove();                                // Insert: select the whole waveform, the jog snaps it to the grid
             }
             break;
         case kMaster: open(Screen::Master); break;
@@ -312,7 +312,7 @@ void App::jog(int delta)
     }
     if (moveMode)
     {
-        moveStep(session.selected(), delta > 0 ? 1 : -1, shift);
+        moveStep(session.selected(), delta > 0 ? 1 : -1, false); // each click puts the first sound on the next 16th, round the loop
         return;
     }
     if (shift && (session.mode() == FourTrackSession::Mode::Armed || session.mode() == FourTrackSession::Mode::RecordingPart) && layerPass[session.recordingTrack() < 0 ? 0 : session.recordingTrack()])
@@ -671,6 +671,12 @@ void App::promptConfirm()
     }
     const int active = session.recordingTrack();
     session.confirmBars(bars);
+    if (tailTrack >= 0 && tailAwait && active >= 0 && partData[active] != nullptr)
+    {
+        tailAwait = false;
+        tailAt = session.loopFrames();
+        tailBase = (uint32_t)(partData[active] - hal.region(active));
+    }
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
         waveDirty[t] = true;
@@ -680,8 +686,6 @@ void App::promptConfirm()
     }
     // a line or mic take arrived late by the input latency: move it back (a pad take has none)
     if (active >= 0 && trackSource[active] != Source::Pads) alignShift[active] = -latencyFrames;
-    if (active >= 0 && pendingSnap > 0) alignShift[active] -= (int32_t)pendingSnap; // the first note is the start of the loop
-    pendingSnap = 0;
     unsaved = true;
     pushBank();
     syncPlayer();
@@ -691,6 +695,7 @@ void App::promptConfirm()
 void App::promptCancel()
 {
     if (session.mode() != FourTrackSession::Mode::ChoosingBars) return;
+    finishTail(false);
     session.cancelBars();
     for (int t = 0; t < FourTrackSession::kTracks; t++)
     {
@@ -845,7 +850,7 @@ void App::startRecording()
         applySource(trackSource[track]);
         hal.recordStart(track, trackSource[track]);
         takeOffset = 0;
-        pendingSnap = 0;
+        autoSnapped = false;
         waitScanned = 0;
         waitLevelDb = -60;
         waitingSound = set.waitSound && trackSource[track] != Source::Pads;
@@ -876,10 +881,37 @@ void App::pressStop()
     }
     if (session.mode() == FourTrackSession::Mode::RecordingFirst)
     {
-        hal.recordStop();
-        session.firstRecordedFrames(hal.recordLength() - takeOffset, hal.recordFull());
+        const bool ring = set.tailWrap && hal.recordActive() && !hal.recordFull();
+        const uint32_t played = hal.recordLength() - takeOffset;
+        const int rec = session.recordingTrack();
+        if (!ring) hal.recordStop();
+        session.firstRecordedFrames(played, hal.recordFull());
         if (session.mode() == FourTrackSession::Mode::RecordingFirst) session.pressStop();
+        if (ring && rec >= 0)
+        {
+            // recording goes on until the sound has died away; the loop length is not known yet
+            const uint32_t room = hal.regionFrames() > hal.recordLength() + kPostFrames ? hal.regionFrames() - hal.recordLength() - kPostFrames : 0;
+            tailWant = hal.sampleRate() * 3 < room ? hal.sampleRate() * 3 : room;
+            tailScanned = 0; tailQuiet = 0; tailUsable = 0xFFFFFFFFu;
+            tailTrack = rec;
+            tailAwait = true;
+            tailAt = 0;
+            tailBase = 0;
+        }
         onFirstTakeFinished();
+        // a set tempo: the loop is rounded to a whole number of bars, so the click and later layers stay on the beat
+        if (session.mode() == FourTrackSession::Mode::ChoosingBars && set.tempoTenths > 0 && autoFrames() == 0)
+        {
+            const uint64_t barFrames = ((uint64_t)hal.sampleRate() * 4u * 600u + set.tempoTenths / 2) / set.tempoTenths;
+            int bars = (int)(((uint64_t)session.pendingFrames() + barFrames / 2) / barFrames);
+            const int fit = barsFit(set.tempoTenths);
+            if (bars < 1) bars = 1;
+            if (bars > fit) bars = fit > 0 ? fit : 1;
+            promptCount = 1;
+            promptBars[0] = bars;
+            promptSelected = 0;
+            promptConfirm();
+        }
     }
     else if (session.mode() == FourTrackSession::Mode::RecordingPart)
     {
@@ -978,10 +1010,10 @@ void App::serviceWait()
         if (s > peak) peak = s;
         if (s >= thr && !levelCheck)
         {
-            uint32_t pre = preRollFrames();
-            if (pre < rate / 50) pre = rate / 50;
-            if (autoFrames() > 0) pre = rate / 50; // with the bars set, beat 1 is your first note: only 20 ms before it
-            takeOffset = i > pre ? i - pre : 0;
+            // the instant the level is passed: the take starts on the nearest zero crossing at or before it
+            uint32_t z = snapToZero(r, got, i, rate / 500);
+            if (z > i) z = i;
+            takeOffset = z;
             waitingSound = false;
             lastClickBeat = -1;
             refresh(true);
@@ -1083,7 +1115,7 @@ void App::onFirstTakeFinished()
 void App::newProjectDefaults()
 {
     set.tempoTenths = 800;
-    set.bars = 4;
+    set.bars = 0;     // auto-stop at a number of bars is off: Stop ends the take
     set.countIdx = 3; // four beats: one bar of count-in
     set.click = true; // the click is on: a loop is played against it
 }
@@ -1118,11 +1150,15 @@ void App::finishTail(bool all)
     if (tailTrack < 0) return;
     const int t = tailTrack;
     tailTrack = -1;
+    const bool waited = tailAwait;
+    tailAwait = false;
     const uint32_t got = hal.recordLength() > tailBase ? hal.recordLength() - tailBase : 0;
     if (hal.recordActive()) hal.recordStop();
-    if (!all || got <= tailAt || !session.hasPart(t) || partData[t] == nullptr) return;
+    if (waited || !all || got <= tailAt || !session.hasPart(t) || partData[t] == nullptr) return;
     uint32_t n = got - tailAt;
     if (n > tailWant) n = tailWant;
+    if (n > tailUsable) n = tailUsable; // only what rings on, up to the silence
+    if (n == 0) return;
     // what rang on past the end of the loop joins the start of the loop, fading out as the take did not
     int16_t* d = const_cast<int16_t*>(partData[t]);
     for (uint32_t i = 0; i < n; i++)
@@ -1133,26 +1169,47 @@ void App::finishTail(bool all)
     waveDirty[t] = true;
 }
 
+// Recording goes on after the end of the loop until the sound has died away (about -50 dB for 0.2 s), or 3 s
 void App::serviceTail()
 {
-    if (tailTrack < 0) return;
-    if (!hal.recordActive() || hal.recordLength() >= tailBase + tailAt + tailWant) finishTail(true);
+    if (tailTrack < 0 || tailAwait) return;
+    const uint32_t rate = hal.sampleRate();
+    const uint32_t start = tailBase + tailAt;
+    const uint32_t got = hal.recordLength();
+    if (!hal.recordActive()) { finishTail(true); return; }
+    const int16_t* r = hal.region(tailTrack);
+    uint32_t i = tailScanned;
+    bool silent = false;
+    for (; start + i < got; i++)
+    {
+        const int32_t v = r[start + i] < 0 ? -(int32_t)r[start + i] : (int32_t)r[start + i];
+        if (v < 103) { if (++tailQuiet >= rate / 5) { tailUsable = i + 1 - tailQuiet; silent = true; break; } }
+        else tailQuiet = 0;
+    }
+    tailScanned = i;
+    if (silent || got >= start + tailWant) finishTail(true);
 }
 
 void App::serviceFirstTake()
 {
     const uint32_t want = autoFrames();
-    if (want > 0 && hal.recordActive() && hal.recordLength() >= takeOffset + want)
+    if (want > 0 && hal.recordActive() && !autoSnapped && hal.recordLength() >= takeOffset + want)
     {
-        // The loop ends on the bar line as always. The waveform is snapped into position by moving its start onto the
-        // first note (on a zero crossing): the quiet before it plays at the end of the loop instead, so nothing is lost.
+        // With the bars set, the loop starts on the first sound: its start moves onto it (on a zero crossing) and the
+        // bars are counted from there. Recording goes on a little past the 4 bars so there is audio for it. What came
+        // before the first sound stays in the memory.
         const int rec0 = session.recordingTrack();
         const int onset = findFirstOnset(hal.region(rec0) + takeOffset, 0, want, hal.sampleRate());
-        pendingSnap = onset > 0 ? (uint32_t)onset : 0;
+        if (onset > 0) takeOffset += (uint32_t)onset;
+        autoSnapped = true;
+    }
+    if (want > 0 && hal.recordActive() && autoSnapped && hal.recordLength() >= takeOffset + want)
+    {
         const int rec = session.recordingTrack();
         const uint32_t used = takeOffset + want + kPostFrames;
         const uint32_t room = hal.regionFrames() > used ? hal.regionFrames() - used : 0;
-        tailWant = set.tailWrap ? (hal.sampleRate() * 2 < room ? hal.sampleRate() * 2 : room) : 0;
+        tailWant = set.tailWrap ? (hal.sampleRate() * 3 < room ? hal.sampleRate() * 3 : room) : 0;
+        tailScanned = 0; tailQuiet = 0; tailUsable = 0xFFFFFFFFu; tailAwait = false;
         if (tailWant > 0) { tailTrack = rec; tailAt = want; tailBase = takeOffset; }
         else hal.recordStop();
         session.firstRecordedFrames(want, false);
@@ -1323,9 +1380,7 @@ void App::serviceClick()
         // the first take has no loop yet: the click follows the starting tempo, or 120 BPM when it is Free
         const uint32_t tenths = set.tempoTenths > 0 ? set.tempoTenths : 1200u;
         const uint32_t beatFrames = (uint32_t)((uint64_t)hal.sampleRate() * 600 / tenths);
-        if (waitingSound) return; // no click while it waits for the first note
-        const uint32_t into = hal.recordLength() > takeOffset ? hal.recordLength() - takeOffset : 0; // beat 1 is the first note
-        const int idx = beatFrames > 0 ? (int)(into / beatFrames) : 0;
+        const int idx = beatFrames > 0 ? (int)(hal.recordLength() / beatFrames) : 0; // ticks from the moment it arms, so you know when to play
         if (idx != lastClickBeat)
         {
             lastClickBeat = idx;
@@ -1351,8 +1406,7 @@ int App::beatIndex()
     {
         const uint32_t tenths = set.tempoTenths > 0 ? set.tempoTenths : 1200u;
         const uint32_t beatFrames = (uint32_t)((uint64_t)hal.sampleRate() * 600 / tenths);
-        const uint32_t into = hal.recordLength() > takeOffset ? hal.recordLength() - takeOffset : 0;
-        return beatFrames > 0 ? (int)(into / beatFrames) : -1;
+        return beatFrames > 0 ? (int)(hal.recordLength() / beatFrames) : -1;
     }
     if (!hal.playerPlaying() || session.bars() <= 0 || session.loopFrames() == 0) return -1;
     const uint32_t beat = session.loopFrames() / ((uint32_t)session.bars() * 4);
@@ -1933,7 +1987,7 @@ void App::fillView()
         if (waitingSound && levelCheck) fmt(v.hint, sizeof(v.hint), "Play your loudest, set the line above the buzz, then press Rec.");
         else if (waitingSound) fmt(v.hint, sizeof(v.hint), "Waiting for your first note: it starts at %d dB. Stop cancels.", (int)set.waitDb);
         else if (v.lane[session.recordingTrack() < 0 ? 0 : session.recordingTrack()].warn) fmt(v.hint, sizeof(v.hint), "At 16 s the take stops by itself and keeps everything.");
-        else if (autoFrames() > 0) fmt(v.hint, sizeof(v.hint), "The take stops by itself on the bar line. Stop ends it early.");
+        else if (autoFrames() > 0) fmt(v.hint, sizeof(v.hint), "Recording the bars from your first sound. Stop ends it early.");
         else fmt(v.hint, sizeof(v.hint), "B2 or Stop ends the take. Then: How many bars?");
     }
     else if (mode == FourTrackSession::Mode::Armed) fmt(v.hint, sizeof(v.hint), "Records one Loop from the loop start, then stops. B1 again disarms.");
@@ -2214,7 +2268,7 @@ void App::moveKey(int k)
             pushBank();
             for (int i = 0; i < FourTrackSession::kTracks; i++) waveDirty[i] = true;
             break;
-        case kB8: moveMode = false; break;
+        case kB8: case kJogPress: moveMode = false; break;
         case kLeft: moveStep(t, -1, shift); break;
         case kRight: moveStep(t, 1, shift); break;
         case kPlay: togglePlay(); break;

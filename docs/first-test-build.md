@@ -345,5 +345,9 @@ Config, Firmware now has one row for each `.ptf` in the card's `Firmware` folder
 ## FT66: Wait for sound lines up with the grid
 With the bars set, a take that waited for your first note now starts 20 ms before it (was 120 ms), so beat 1 is your first strum, and the click starts on that note (it stays silent while waiting). The loop is the 4 bars counted from there. The click is on by default in new projects (Shift + Play).
 
-## FT67 and FT68: the loop starts on the first note
-With the bars set, the loop is ready exactly on the bar line (4 bars after the count-in, or after the wait trigger). The waveform is then snapped into position: its start is moved onto the first note (on a zero crossing) by shifting the Part's offset, so the quiet before the note plays at the end of the loop and nothing is cut. The Part Editor shows the shift as the Offset and can change it. (FT67 waited for extra audio instead, which delayed the loop.) Also fixed: the tail fold used the wrong position when the take did not start at the beginning of the memory.
+## FT69: how a take ends, and the snap (from the grilling session)
+- **Auto-stop at N bars is off by default** (Tempo panel, Bars: Off). You press Stop; with a set tempo the loop is **rounded to whole bars** (5.5 s at 80 BPM becomes 2 bars), so the click and later layers stay on the beat. With Free tempo the old "How many bars?" question is back.
+- **Recording goes on after the end until the sound has died away** (about -50 dB for 0.2 s, at most 3 s). The ring-out is folded onto the start of the loop (Tail wrap) and the rest stays in the track's memory.
+- **The loop starts on your first sound.** Count-in: the first sound the detector finds, on a zero crossing; nothing before it is deleted. Wait for sound: the take starts at the instant the level is passed, on the zero crossing just before it. With auto-stop on, the 4 bars are counted from that first sound, so the loop appears a moment after the 4-bar mark.
+- **The click ticks from the moment it arms**, also while it waits for your first note.
+- **Select and move:** Insert (jog press) selects the whole waveform (move mode); each jog click puts its first sound on the next 16th, wrapping round the loop; Left/Right do the same, Shift + Left/Right move 1 ms. B1 "To start" snaps it back to the beginning. The old actions menu is Shift + Insert.

@@ -616,7 +616,9 @@ class App
     int tailTrack = -1;          // a first take whose tail is still being recorded
     uint32_t tailAt = 0;         // frame where the loop ends, counted from the loop start
     uint32_t tailBase = 0;       // where the loop starts in the take
-    uint32_t pendingSnap = 0;    // frames the first note lies after the start of the first take: the loop starts there
+    bool tailAwait = false;      // the first take was stopped by hand: the tail waits for the loop length
+    uint32_t tailScanned = 0, tailQuiet = 0, tailUsable = 0xFFFFFFFFu; // looking for the silence after the loop end
+    bool autoSnapped = false;    // the start of the first take has been moved onto its first sound
     uint32_t tailWant = 0;       // how many frames of tail to record
     uint32_t countInStart = 0;
     int countInBeats = 0;

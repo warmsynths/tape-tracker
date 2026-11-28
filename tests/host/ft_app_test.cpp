@@ -803,30 +803,31 @@ static void pagesAndProjects()
         app.key(kPattern);
         CHECK(app.screen() == Screen::Main, "Pattern goes home");
     }
-    {   // the action menu on Insert
+    {   // the action menu on Shift + Insert
         FakeHal hal;
         App app(hal, palette());
         app.setMeasure(&gfx);
         app.enter();
         recordLoop(hal, app);
-        app.key(kJogPress);
-        CHECK(std::strcmp(app.view().btn[0], "Move") == 0 && std::strcmp(app.view().btn[7], "Close") == 0, "Insert opens the action menu");
+        auto menu = [&]() { app.setShift(true); app.key(kJogPress); app.setShift(false); };
+        menu();
+        CHECK(std::strcmp(app.view().btn[0], "Move") == 0 && std::strcmp(app.view().btn[7], "Close") == 0, "Shift + Insert opens the action menu");
         app.key(kB4);
         CHECK(hal.trackBank.cfg[0].mute, "Mute in the menu mutes the track");
         app.key(kB4);
         app.key(kB1);
         CHECK(std::strcmp(app.view().btn[0], "To start") == 0, "Move in the menu starts move mode");
         app.key(kB7);
-        app.key(kJogPress);
+        menu();
         app.key(kB2);
         CHECK(app.screen() == Screen::Editor, "Edit in the menu opens the Part Editor");
         app.key(kB8);
-        app.key(kJogPress);
+        menu();
         app.key(kB8);
         CHECK(std::strcmp(app.view().btn[0], "Rec") == 0, "Close leaves the menu");
-        CHECK(std::strstr(app.view().hint, "Insert for actions") != nullptr, "the hint says what Insert does");
+        CHECK(std::strstr(app.view().hint, "Insert") != nullptr, "the hint says what Insert does");
     }
-    {   // moving a Part: Shift+Insert enters, the jog steps the first note along the grid
+    {   // moving a Part: Insert selects the whole waveform, the jog puts the first sound on each 16th in turn
         FakeHal hal;
         App app(hal, palette());
         app.setMeasure(&gfx);
@@ -835,21 +836,20 @@ static void pagesAndProjects()
         const uint32_t loop = app.state().loopFrames();
         const uint32_t bars = (uint32_t)app.state().bars();
         app.key(kJogPress);
-        CHECK(!app.view().btn[0][0] || std::strcmp(app.view().btn[0], "To start") != 0, "Insert alone does not enter move mode");
-        app.key(kJogPress); // closes the action menu again
-        app.setShift(true); app.key(kJogPress); app.setShift(false);
-        CHECK(std::strcmp(app.view().btn[0], "To start") == 0, "Shift+Insert enters move mode");
+        CHECK(std::strcmp(app.view().btn[0], "To start") == 0, "Insert selects the waveform: move mode");
         app.jog(1);
-        CHECK(hal.trackBank.cfg[0].offset == (int32_t)(loop / (bars * 16)), "the jog moves the first note one sixteenth");
+        CHECK(hal.trackBank.cfg[0].offset == (int32_t)(loop / (bars * 16)), "the jog moves the first sound one sixteenth");
+        app.jog(1);
+        CHECK(hal.trackBank.cfg[0].offset == (int32_t)(2 * (loop / (bars * 16))), "and the next click one more");
         app.key(kB3); // grid 1/4 is not next: the grid goes round to off
         app.key(kB3);
         app.key(kB1);
-        CHECK(hal.trackBank.cfg[0].offset == 0, "To start puts the first note on the loop start");
+        CHECK(hal.trackBank.cfg[0].offset == 0, "To start puts the first sound on the loop start");
         app.key(kB4);
         app.jog(1);
         app.key(kB7);
         CHECK(hal.trackBank.cfg[0].offset == 0, "Cancel puts it back");
-        app.setShift(true); app.key(kJogPress); app.setShift(false);
+        app.key(kJogPress);
         app.jog(1);
         app.key(kB8);
         CHECK(hal.trackBank.cfg[0].offset != 0 && std::strcmp(app.view().btn[0], "To start") != 0, "OK keeps the move and leaves move mode");
@@ -1066,7 +1066,8 @@ int main()
         hal.setDefaults = true;
         App app(hal, palette());
         app.enter();
-        CHECK(app.settings().roleFlow, "a real machine asks what to record");
+        CHECK(app.settings().roleFlow && app.settings().bars == 0, "a real machine asks what to record, and auto-stop is off");
+        app.settingsForTest().bars = 4;
         app.key(kRec);
         CHECK(app.screen() == Screen::Role, "Rec on an empty track opens the role choice");
         app.key(kB5); // Audio: a line take
@@ -1194,13 +1195,32 @@ int main()
         hal.quiet = FakeHal::kRate / 2 + 37; // the first note comes half a second into the take
         App app(hal, palette());
         app.enter();
+        app.settingsForTest().bars = 4;
         app.key(kRec);
         app.key(kB5);
         hal.advance(app, FakeHal::kRate * 3 + 4000);   // the count-in
         hal.advance(app, FakeHal::kRate * 12 + FakeHal::kRate / 4);
-        CHECK(app.view().statusKind == 1 && app.view().loopFrames == FakeHal::kRate * 12, "the loop appears on the bar line, 12 s long");
-        const int32_t off = hal.bank().cfg[0].offset;
-        CHECK(off < -(int32_t)(FakeHal::kRate / 2 - 500) && off > -(int32_t)(FakeHal::kRate / 2 + 500), "the first note is moved to the start of the loop");
+        CHECK(app.view().statusKind == 2, "recording goes on past the 4 bars until the 4 bars after the first sound are in");
+        hal.advance(app, FakeHal::kRate);
+        CHECK(app.view().statusKind == 1 && app.view().loopFrames == FakeHal::kRate * 12, "then the loop plays, 12 s long");
+        CHECK(hal.data[0] != nullptr && hal.data[0][200] != 0, "it starts on the first sound, not on the quiet before it");
+        CHECK(hal.data[0] - hal.mem[0].data() >= (long)(FakeHal::kRate / 2), "the quiet before it is still in memory");
+    }
+    {   // autoloop off: Stop ends the take, the loop is rounded to whole bars, recording goes on for the ring-out
+        FakeHal hal;
+        hal.setDefaults = true;
+        App app(hal, palette());
+        app.enter();
+        app.key(kRec);
+        app.key(kB5);
+        hal.advance(app, FakeHal::kRate * 3 + 4000);      // the count-in
+        hal.advance(app, FakeHal::kRate * 5 + FakeHal::kRate / 2); // 5.5 s: nearly two bars at 80 BPM (3 s each)
+        app.key(kStop);
+        CHECK(app.view().barCount == 2 && app.view().loopFrames == FakeHal::kRate * 6, "5.5 s rounds to 2 bars, 6 s");
+        CHECK(app.view().statusKind == 1, "the loop plays at once");
+        CHECK(hal.recActive, "the recorder runs on for the ring-out");
+        hal.advance(app, FakeHal::kRate * 4);
+        CHECK(!hal.recActive, "and stops by itself");
     }
     {   // chords: Note opens the page and the pads play chords and scale notes
         FakeHal hal;
