@@ -400,3 +400,10 @@ checked in the emulator and by the host tests. It will be compiled for the first
 - **Record mix** (Project > Export, B2): records everything you hear, live, as a stereo WAV in Exports, no length limit. Stop (B8) ends it. The file is first written raw, then wrapped as a WAV. It uses the stock master export queue, so a slow SD write could drop a few blocks; that needs the real device to judge.
 - Input monitoring already exists (Input screen, Monitor).
 - Bounce was FT76.
+
+## Stock delay buffer removed (source only, not built)
+
+- The Tracker's own 1.5 MB delay buffer (`.delay_memory`) is gone. The stock delay effect now stays blocked and silent; nothing in the Four-Track firmware sends to it. Our own reverb and delay sends are untouched.
+- This frees 1.5 MB of external RAM (the section simply ends sooner in the linker script; no flash or boot area is touched).
+- The freed RAM is not used yet. Next decision: longer tracks (about 20 s) or more sample space.
+- The scratch area (768 KB) stays: it holds the SD sample-streaming buffer, the plugin loader and the stock exporter's render buffer.

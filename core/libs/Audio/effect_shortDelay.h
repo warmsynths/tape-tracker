@@ -52,9 +52,9 @@ class AudioEffectShortDelay : public AudioStream
     static constexpr uint16_t kMaxFilterCoeff = (1 << kFilterCoeffsShift) - 1;
     static constexpr float kMaxFeedback = 0.99f;
     static constexpr uint32_t delaylineLengthMask = MAX_DELAYLINE_LENGTH - 1;
-    int16_t* pingpongDelaylineRight;
-    int16_t* pingpongDelaylineLeft;
-    int16_t* monoDelayline;
+    int16_t* pingpongDelaylineRight = nullptr;
+    int16_t* pingpongDelaylineLeft = nullptr;
+    int16_t* monoDelayline = nullptr;
     uint32_t headIdx;
     audio_block_t* inputQueueArray[1];
     uint32_t timeInSamples;

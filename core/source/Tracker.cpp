@@ -20,7 +20,7 @@
 //-----------------------------------  EXTERNAL RAM CONFIGURATION --------------------------------
 // clang-format off
 __attribute__((section(".sample_memory"), used)) int16_t externalRamSampleMemory[SAMPLE_MEMORY_SIZE / 2];
-__attribute__((section(".delay_memory"), used)) int16_t externalRamDelayBuff[DELAY_MEMORY_SIZE / 2];
+// (the stock delay buffer, 1.5 MB, is gone: the Four-Track firmware has its own send effects)
 __attribute__((section(".reverb_memory"), used)) uint16_t externalRamReverbBuff[REVERB_MEMORY_SIZE / 2];
 __attribute__((section(".scratch_memory"), aligned(32), used)) uint8_t externalRamScratchBuff[SHARED_SCRATCH_MEMORY_SIZE];
 

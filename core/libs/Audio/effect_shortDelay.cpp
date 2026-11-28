@@ -9,7 +9,6 @@ const float tempoSyncRatesShortDelay[19] = {
     8,        6,    4,      3,        2,     1.5,      1,      0.75,     0.5,     0.375,
     0.333333, 0.25, 0.1875, 0.166667, 0.125, 0.083333, 0.0625, 0.041667, 0.03125,
 };
-extern int16_t externalRamDelayBuff[];
 
 AUDIO_CORE_FLASH void AudioEffectShortDelay::begin(float feedback,
                                              uint32_t timeMs,
@@ -25,8 +24,7 @@ AUDIO_CORE_FLASH void AudioEffectShortDelay::begin(float feedback,
     setRate(syncRateIdx);
     setFilterFrequency(frequency);
 
-    setBuffer(externalRamDelayBuff);
-    unblockUpdate();
+    // No delay memory in this firmware: the stock delay stays blocked and silent.
 }
 
 AUDIO_CORE_FLASH void AudioEffectShortDelay::setBuffer(int16_t* buffer)
@@ -107,6 +105,7 @@ AUDIO_CORE_FLASH void AudioEffectShortDelay::setFilterFrequency(float frequency)
 
 AUDIO_CORE_FLASH void AudioEffectShortDelay::clear()
 {
+    if (monoDelayline == nullptr) return;
     blockUpdate();
     //    AudioNoInterrupts();
     headIdx = 0;
@@ -131,6 +130,7 @@ AUDIO_CORE_FLASH void AudioEffectShortDelay::blockUpdate()
 }
 AUDIO_CORE_FLASH void AudioEffectShortDelay::unblockUpdate()
 {
+    if (monoDelayline == nullptr) return; // nothing to run on
     noRefresh = false;
 }
 
