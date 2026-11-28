@@ -88,6 +88,13 @@ int main()
     std::vector<float> after;
     for (int b = 0; b < 30; b++) { float a[128] = {}, c[128] = {}; d->render(a, c, 128); for (int i = 0; i < 128; i++) after.push_back(a[i]); }
     CHECK(energy(open, 0, 3840) > 0.0f, "the open hat rings");
+    // every voice keeps sounding past the first few blocks (a bug once made them stop after about 10 ms)
+    for (int v : { 15, 14, 11, 10, 12, 13, 7, 3 })
+    {
+        d->reset();
+        const std::vector<float> w = play(*d, v, 100, 60);
+        CHECK(energy(w, 1024, 5120) > 0.005f, "a hit still sounds after the first 10 ms");
+    }
     if (failures == 0) std::printf("all passed\n");
     return failures ? 1 : 0;
 }

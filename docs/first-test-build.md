@@ -429,3 +429,8 @@ The test: Dream Keys and Glass Pad nice; Warm Pad a tiny bit of distortion; Juno
 - The "Synth load: 0%" reading in FT77 could not be trusted: it only measured while the About page was open, and you cannot play pads there.
 - The load is now measured on every screen from the moment the Tracker starts. About > Synth load shows `peak N%, M over, K voices`: the heaviest block so far, how many blocks took over about 92% of their time, and the voices allowed now. B2 on About clears the peak.
 - A model run of rapid random chords on Heartbreak (old and new code, voice limits 2 to 6) shows no instability, no jumps and no NaN, so the "resonant robotic" sound is not a plain maths fault in the synth. The leading suspect is still a block that runs late.
+
+## Drums fix (source only, not built)
+
+- **Found:** every drum except the hit's first 10 ms was silent ("a very short faint tk"). In `DrumKit::render`, the member that counts how long each voice rings was called `left`, and the output buffer parameter is also called `left`. The ring-time code read and wrote the audio buffer instead. So a voice only rendered in the block where it was hit.
+- **Fixed:** the member is now `ringFor`. A new host test checks that kick, snare, toms and hats still sound after the first 10 ms. (The old drum test only looked at the first few blocks.)

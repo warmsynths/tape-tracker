@@ -51,7 +51,7 @@ class DrumKit
     int activeFor = 0;  // blocks of sound left to render after the last hit
     float accent[kVoices] = {};
     bool pending[kVoices] = {};
-    int left[kVoices] = {};   // blocks a voice still has to ring after a hit; a silent voice is not rendered
+    int ringFor[kVoices] = {};   // blocks a voice still has to ring after a hit; a silent voice is not rendered
     float chokeTarget = 1.0f, chokeGain = 1.0f; // the open hats shut when a closed one is played
 
     plaits::AnalogBassDrum analogKick, analogKickAlt, analogTom1, analogTom2;

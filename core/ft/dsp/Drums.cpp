@@ -77,7 +77,7 @@ void DrumKit::reset()
     syntheticKick.Init(); syntheticKickAlt.Init();
     analogSnare.Init(); analogSnareAlt.Init(); syntheticSnare.Init(); syntheticSnareAlt.Init();
     hatA.Init(); openA.Init(); hatB.Init(); openB.Init();
-    for (int i = 0; i < kVoices; i++) { simple[i] = Simple(); accent[i] = 0.0f; pending[i] = false; left[i] = 0; }
+    for (int i = 0; i < kVoices; i++) { simple[i] = Simple(); accent[i] = 0.0f; pending[i] = false; ringFor[i] = 0; }
     activeFor = 0;
     chokeTarget = chokeGain = 1.0f;
 }
@@ -90,7 +90,7 @@ void DrumKit::trigger(int voice, int velocity)
     accent[voice] = (float)(velocity < 1 ? 1 : (velocity > 127 ? 127 : velocity)) / 127.0f;
     pending[voice] = true;
     static const float secs[kVoices] = { 0.3f, 0.5f, 2.0f, 2.0f, 0.4f, 0.1f, 0.6f, 0.6f, 0.5f, 1.5f, 1.4f, 1.4f, 1.2f, 1.2f, 2.2f, 2.2f };
-    left[voice] = (int)(rate * secs[voice] / (float)kMaxBlock) + 1;
+    ringFor[voice] = (int)(rate * secs[voice] / (float)kMaxBlock) + 1;
     activeFor = (int)(rate * 2.5f / (float)kMaxBlock); // about 2.5 s of sound after a hit
 }
 
@@ -184,7 +184,7 @@ void DrumKit::render(float* left, float* right, int n)
     for (int i = 0; i < n; i++) mix[i] = 0.0f;
     float a[kMaxBlock], t1[kMaxBlock], t2[kMaxBlock];
     bool run[kVoices];
-    for (int v = 0; v < kVoices; v++) { run[v] = pending[v] || left[v] > 0; if (left[v] > 0) left[v]--; }
+    for (int v = 0; v < kVoices; v++) { run[v] = pending[v] || ringFor[v] > 0; if (ringFor[v] > 0) ringFor[v]--; }
     auto clear = [&](float* b) { for (int i = 0; i < n; i++) b[i] = 0.0f; };
     const float sr = 44100.0f;
 
