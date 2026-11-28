@@ -11,7 +11,7 @@ namespace
 int clampv(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
 const uint8_t kBassSounds[] = { 8, 9, 7, 6 };
-const uint8_t kMelodySounds[] = { 10, 11, 7, 4, 5, 3 };
+const uint8_t kMelodySounds[] = { 10, 11, 7, 4, 6, 1 };
 
 void noteLabel(int note, char* out, int size)
 {
