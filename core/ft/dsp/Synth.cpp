@@ -311,8 +311,9 @@ void Synth::render(float* left, float* right, int n)
     }
     if (p.ensemble > 0.0f)
     {
-        ensemble.set_amount(p.ensemble);
-        ensemble.set_depth(p.depth);
+        // the chorus is kept tame: at full strength it warbles like a broken tape
+        ensemble.set_amount(p.ensemble > 0.7f ? 0.7f : p.ensemble);
+        ensemble.set_depth(p.depth > 0.7f ? 0.7f : p.depth);
         ensemble.Process(left, right, (size_t)n);
     }
     // keep the sum inside the range: a gentle limiter, so a full chord of a thick patch rounds off and does not clip

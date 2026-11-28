@@ -1183,6 +1183,30 @@ int main()
         app.pad(5, false);
         CHECK(std::strcmp(app.view().padsMode, "DRUM") == 0, "the pads say Drum");
     }
+    {   // a Drums take: Stop ends it, and every button still works afterwards
+        FakeHal hal;
+        hal.setDefaults = true;
+        App app(hal, palette());
+        app.enter();
+        app.key(kRec);
+        app.key(kB4);
+        app.key(kB8); // the kit is chosen: the count-in starts
+        hal.advance(app, 300000);
+        CHECK(app.state().mode() == Mode::RecordingFirst, "the drum take records");
+        app.pad(47, true); hal.advance(app, 20000); app.pad(47, false);
+        hal.advance(app, FakeHal::kRate * 3);
+        app.key(kStop);
+        hal.advance(app, FakeHal::kRate * 4);
+        CHECK(app.state().mode() == Mode::Idle && app.state().hasPart(0), "Stop ends the take and keeps it");
+        app.key(kConfig);
+        CHECK(app.screen() == Screen::Device, "Config opens after a drum take");
+        app.key(kB8);
+        app.key(kParams);
+        CHECK(app.screen() == Screen::Mixer, "so does Params");
+        app.key(kB8);
+        app.key(kPattern);
+        CHECK(app.screen() == Screen::Main || app.screen() == Screen::Play, "and the way back");
+    }
     {   // roles: Shift + Rec skips the question; Audio leaves the pads alone
         FakeHal hal;
         hal.setDefaults = true;

@@ -441,3 +441,9 @@ The test: Dream Keys and Glass Pad nice; Warm Pad a tiny bit of distortion; Juno
 - So it is not running out of time. My model of the synth stays steady over a long held chord (level, high-frequency content), so the fizz is probably added after the synth.
 - Suspect: the Tracker's stock output limiter, which every sound passes through and which can pump on a dense, swelling pad. It is now set to its highest threshold when the Four-Track screen starts (`setLimiterThreshold(LIMITER_THRESHOLD_MAX)` in `cFourTrack::start`).
 - Check on the device: lower the Synth level with Shift + Left on the home screen by 6 dB and hold the same chord. If the fizz goes away it is level; if it stays, it is not.
+
+## Chorus (source only, not built)
+
+- Found by the owner: the fizz and the "going crazy" on held chords was the chorus. Several pads had it at 100% with the depth up to 100%.
+- Chorus amount and depth are now lower on every patch (about 0.3 to 0.65), and the synth caps both at 0.7 whatever the knobs or the patch say.
+- Drums take then freeze (owner report): could not be reproduced in the host test (a drum take, Stop, then Config and Params all work). A host test now checks that. The cause is probably specific to the device.
