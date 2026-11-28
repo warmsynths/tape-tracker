@@ -65,6 +65,8 @@ class Synth
         float note = 60.0f;    // as played (glide moves `pitch` towards it)
         float pitch = 60.0f;
         float vel = 1.0f;
+        float driftV = 0.0f, driftT = 0.0f; // the voice's own slow pitch wander and where it is heading
+        int driftN = 0;
         int midi = -1;
         bool gate = false;
         int pendNote = -1;        // a note that waits for this voice to fade out (it was stolen), or -2: fade out and stop

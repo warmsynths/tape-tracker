@@ -43,6 +43,7 @@ struct SynthPatch
     float glide;       // seconds, mono mode only
     bool mono;
     float level;       // output level, 0 to 1
+    float drift = 0.0f; // tape drift, 0 to 1: every voice wanders a little in pitch, slowly and differently (up to about 30 cents)
 };
 
 constexpr int kSynthPresets = 12;

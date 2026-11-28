@@ -453,3 +453,10 @@ The test: Dream Keys and Glass Pad nice; Warm Pad a tiny bit of distortion; Juno
 - Owner report: pressed Stop on a long Drums take; the screen stopped changing and no button worked, but the pads still made sound and kits still changed.
 - Found in the stock `Recorder::stop()`: it drains the left and right record queues with `while (left has a block or right has a block) update();`. For a take from the pad bus (two queues into one mono track), `update()` only consumes a block when both queues have one. If one queue has a block the other lacks (the two queues can drift apart on a long take, or when Stop lands between the two `end()` calls), nothing is consumed and the loop never ends. That freezes the main loop; the audio and the pad callbacks keep running.
 - Fixed: the drain is bounded (40 passes) and anything left is thrown away. This also protects every other take from the same hang.
+
+## New patches and tape drift (source only, not built)
+
+- Seven patches replaced: Strings is **Noir Strings**, Heartbreak is **Tape Choir** (the nostalgic drifting pad), Organ is **Dusty Rhodes**, Pluck is **Cold Stab**, Bass is **Dark Moog Bass**, Lead is **Wobbly Lead**, Square Lead is **Poly Brass**. Warm Pad, Juno Clean, Dream Keys, Glass Pad and Sub Bass stay. The index of each slot is unchanged, so saved Bass and Melody choices still point at a bass and a lead.
+- **Tape drift:** every voice now wanders slowly in pitch (up to about 30 cents, a new target about every half second), differently for each voice. It is a patch setting, not on the Advanced page. Tape Choir, Wobbly Lead and Noir Strings use it most.
+- **Drive was cutting the level:** the vendored Plaits overdrive attenuated a lot at low settings (about 15 dB at 0.1), so every patch with a little drive was far quieter than the others. Replaced with a simple soft saturation that keeps the level. The patch Level now goes to 200% so single-voice bass and lead patches can match the pads.
+- Cost (model, 6 voices for 1 second): the new patches are 46 to 69 million instructions, the same band as the old ones (the heaviest before was 69). Tape drift adds almost nothing. No extra memory.

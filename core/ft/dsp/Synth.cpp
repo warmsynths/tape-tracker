@@ -189,7 +189,18 @@ void Synth::render(float* left, float* right, int n)
         const float fadeStep = fading ? 1.0f / (float)n : 0.0f;
         // pitch: glide in a mono lead, then vibrato
         v.pitch += (v.note - v.pitch) * (glideK > 1.0f ? 1.0f : glideK);
-        const float note = v.pitch + lfo * p.lfoPitch + mod;
+        if (p.drift > 0.0f)
+        {
+            // tape drift: every half second or so a new target, and the voice drifts towards it
+            if (++v.driftN >= 170)
+            {
+                v.driftN = 0;
+                noiseState = noiseState * 1664525u + 1013904223u;
+                v.driftT = (float)(int32_t)(noiseState >> 8) / 8388608.0f;
+            }
+            v.driftV += (v.driftT - v.driftV) * 0.004f;
+        }
+        const float note = v.pitch + lfo * p.lfoPitch + mod + v.driftV * p.drift * 0.3f;
         const float f = noteToNorm(note, rate);
         const float fB = f * detuneRatio > 0.25f ? 0.25f : f * detuneRatio;
 
@@ -303,7 +314,13 @@ void Synth::render(float* left, float* right, int n)
         }
     }
 
-    if (p.drive > 0.0f) overdrive.Process(p.drive, sum, (size_t)n);
+    if (p.drive > 0.0f)
+    {
+        // soft saturation: the gain goes up with the drive and is taken off again, so the level stays about the same
+        const float g = 1.0f + p.drive + p.drive * p.drive * 7.0f;
+        const float inv = 1.0f / g;
+        for (int i = 0; i < n; i++) sum[i] = stmlib::SoftClip(sum[i] * g) * inv;
+    }
     for (int i = 0; i < n; i++)
     {
         left[i] = sum[i] * p.level;
