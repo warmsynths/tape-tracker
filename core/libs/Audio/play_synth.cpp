@@ -111,6 +111,7 @@ void AudioPlaySynth::update(void)
     release(right);
     const uint32_t spent = cycleCount() - t0;
     if (spent > peakCycles) peakCycles = spent;
+    if (spent > 480000u) overruns = overruns + 1; // about 92% of the block: the next block may start late
     // Short of time (more than about half a block): allow fewer voices at once. Plenty of time for a while: allow more.
     // (a single slow block is not enough: the card or the display can steal a block now and then)
     if (spent > 450000u) { calm = 0; over = 0; if (limitNow > 2) { limitNow = 2; synth.setVoiceLimit(2); } } // nearly out of time: drop to two voices at once

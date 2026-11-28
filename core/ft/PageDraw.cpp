@@ -708,7 +708,7 @@ void App::drawDevice(Pen& p)
     fmt(title, sizeof title, "%s - %s", focusName, groups[dvGroup]);
     p.text(14, 387, title, F17B, pal.text);
     p.text(14, 411, focusHelp, F14, pal.text);
-    const char* l[8] = { dvGroup == 7 && fwCount > 0 ? "Update" : (dvGroup == 5 && dvRow == 4 ? "Calibrate" : (dvGroup == 5 && dvRow == 3 ? "Set level" : "")), "", "", "", "", "", "", "Back" };
+    const char* l[8] = { dvGroup == 7 && fwCount > 0 ? "Update" : (dvGroup == 5 && dvRow == 4 ? "Calibrate" : (dvGroup == 5 && dvRow == 3 ? "Set level" : "")), dvGroup == 8 ? "Clear peak" : "", "", "", "", "", "", "Back" };
     p.buttons(l);
 }
 

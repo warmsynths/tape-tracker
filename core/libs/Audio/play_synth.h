@@ -25,6 +25,7 @@ class AudioPlaySynth : public AudioStream
     void drum(int voice, int velocity);
     void setMod(float bend, float vibrato);
     int voiceLimit() const { return limitNow; }
+    int overrunCount() const { return (int)overruns; }
     int loadPercent(); // the most one block took since the last call, as a percent of a block's time (at 180 MHz)
     void setKit(int kit);
 
@@ -36,6 +37,7 @@ class AudioPlaySynth : public AudioStream
     bool started = false;
     volatile float levelAmp = 1.0f;
     volatile uint32_t peakCycles = 0;
+    volatile uint32_t overruns = 0; // blocks that took over about 92% of their time, since start
     int limitNow = 3;      // voices allowed at once: lowered when the processor is short of time
     uint32_t calm = 0, over = 0;
 };

@@ -105,6 +105,7 @@ class FourTrackHal : public ft::Hal
     void synthSetKit(int kit) override;
     int synthLoad() override;
     int synthVoices() override;
+    int synthOverruns() override;
     void synthMod(float bend, float vibrato) override;
     void synthSetLevelDb10(int db10) override;
     void sampleNote(int id, int note, int velocity, bool on) override;

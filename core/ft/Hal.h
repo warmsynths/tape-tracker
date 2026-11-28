@@ -172,6 +172,7 @@ class Hal
     virtual void synthAllOff() {}
     virtual void synthDrum(int /*voice*/, int /*velocity*/) {}   // a drum hit (the Drums role), voice 0 to 15, velocity 1 to 127
     virtual void synthSetKit(int /*kit*/) {}
+    virtual int synthOverruns() { return 0; } // blocks the synth took nearly all its time for, since start
     virtual int synthVoices() { return -1; } // how many voices the synth allows at once now
     virtual int synthLoad() { return -1; } // the synth's heaviest block since last asked, percent of its time; -1 when not measured
     virtual void synthMod(float /*bendSemitones*/, float /*vibratoSemitones*/) {} // pitch bend and vibrato depth for the notes sounding                    // which of the 24 drum kits

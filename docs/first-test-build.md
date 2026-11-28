@@ -423,3 +423,9 @@ The test: Dream Keys and Glass Pad nice; Warm Pad a tiny bit of distortion; Juno
 - **Limiter is calmer:** a voice is shed only after three slow blocks in a row (one stray slow block no longer counts), it starts at 3 voices, climbs back after about 1.7 s of calm, and drops to 2 at once when a block takes over 86% of the time.
 - **Heartbreak:** the overdrive is off (it cut the level to a quarter and it was the only pad using it), the release is 1.8 s instead of 2.4 s, and the level is 0.85. Fewer voices overlap.
 - Still unknown: the real "Synth load" number on the device (Config > About).
+
+## About now shows what really happened (source only, not built)
+
+- The "Synth load: 0%" reading in FT77 could not be trusted: it only measured while the About page was open, and you cannot play pads there.
+- The load is now measured on every screen from the moment the Tracker starts. About > Synth load shows `peak N%, M over, K voices`: the heaviest block so far, how many blocks took over about 92% of their time, and the voices allowed now. B2 on About clears the peak.
+- A model run of rapid random chords on Heartbreak (old and new code, voice limits 2 to 6) shows no instability, no jumps and no NaN, so the "resonant robotic" sound is not a plain maths fault in the synth. The leading suspect is still a block that runs late.

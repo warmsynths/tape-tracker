@@ -1594,7 +1594,6 @@ int App::deviceRowCount(int g) const
 
 void App::deviceOpen()
 {
-    synthPeak = 0;
     dvGroup = 0;
     dvRow = 0;
     dvRows = true;
@@ -1721,9 +1720,8 @@ void App::deviceRow(int g, int r, char* name, char* value, char* help, int size)
             else if (r == 2)
             {
                 n = "Synth load";
-                if (synthPeak < hal.synthLoad()) synthPeak = hal.synthLoad();
-                fmt(value, size, "%d%% (%d voices)", synthPeak < 0 ? 0 : synthPeak, hal.synthVoices());
-                h = "The heaviest block of the synth since you opened this page, as a share of the time it has. Play a chord and look. When it is high the synth allows fewer voices at once (the number in brackets).";
+                fmt(value, size, "peak %d%%, %d over, %d voices", synthPeak < 0 ? 0 : synthPeak, hal.synthOverruns(), hal.synthVoices());
+                h = "The heaviest synth block since the Tracker started, as a share of the time it has, how many blocks took almost all of it ('over'), and how many voices it allows now. It is measured while you play on any screen. B2 clears the peak.";
             }
             else { n = "Build"; fmt(value, size, "%s", FT_BUILD_ID); h = "The build of the Four-Track code. The emulator shows the same id when it runs the same code."; }
             break;
@@ -1809,6 +1807,7 @@ void App::deviceKey(int k)
                 else firmwareGo();
             }
             break;
+        case kB2: if (dvGroup == 8) synthPeak = 0; break;
         case kB8:
         case kConfig: back(); return;
         default: break;

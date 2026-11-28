@@ -244,6 +244,7 @@ void FourTrackHal::synthSetLevelDb10(int db10) { engine.getSynthPlayer()->setLev
 void FourTrackHal::synthAllOff() { engine.getSynthPlayer()->allNotesOff(); }
 void FourTrackHal::synthDrum(int voice, int velocity) { engine.getSynthPlayer()->drum(voice, velocity); }
 void FourTrackHal::synthMod(float bend, float vibrato) { engine.getSynthPlayer()->setMod(bend, vibrato); }
+int FourTrackHal::synthOverruns() { return engine.getSynthPlayer()->overrunCount(); }
 int FourTrackHal::synthVoices() { return engine.getSynthPlayer()->voiceLimit(); }
 int FourTrackHal::synthLoad() { return engine.getSynthPlayer()->loadPercent(); }
 void FourTrackHal::synthSetKit(int kit) { engine.getSynthPlayer()->setKit(kit); }

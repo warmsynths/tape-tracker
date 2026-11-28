@@ -1568,6 +1568,7 @@ bool App::updateTrackMeters()
     const uint32_t now = hal.millis();
     if (now - meterTimer < 50) return false;
     meterTimer = now;
+    { const int load = hal.synthLoad(); if (load > synthPeak) synthPeak = load; } // measured on every screen, so About shows what happened while playing
 
     const FourTrackSession::Mode mode = session.mode();
     const bool recordingNow = (mode == FourTrackSession::Mode::RecordingFirst || mode == FourTrackSession::Mode::RecordingPart);
