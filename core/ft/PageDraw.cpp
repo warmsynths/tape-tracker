@@ -1399,6 +1399,7 @@ void App::drawChordPad(Pen& p, int pad, int px, int py, int pw, int ph)
     int ty = py + ph / 2 - 9;
     if (stroke) ty = py + ph / 2 - 12;
     p.textMid(px, pw, ty, name, font, ink);
+    if ((usedPads[session.selected() & 3] >> pad) & 1) p.rect(px + pw - 9, py + 4, 5, 5, held ? pal.bg : pal.marker);
     if (pi.role == Role::Chord)
     {
         chords.outsideName(pad, out, sizeof out);
@@ -1477,7 +1478,18 @@ void App::drawPlayView(Pen& p)
     p.text(26, ly + 8, b, F17B, pal.dim);
     p.text(46, ly + 8, L.name, F17B, pal.text);
     if (L.tag[0] != 0) p.text(26, ly + 34, L.tag, F12, pal.dim);
-    if (L.hasPart && L.waveCount > 0)
+    if (L.active && session.mode() == FourTrackSession::Mode::RecordingPart)
+    {
+        // what is being recorded, drawn as it comes in
+        p.g.color(pal.rec);
+        for (int i = 0; i < 120; i++)
+        {
+            if (liveWave[i] == 0) continue;
+            const int h = 2 + liveWave[i] * (lh - 14) / 255;
+            p.g.rect(wx + i * ww / 120, ly + lh / 2 - h / 2, ww / 120, h);
+        }
+    }
+    else if (L.hasPart && L.waveCount > 0)
     {
         if (L.bitmap)
         {

@@ -386,6 +386,13 @@ class App
     void updateMods();
     bool latched[48] = {};
     uint8_t heldCount[48] = {};
+    uint8_t liveWave[120] = {};   // the level heard so far in this take, by place in the loop (Play view)
+    uint64_t usedPads[4] = {};   // per track: the pads played while that track was recording (shown as dots)
+    void markUsed(int pad)
+    {
+        const FourTrackSession::Mode m = session.mode();
+        if (m == FourTrackSession::Mode::RecordingFirst || m == FourTrackSession::Mode::RecordingPart) usedPads[session.selected() & 3] |= 1ull << pad;
+    }
     uint8_t heldNote[48][kMaxChordNotes] = {};
     int psField = 0;              // pad sample page: 0 tune, 1 volume, 2 pan, 3 play mode, 4 start, 5 end
     bool psAuditioning = false;

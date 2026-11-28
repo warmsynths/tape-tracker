@@ -326,6 +326,7 @@ void App::rolePadPress(int p, bool down, int velocity)
     }
     heldCount[p] = 1;
     hitAt[p] = now;
+    if (rp.kind == RoleKind::Note || rp.kind == RoleKind::Drum) markUsed(p);
     const bool pitched = r == TrackRole::Bass || r == TrackRole::Melody;
     int base = chords.cfg.padVelocity && velocity >= 1 ? (velocity > 127 ? 127 : velocity) : 100;
     if (roleMods & 1) base = 127;
@@ -558,6 +559,7 @@ void App::drawRolePad(Pen& p, int pad, int px, int py, int pw, int ph)
     int ty = py + ph / 2 - 9;
     if (stroke || caption[0] != 0) ty = py + ph / 2 - 14;
     p.textMid(px, pw, ty, name, font, ink);
+    if ((usedPads[session.selected() & 3] >> pad) & 1) p.rect(px + pw - 9, py + 4, 5, 5, held ? pal.bg : pal.marker);
     if (caption[0] != 0) p.textMid(px, pw, py + ph - 18, caption, F12, pal.dim);
     else if (stroke) p.rect(px + pw / 2 - 11, py + ph - 12, 22, 4, lastFamily >= 0 ? pal.t[lastFamily] : pal.dim);
 }

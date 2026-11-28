@@ -551,6 +551,7 @@ void App::chordPad(int p, bool down, int velocity)
         const int count = chords.notes(p, n);
         chords.played(p);
         if (count == 0) return;
+        markUsed(p);
         if (pi.role == Role::Chord)
         {
             chords.label(p, lastChordName, sizeof lastChordName);
@@ -852,6 +853,8 @@ void App::startRecording()
         else layerPass[t] = false; // the old audio could not be kept, so it cannot be laid under the new pass
     }
     else layerPass[t] = false;
+    if (!layerPass[t]) usedPads[t & 3] = 0;
+    for (int i = 0; i < 120; i++) liveWave[i] = 0;
     if (padsChords && trackRole[t] == TrackRole::Chords && !layerPass[t]) chordEvCount = 0; // a new Chords take writes a new chord track
     layerScratch[t] = layerPass[t] ? layerScratchTrack(t) : -1;
     if (layerScratch[t] < 0) layerPass[t] = false;
@@ -1581,6 +1584,11 @@ bool App::updateTrackMeters()
         if (level < 0) level = 0;
         if (level > 100) level = 100;
         model.lane[t].meter = (uint8_t)level;
+        if (t == session.selected() && session.mode() == FourTrackSession::Mode::RecordingPart && session.loopFrames() > 0)
+        {
+            const int col = (int)(((uint64_t)hal.playerPosition() * 120) / session.loopFrames());
+            if (col >= 0 && col < 120 && level > liveWave[col]) liveWave[col] = (uint8_t)(level * 255 / 100);
+        }
     }
     return true;
 }

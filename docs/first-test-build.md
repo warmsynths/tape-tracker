@@ -376,3 +376,9 @@ Juno Pad is now **Juno Clean** (clean wide saw pad with a bright chorus, for syn
 - The synth now watches how long each audio block takes. If it gets close to running out of time, it allows fewer voices at once (down to 2) and brings them back after a calm second or so. This is meant to stop the break-up on heavy pads (Heartbreak, Strings, Warm Pad) and the freeze when tweaking Release, Reson or Thick while playing.
 - Config > About > "Synth load" now shows the load and the voice count, e.g. "45% (4 voices)".
 - Not measured on the device yet. The load number from the real device is what decides if more cutting is needed.
+
+## FT75 – Play view: used-pad dots and live waveform
+
+- Pads played while a track is recording get a small dot in their corner (chord pads and Bass/Melody/Drums pads). The dots reset when a new take starts on that track.
+- While you record a loop (the Part pass), the Play view lane draws the level heard so far, in red, by place in the loop. The first take does not draw yet, because its length is not known until it ends.
+- Not done: the Bass bottom row.
