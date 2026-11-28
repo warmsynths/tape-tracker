@@ -7,3 +7,6 @@
 #else
 #define FT_FASTRUN
 #endif
+
+// Small functions defined inside a class are built into the function that calls them, so they run from RAM with it.
+#define FT_INLINE inline __attribute__((always_inline))

@@ -47,7 +47,7 @@ class Overdrive {
     post_gain_ = 0.0f;
   }
   
-  FT_FASTRUN void Process(float drive, float* in_out, size_t size) {
+  FT_INLINE void Process(float drive, float* in_out, size_t size) {
     const float drive_2 = drive * drive;
     const float pre_gain_a = drive * 0.5f;
     const float pre_gain_b = drive_2 * drive_2 * drive * 24.0f;
