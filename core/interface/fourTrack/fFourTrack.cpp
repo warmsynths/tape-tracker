@@ -101,6 +101,9 @@ void cFourTrack::start(uint32_t options)
     moduleRefresh = 1;
     application().setPalette(paletteFromTheme());
     hal.connectRecorder();
+    // The stock output limiter can pump on a dense held chord. The synth and the loops already keep themselves
+    // inside the range, so the limiter is set to its highest threshold (it then only catches true clipping).
+    engine.setLimiterThreshold(LIMITER_THRESHOLD_MAX);
 
     songTimer.hide();
 

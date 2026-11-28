@@ -434,3 +434,10 @@ The test: Dream Keys and Glass Pad nice; Warm Pad a tiny bit of distortion; Juno
 
 - **Found:** every drum except the hit's first 10 ms was silent ("a very short faint tk"). In `DrumKit::render`, the member that counts how long each voice rings was called `left`, and the output buffer parameter is also called `left`. The ring-time code read and wrote the audio buffer instead. So a voice only rendered in the block where it was hit.
 - **Fixed:** the member is now `ringFor`. A new host test checks that kick, snare, toms and hats still sound after the first 10 ms. (The old drum test only looked at the first few blocks.)
+
+## FT78 test result and the next step (source only, not built)
+
+- Test: Synth load peak 46% with 6 voices, so the synth has plenty of time and the readout works. Drums not yet reported. All pads "fizz up" towards a long held chord.
+- So it is not running out of time. My model of the synth stays steady over a long held chord (level, high-frequency content), so the fizz is probably added after the synth.
+- Suspect: the Tracker's stock output limiter, which every sound passes through and which can pump on a dense, swelling pad. It is now set to its highest threshold when the Four-Track screen starts (`setLimiterThreshold(LIMITER_THRESHOLD_MAX)` in `cFourTrack::start`).
+- Check on the device: lower the Synth level with Shift + Left on the home screen by 6 dB and hold the same chord. If the fizz goes away it is level; if it stays, it is not.
